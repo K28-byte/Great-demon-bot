@@ -12,8 +12,8 @@ const https = require('https');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
-const OWNER_NAME = "Great Demon (Khalid)";
-const BOT_NAME = "𝕲𝔯𝔢𝔞𝔱 𝕯𝔢𝔪𝔬𝔫 𝕭𝔬𝔱";
+const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
+const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
 const BOT_VERSION = "v10.0 ULTRA";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
@@ -82,7 +82,7 @@ async function startDemonBot() {
                 startDemonBot();
             }
         } else if (connection === 'open') {
-            console.log('\n⚡ 𝕲𝔯𝔢𝔞𝔱 𝕯𝔢𝔪𝔬𝔫 𝕭𝔬𝔱 CONNECTED AND ONLINE! ⚡\n');
+            console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
         }
     });
 
@@ -95,7 +95,9 @@ async function startDemonBot() {
         const isGroup = from.endsWith('@g.us');
         const sender = msg.key.participant || msg.key.remoteJid;
         const senderNum = sender.split('@')[0];
-        const isOwner = sender.includes(OWNER_NUMBER);
+
+        // FIXED OWNER CHECK: Allows execution from self or owner number
+        const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
         const isVip = isOwner || vipUsers.has(senderNum);
 
         const body = msg.message.conversation || 
@@ -222,7 +224,7 @@ async function startDemonBot() {
 ⬡ .xvideos, .yts, .ping
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-_© 𝕲𝔯𝔢𝔞𝔱 𝕯𝔢𝔪𝔬𝔫 𝕭𝔬𝔱 Engine Active_`;
+_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝒉𝒊𝒔 𝒑𝒓𝒆𝒆𝒒 𝑰𝒔 𝒂𝒄𝒕𝒊𝒗𝒆_`;
 
                 try {
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
@@ -235,9 +237,15 @@ _© 𝕲𝔯𝔢𝔞𝔱 𝕯𝔢𝔪𝔬𝔫 𝕭𝔬𝔱 Engine Active_`;
             // ==========================================
             // OWNER & SYSTEM COMMANDS
             // ==========================================
-            case 'mode': {
+            case 'mode':
+            case 'private':
+            case 'public': {
                 if (!isOwner) return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Owner only command!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-                const selectedMode = args[0]?.toLowerCase();
+                
+                let selectedMode = args[0]?.toLowerCase();
+                if (command === 'private') selectedMode = 'private';
+                if (command === 'public') selectedMode = 'public';
+
                 if (selectedMode === 'public') {
                     botMode = 'public';
                     await sock.sendMessage(from, { text: '╭━━━〔 *MODE UPDATE* 〕━━━┈\n✦ Bot mode set to *PUBLIC* 🔓\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
@@ -534,7 +542,7 @@ _© 𝕲𝔯𝔢𝔞𝔱 𝕯𝔢𝔪𝔬𝔫 𝕭𝔬𝔱 Engine Active_`;
                 const query = args.join(' ');
                 if (!query) return sock.sendMessage(from, { text: '╭━━━〔 *AI ENGINE* 〕━━━┈\n✦ Please ask a question!\n✦ Example: `.ai Explain Pain speech in Naruto`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
 
-                await sock.sendMessage(from, { text: '⚡ *𝕲𝔯𝔢𝔞𝔱 𝕯𝔢𝔪𝔬𝔫 AI Thinking...*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 AI Thinking...*' }, { quoted: msg });
                 try {
                     const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(query)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
                     await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ ${res.response}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
