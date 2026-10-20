@@ -29,7 +29,6 @@ let botMode = "private";
 const vipUsers = new Set([config.ownerNumber]);
 const owners = new Set([config.ownerNumber]);
 
-// Pairing code configuration for Railway headless deployment
 const usePairingCode = true;
 const botPhoneNumber = "2347061696819";
 
@@ -68,29 +67,15 @@ async function startDemonBot() {
     const sock = makeWASocket({
         version, 
         auth: state, 
-        printQRInTerminal: !usePairingCode,
+        printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ["𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 OS", "Chrome", "20.0.04"], 
+        browser: ["Chrome", "Desktop", "10.0"], 
         syncFullHistory: false
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    if (usePairingCode && !sock.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                let num = botPhoneNumber.replace(/[^0-9]/g, '');
-                const code = await sock.requestPairingCode(num);
-                console.log(`\n🔑 ==========================================`);
-                console.log(`🔗 YOUR PAIRING CODE IS: ${code}`);
-                console.log(`==========================================\n`);
-            } catch (err) {
-                console.log('❌ Failed to request pairing code:', err.message);
-            }
-        }, 4000);
-    }
-
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
@@ -105,19 +90,21 @@ async function startDemonBot() {
         }
     });
 
-    // Group Participant Join/Leave Listeners
-    sock.ev.on('group-participants.update', async (update) => {
-        const { id, participants, action } = update;
-        if (settings.welcome[id]) {
-            for (const user of participants) {
-                if (action === 'add') {
-                    await sock.sendMessage(id, { text: `👋 Welcome @${user.split('@')[0]} to the realm!`, mentions: [user] });
-                } else if (action === 'remove') {
-                    await sock.sendMessage(id, { text: `👋 @${user.split('@')[0]} left the realm.`, mentions: [user] });
-                }
+    // Safely wait for socket to initialize before requesting pairing code on Railway
+    if (usePairingCode && !sock.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                let num = botPhoneNumber.replace(/[^0-9]/g, '');
+                console.log(`\n⏳ Requesting pairing code for ${num}...`);
+                const code = await sock.requestPairingCode(num);
+                console.log(`\n🔑 ==========================================`);
+                console.log(`🔗 YOUR PAIRING CODE IS: ${code}`);
+                console.log(`==========================================\n`);
+            } catch (err) {
+                console.log('❌ Failed to request pairing code:', err.message);
             }
-        }
-    });
+        }, 10000); // 10-second delay prevents Railway container crashes
+    }
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
@@ -329,7 +316,7 @@ async function startDemonBot() {
                     setTimeout(async () => {
                         const code = await subSock.requestPairingCode(targetNum);
                         await sock.sendMessage(from, { text: `🔑 Pairing Code: \`\`\`${code}\`\`\`` }, { quoted: msg });
-                    }, 3000);
+                    }, 4000);
                 } catch (e) {
                     await sock.sendMessage(from, { text: `❌ Error: ${e.message}` }, { quoted: msg });
                 }
