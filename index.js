@@ -29,7 +29,7 @@ let botMode = "private";
 const vipUsers = new Set([config.ownerNumber]);
 const owners = new Set([config.ownerNumber]);
 
-const usePairingCode = false; // Set to false so Railway loads your session automatically
+const usePairingCode = false;
 const botPhoneNumber = "2347061696819";
 
 const settings = {
@@ -65,7 +65,6 @@ async function startDemonBot() {
         fs.mkdirSync('./demon_session', { recursive: true });
     }
 
-    // Automatically load session from Railway environment variable
     if (process.env.SESSION_ID) {
         try {
             const sessData = process.env.SESSION_ID.trim();
@@ -109,7 +108,6 @@ async function startDemonBot() {
         }
     });
 
-    // Pairing fallback if explicitly enabled
     if (usePairingCode && !sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
@@ -173,9 +171,6 @@ async function startDemonBot() {
         }
 
         switch (command) {
-            // ==========================================
-            // OWNER MENU
-            // ==========================================
             case 'addowner': {
                 if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
                 const targetNum = args[0]?.replace(/[^0-9]/g, '');
@@ -341,10 +336,6 @@ async function startDemonBot() {
                 }
                 break;
             }
-
-            // ==========================================
-            // VIP MENU
-            // ==========================================
             case 'connectedusers': {
                 if (!isVip) return sock.sendMessage(from, { text: '❌ VIP only!' }, { quoted: msg });
                 await sock.sendMessage(from, { text: `👥 Connected users in active session: 1` }, { quoted: msg });
@@ -401,10 +392,6 @@ async function startDemonBot() {
                 await sock.sendMessage(from, { text: `👑 VIP command executed successfully.` }, { quoted: msg });
                 break;
             }
-
-            // ==========================================
-            // GROUP MANAGEMENT & MODERATION MENU
-            // ==========================================
             case 'activeusers': {
                 if (!isGroup) return;
                 await sock.sendMessage(from, { text: `👥 Active group members queried successfully.` }, { quoted: msg });
@@ -676,10 +663,6 @@ async function startDemonBot() {
                 }
                 break;
             }
-
-            // ==========================================
-            // AI MENU (REAL API INTEGRATION)
-            // ==========================================
             case 'ai':
             case 'gpt':
             case 'claude':
@@ -710,10 +693,6 @@ async function startDemonBot() {
                 await sock.sendMessage(from, { text: `🤖 Processing request: "${query}"` }, { quoted: msg });
                 break;
             }
-
-            // ==========================================
-            // CONVERT MENU
-            // ==========================================
             case 'convertmenu': {
                 await sock.sendMessage(from, { text: `🔄 Convert Menu: .stiker, .toaud, .togif, .toimg, .tomp4, .toptt, .tourl` }, { quoted: msg });
                 break;
@@ -792,10 +771,6 @@ async function startDemonBot() {
                 await sock.sendMessage(from, { text: `✨ Telegram sticker pack processed.` }, { quoted: msg });
                 break;
             }
-
-            // ==========================================
-            // DOWNLOAD MENU (REAL API INTEGRATION)
-            // ==========================================
             case 'downloadmenu': {
                 await sock.sendMessage(from, { text: `📥 Download Menu: .dl, .capcut, .fb, .applemusic` }, { quoted: msg });
                 break;
@@ -824,10 +799,6 @@ async function startDemonBot() {
                 await sock.sendMessage(from, { text: `🎵 Processing Apple Music track...` }, { quoted: msg });
                 break;
             }
-
-            // ==========================================
-            // POKÉMON & ANIME GACHA ENGINE (GAME MENU)
-            // ==========================================
             case 'spawn': {
                 const card = spawnWildPokemon(from);
                 try {
@@ -864,7 +835,7 @@ async function startDemonBot() {
                 } else {
                     player.deck.forEach((p, idx) => {
                         const activeTag = idx === player.activeSlot ? ' [ACTIVE ⚔️]' : '';
-                        text += `⬡ [${idx + 1}] *${p.name}* [${p.tier}] (Lvl${p.level}/100)${activeTag}\n   └ Moves: ${p.moves.join(', ')}\n`;
+                        text += `⬡ [${idx + 1}] *${p.name}* [${p.tier}] (Lvl ${p.level}/100)${activeTag}\n   └ Moves: ${p.moves.join(', ')}\n`;
                     });
                 }
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
@@ -886,6 +857,102 @@ async function startDemonBot() {
                 const xpGain = Math.floor(Math.random() * 80) + 120;
                 const result = addXPAndCheckMoves(player, activePoke, xpGain);
 
-                let reply = `╭━━━〔 *TRAINING* 〕━━━┈\n✦ *${activePoke.name}* won battle!\n✦ XP: +${xpGain} \vert{} Level: *Lvl${activePoke.level}/100*\n`;
+                let reply = `╭━━━〔 *TRAINING* 〕━━━┈\n✦ *${activePoke.name}* won battle!\n✦ XP: +${xpGain} | Level: *Lvl ${activePoke.level}/100*\n`;
                 if (result.leveledUp) reply += `🎉 *LEVEL UP!* Reached Level ${activePoke.level}!\n`;
-                reply += `╰━━━━━━━━━━━━━━━━━━━━━━
+                reply += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+                await sock.sendMessage(from, { text: reply }, { quoted: msg });
+                break;
+            }
+            case 'slots': {
+                const bet = parseInt(args[0]) || 50;
+                if (player.coins < bet) return sock.sendMessage(from, { text: `❌ Need $${bet} coins!` }, { quoted: msg });
+
+                const icons = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
+                const r1 = icons[Math.floor(Math.random() * icons.length)];
+                const r2 = icons[Math.floor(Math.random() * icons.length)];
+                const r3 = icons[Math.floor(Math.random() * icons.length)];
+
+                let win = 0;
+                if (r1 === r2 && r2 === r3) win = bet * 5;
+                else if (r1 === r2 || r2 === r3 || r1 === r3) win = bet * 2;
+
+                player.coins = player.coins - bet + win;
+                saveDB();
+
+                await sock.sendMessage(from, { text: `╭━━━〔 🎰 *SLOTS* 🎰 〕━━━┈\n[ ${r1} | ${r2} | ${r3} ]\n\n✦ ${win > 0 ? `🎉 WON $${win}!` : `❌ Lost $${bet}`}\n✦ Wallet: $${player.coins}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                break;
+            }
+            case 'daily': {
+                player.coins += 500;
+                saveDB();
+                await sock.sendMessage(from, { text: `🎁 Daily claimed: +$500 coins!\n✦ Wallet: $${player.coins}` }, { quoted: msg });
+                break;
+            }
+            case 'pay': {
+                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                const amount = parseInt(args[1]) || parseInt(args[0]);
+                if (mentioned.length === 0 || isNaN(amount) || amount <= 0) return sock.sendMessage(from, { text: '❌ Usage: `.pay @user <amount>`' }, { quoted: msg });
+                if (player.coins < amount) return sock.sendMessage(from, { text: '❌ Insufficient balance!' }, { quoted: msg });
+
+                const targetNum = mentioned[0].split('@')[0];
+                getPlayer(targetNum).coins += amount;
+                player.coins -= amount;
+                saveDB();
+
+                await sock.sendMessage(from, { text: `💸 Sent $${amount} to @${targetNum}!`, mentions: [mentioned[0]] }, { quoted: msg });
+                break;
+            }
+            case 'ping':
+            case 'speed': {
+                const start = Date.now();
+                await sock.sendMessage(from, { text: `⚡ Latency: ${Date.now() - start}ms` }, { quoted: msg });
+                break;
+            }
+            case 'menu':
+            case 'help': {
+                const uptime = Math.floor((Date.now() - startTime) / 1000);
+                const menuText = 
+`╭━━━〔  *${config.botName}*  〕━━━┈
+✦ *Owner:* ${config.ownerName}
+✦ *Prefix:* .
+✦ *Mode:* ${botMode.toUpperCase()}
+✦ *Uptime:* ${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}s
+✦ *Version:* v10.0 ULTRA
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *OWNER MENU* 』
+• .addowner, .antidelete, .antiviewonce, .autoonline, .autorecording, .autostatuslike, .autostatusview, .autotyping, .block, .buatgc, .changebio, .devices, .getpp, .joingroup, .leavegroup, .listfont, .listgroup, .bancheck, .botlink, .fetchstatus, .listchannels, .mode <public/private>, .pair <number>
+
+『 *VIP MENU* 』
+• .connectedusers, .inspectsock, .vipadd, .vipadmin, .vipallgroups, .vipdemote, .vipdetails, .vipgroups, .viplist, .vipmenu, .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
+
+『 *GROUP MANAGEMENT* 』
+• .activeusers, .addmember, .antiadd, .antibot, .antidemote, .antigroupsmention, .antiimage, .antilink, .antipromote, .antiremove, .antispam, .antitag, .antitagadmin, .approveall, .close, .closetime, .demoteall, .demoteuser, .disapproveall, .dor, .gcs, .glostat, .goodbye, .grouplink, .groupmenu, .grouponly, .hidetag, .inactiveusers, .kickall, .left, .listgroups, .mediatag, .open, .opentime, .promoteall, .promoteuser, .remove, .setgroupbio, .setgroupname, .setgrouppp, .setwarning, .tagadmin, .tagall, .tagonline, .tagpoll, .warning, .welcome, .pin, .status, .vv
+
+『 *AI MENU* 』
+• .ai, .aimenu, .claude, .copilot, .describe, .felo, .gpt, .imagine, .llama
+
+『 *CONVERT MENU* 』
+• .audio, .convertmenu, .stickermeme, .stiker, .swm, .telystick, .toaud, .togif, .toimg, .tomp4, .toptt, .tourl
+
+『 *DOWNLOAD MENU* 』
+• .applemusic, .capcut, .dl, .downloadmenu, .fb
+
+『 *GAME MENU* 』
+• .spawn, .catch, .deck, .select, .train, .slots, .daily, .pay
+
+『 *SYSTEM* 』
+• .ping, .menu`;
+
+                try {
+                    await sock.sendMessage(from, { image: { url: config.menuImage }, caption: menuText }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: menuText }, { quoted: msg });
+                }
+                break;
+            }
+        }
+    });
+}
+
+startDemonBot();
