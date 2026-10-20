@@ -15,7 +15,7 @@ const http = require('http');
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v38.0 ULTIMATE EDITION";
+const BOT_VERSION = "v39.0 STABLE PAIRING EDITION";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -142,7 +142,7 @@ async function startDemonBot() {
                 } catch (err) {
                     console.log('❌ Error requesting pairing code:', err.message);
                 }
-            }, 3000);
+            }, 4000);
         }
     }
 
@@ -565,7 +565,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             default: {
-                // Catch-all response so any menu command listed is acknowledged
                 if (body.startsWith('.')) {
                     await sock.sendMessage(from, { text: `ℹ️ Command \`.${command}\` is loaded in the *${BOT_NAME}* engine. Type \`.menu\` to see active features.` }, { quoted: msg });
                 }
