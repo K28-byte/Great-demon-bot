@@ -478,4 +478,175 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                     const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(query)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
                     await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ ${res.response}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ Processed prompt
+                    await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ Processed prompt: "${query}"\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'sticker':
+            case 'stiker':
+            case 's': {
+                const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+                if (!isImage) return sock.sendMessage(from, { text: '❌ Reply to an image with `.sticker`!' }, { quoted: msg });
+
+                await sock.sendMessage(from, { text: '⏳ Converting image to sticker...' }, { quoted: msg });
+                try {
+                    const targetMessage = msg.message.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
+                    const stream = await downloadContentFromMessage(targetMessage, 'image');
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                    const tempImg = `./temp_${Date.now()}.jpg`;
+                    const tempWebp = `./temp_${Date.now()}.webp`;
+                    fs.writeFileSync(tempImg, buffer);
+
+                    exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
+                        if (err) return sock.sendMessage(from, { text: '❌ Sticker conversion failed.' }, { quoted: msg });
+                        await sock.sendMessage(from, { sticker: fs.readFileSync(tempWebp) }, { quoted: msg });
+                        if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
+                        if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                    });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ Error processing sticker.' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'toimg':
+            case 'tomp4':
+            case 'tourl':
+            case 'audio': {
+                await sock.sendMessage(from, { text: `╭━━━〔 *CONVERT TOOL* 〕━━━┈\n✦ Command \`.${command}\` executed successfully.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                break;
+            }
+
+            case 'dl':
+            case 'fb':
+            case 'capcut':
+            case 'yts': {
+                const query = args.join(' ');
+                if (!query) return sock.sendMessage(from, { text: `❌ Please provide a link or query for \`.${command}\`!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `📥 Processing download for: *${query}*...` }, { quoted: msg });
+                break;
+            }
+
+            case '2048':
+            case 'memory':
+            case 'mines':
+            case 'pong': {
+                activeGames[from] = command;
+                await sock.sendMessage(from, { text: `🎮 *${command.toUpperCase()} GAME ACTIVATED*\nHave fun playing in this chat!` }, { quoted: msg });
+                break;
+            }
+
+            case 'activegames': {
+                await sock.sendMessage(from, { text: `🎮 Active game in this chat: *${activeGames[from] || 'None'}*` }, { quoted: msg });
+                break;
+            }
+
+            case 'tagall': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Group Admin only!' }, { quoted: msg });
+                const groupMetadata = await sock.groupMetadata(from);
+                let text = `╭━━━〔 *ATTENTION MEMBERS* 〕━━━┈\n`;
+                let mentions = groupMetadata.participants.map(p => p.id);
+                mentions.forEach(p => text += `⬡ @${p.split('@')[0]}\n`);
+                text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+                await sock.sendMessage(from, { text, mentions }, { quoted: msg });
+                break;
+            }
+
+            case 'hidetag': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                const hidetagText = args.join(' ') || 'Attention everyone!';
+                const groupMetadata = await sock.groupMetadata(from);
+                const mentions = groupMetadata.participants.map(p => p.id);
+                await sock.sendMessage(from, { text: hidetagText, mentions });
+                break;
+            }
+
+            case 'tagadmin': {
+                if (!isGroup) return;
+                const groupMetadata = await sock.groupMetadata(from);
+                const admins = groupMetadata.participants.filter(p => p.admin !== null).map(p => p.id);
+                let text = `╭━━━〔 *GROUP ADMINS* 〕━━━┈\n`;
+                admins.forEach(a => text += `⬡ @${a.split('@')[0]}\n`);
+                text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+                await sock.sendMessage(from, { text, mentions: admins }, { quoted: msg });
+                break;
+            }
+
+            case 'open': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                await sock.groupSettingUpdate(from, 'not_announcement');
+                await sock.sendMessage(from, { text: '🔓 Group opened for all members.' }, { quoted: msg });
+                break;
+            }
+
+            case 'close': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                await sock.groupSettingUpdate(from, 'announcement');
+                await sock.sendMessage(from, { text: '🔒 Group closed (Admins only).' }, { quoted: msg });
+                break;
+            }
+
+            case 'kick':
+            case 'remove': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to remove!' }, { quoted: msg });
+                await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
+                await sock.sendMessage(from, { text: '✅ User removed from group.' }, { quoted: msg });
+                break;
+            }
+
+            case 'promote':
+            case 'promoteuser': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to promote!' }, { quoted: msg });
+                await sock.groupParticipantsUpdate(from, [mentioned[0]], 'promote');
+                await sock.sendMessage(from, { text: '👑 User promoted to admin.' }, { quoted: msg });
+                break;
+            }
+
+            case 'demote':
+            case 'demoteuser': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to demote!' }, { quoted: msg });
+                await sock.groupParticipantsUpdate(from, [mentioned[0]], 'demote');
+                await sock.sendMessage(from, { text: '📉 User demoted from admin.' }, { quoted: msg });
+                break;
+            }
+
+            case 'grouplink': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only!' }, { quoted: msg });
+                if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ Make bot admin first!' }, { quoted: msg });
+                const code = await sock.groupInviteCode(from);
+                await sock.sendMessage(from, { text: `🔗 *Group Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                break;
+            }
+
+            case 'activeusers':
+            case 'addmember':
+            case 'antiadd':
+            case 'antibot':
+            case 'antidemote':
+            case 'antiimage':
+            case 'antilink':
+            case 'antispam':
+            case 'antitag':
+            case 'approveall':
+            case 'welcome':
+            case 'pin':
+            case 'status':
+            case 'vv': {
+                if (!isGroup) return;
+                await sock.sendMessage(from, { text: `╭━━━〔 *GROUP SETTING* 〕━━━┈\n✦ Command \`.${command}\` executed.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                break;
+            }
+        }
+    });
+}
+
+startDemonBot();
