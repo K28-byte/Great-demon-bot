@@ -1,4 +1,3 @@
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -10,12 +9,20 @@ const fs = require('fs');
 const exec = require('child_process').exec;
 const os = require('os');
 const https = require('https');
+const http = require('http');
+
+// --- SILENT RAILWAY PORT KEEPER (STOPS SIGTERM CRASH) ---
+const PORT = process.env.PORT || 8080;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Online');
+}).listen(PORT, '0.0.0.0');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v23.0 OMNI ULTIMATE";
+const BOT_VERSION = "v24.0 RAILWAY STABLE";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
