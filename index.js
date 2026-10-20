@@ -1,4 +1,3 @@
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -64,6 +63,7 @@ async function startDemonBot() {
 
         phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
         
+        // 10-second delay added here to let the container network stabilize
         setTimeout(async () => {
             try {
                 const code = await sock.requestPairingCode(phoneNumber);
@@ -71,7 +71,7 @@ async function startDemonBot() {
             } catch (err) {
                 console.log('❌ Error requesting pairing code:', err.message);
             }
-        }, 3000);
+        }, 10000);
     }
 
     sock.ev.on('connection.update', (update) => {
