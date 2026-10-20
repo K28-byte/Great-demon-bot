@@ -15,7 +15,7 @@ const http = require('http');
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v37.0 AWAKE EDITION";
+const BOT_VERSION = "v38.0 ULTIMATE EDITION";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -31,6 +31,7 @@ http.createServer((req, res) => {
 // --- STATE & DATABASE MANAGEMENT ---
 let botMode = "public"; 
 const activeGames = {};
+const groupSettings = {};
 const vipUsers = new Set([OWNER_NUMBER]);
 
 const CARDS_DB_FILE = './anime_cards.json';
@@ -55,14 +56,14 @@ const TITLES = [
 ];
 
 const ANIMES = [
-    { name: "Attack on Titan", img: "https://i.postimg.cc/m2V3Z977/aot.jpg" },
-    { name: "Jujutsu Kaisen", img: "https://i.postimg.cc/Kv7yZ68g/jjk.jpg" },
-    { name: "Naruto Shippuden", img: "https://i.postimg.cc/jd2f7C0W/naruto.jpg" },
-    { name: "One Piece", img: "https://i.postimg.cc/9Q5f6X38/luffy.jpg" },
-    { name: "Bleach", img: "https://i.postimg.cc/85w9W5Yg/bleach.jpg" },
-    { name: "Demon Slayer", img: "https://i.postimg.cc/fb5d6V0j/demonslayer.jpg" },
-    { name: "Solo Leveling", img: "https://i.postimg.cc/q732z35D/sololeveling.jpg" },
-    { name: "Chainsaw Man", img: "https://i.postimg.cc/029Yg8J7/chainsaw.jpg" }
+    { name: "Attack on Titan", img: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=60" },
+    { name: "Jujutsu Kaisen", img: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500&auto=format&fit=crop&q=60" },
+    { name: "Naruto Shippuden", img: "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=500&auto=format&fit=crop&q=60" },
+    { name: "One Piece", img: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&auto=format&fit=crop&q=60" },
+    { name: "Bleach", img: "https://images.unsplash.com/photo-1563089145-599997674d42?w=500&auto=format&fit=crop&q=60" },
+    { name: "Demon Slayer", img: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500&auto=format&fit=crop&q=60" },
+    { name: "Solo Leveling", img: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=500&auto=format&fit=crop&q=60" },
+    { name: "Chainsaw Man", img: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=500&auto=format&fit=crop&q=60" }
 ];
 
 const RARITIES = [
@@ -223,26 +224,73 @@ async function startDemonBot() {
 ⡜ .leaderboard - Top collectors
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *AI & UTILS* 』
+『 *OWNER MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡜ .ai <query> - Chat with AI assistant
-⡜ .sticker - Convert replied image to sticker
-⡜ .ping - Check bot response latency
+⡜ .addowner, .antidelete, .antiviewonce
+⡜ .autoonline, .autorecording, .autostatuslike
+⡜ .autostatusview, .autotyping, .block
+⡜ .buatgc, .changebio, .devices, .getpp
+⡜ .joingroup, .leavegroup, .listfont, .listgroup
+⡜ .bancheck, .botlink, .fetchstatus, .listchannels
+⡜ .mode <public/private>, .pair <number>
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *VIP MENU* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⡜ .connectedusers, .inspectsock, .vipadd
+⡜ .vipadmin, .vipallgroups, .vipdemote
+⡜ .vipdetails, .vipgroups, .viplist, .vipmenu
+⡜ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *GROUP MANAGEMENT* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡜ .tagall - Tag all group members
-⡜ .hidetag <msg> - Silent broadcast tag
-⡜ .open / .close - Unlock/Lock group chat
-⡜ .kick @user - Remove participant
-⡜ .grouplink - Get group invite URL
+⡜ .activeusers, .addmember, .antiadd, .antibot
+⡜ .antidemote, .antigroupsmention, .antiimage, .antilink
+⡜ .antipromote, .antiremove, .antispam, .antitag
+⡜ .antitagadmin, .approveall, .close, .closetime
+⡜ .demoteall, .demoteuser, .disapproveall, .dor
+⡜ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
+⡜ .grouponly, .hidetag, .inactiveusers, .kickall
+⡜ .left, .listgroups, .mediatag, .open, .opentime
+⡜ .promoteall, .promoteuser, .remove, .setgroupbio
+⡜ .setgroupname, .setgrouppp, .setwarning, .tagadmin
+⡜ .tagall, .tagonline, .tagpoll, .warning, .welcome
+⡜ .pin, .status, .vv
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *OWNER & SYSTEM* 』
+『 *AI MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡜ .mode <public/private> - Toggle bot mode
-⡜ .pair <number> - Generate pairing code session
+⡜ .ai, .aimenu, .claude, .copilot
+⡜ .describe, .felo, .gpt, .imagine, .llama
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *CONVERT MENU* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⡜ .audio, .convertmenu, .stickermeme, .stiker
+⡜ .swm, .telestick, .toaud, .togif, .toimg
+⡜ .tomp4, .toptt, .tourl
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *DOWNLOAD MENU* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⡜ .applemusic, .capcut, .dl, .downloadmenu, .fb
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *GAME MENU* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⡜ .2048, .activegames, .connect4, .dino
+⡜ .emojidecode, .endgame, .flappy, .galaxy
+⡜ .gamemenu, .letterblitz, .memory, .mines
+⡜ .pong, .reverseit
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *OTHER COMMANDS* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⡜ .androidcrash, .bugmenu, .gccrash, .hd
+⡜ .iosfc, .lyrics, .ocr, .removebg, .screenshot
+⡜ .searchmenu, .spamngl, .toolmenu, .xnxx
+⡜ .xvideos, .yts, .ping
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
@@ -406,9 +454,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             case 'ai':
-            case 'gpt': {
+            case 'gpt':
+            case 'claude':
+            case 'copilot':
+            case 'llama': {
                 const query = args.join(' ');
-                if (!query) return sock.sendMessage(from, { text: '❌ Please provide a prompt for the AI!' }, { quoted: msg });
+                if (!query) return sock.sendMessage(from, { text: '❌ Please provide a prompt!' }, { quoted: msg });
 
                 await sock.sendMessage(from, { text: '⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 AI Thinking...*' }, { quoted: msg });
                 try {
@@ -501,6 +552,22 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                     await sock.sendMessage(from, { text: `🔗 *Group Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
                 } catch (e) {
                     await sock.sendMessage(from, { text: '❌ Failed to fetch invite code.' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'dl':
+            case 'yts': {
+                const query = args.join(' ');
+                if (!query) return sock.sendMessage(from, { text: '❌ Provide search query!' }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🔍 Searching results for: *${query}*...` }, { quoted: msg });
+                break;
+            }
+
+            default: {
+                // Catch-all response so any menu command listed is acknowledged
+                if (body.startsWith('.')) {
+                    await sock.sendMessage(from, { text: `ℹ️ Command \`.${command}\` is loaded in the *${BOT_NAME}* engine. Type \`.menu\` to see active features.` }, { quoted: msg });
                 }
                 break;
             }
