@@ -1,4 +1,3 @@
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -55,8 +54,13 @@ async function startDemonBot() {
 
     if (!sock.authState.creds.registered) {
         console.log('\n==================================================');
-        let phoneNumber = process.env.PHONE_NUMBER || OWNER_NUMBER;
+        let phoneNumber = process.env.PHONE_NUMBER;
         
+        if (!phoneNumber) {
+            console.log('❌ ERROR: Please set PHONE_NUMBER in Railway Environment Variables!');
+            return;
+        }
+
         phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
         
         setTimeout(async () => {
@@ -92,6 +96,7 @@ async function startDemonBot() {
         const sender = msg.key.participant || msg.key.remoteJid;
         const senderNum = sender.split('@')[0];
 
+        // FIXED OWNER CHECK: Allows execution from self or owner number
         const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
         const isVip = isOwner || vipUsers.has(senderNum);
 
@@ -101,6 +106,7 @@ async function startDemonBot() {
 
         if (!body.startsWith('.')) return;
 
+        // PRIVATE MODE GUARD
         if (botMode === 'private' && !isVip) return;
 
         const args = body.slice(1).trim().split(/ +/);
@@ -129,6 +135,9 @@ async function startDemonBot() {
         }
 
         switch (command) {
+            // ==========================================
+            // MAIN MENU
+            // ==========================================
             case 'menu':
             case 'help': {
                 const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
@@ -225,6 +234,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // OWNER & SYSTEM COMMANDS
+            // ==========================================
             case 'mode':
             case 'private':
             case 'public': {
@@ -345,6 +357,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // VIP MENU COMMANDS
+            // ==========================================
             case 'vipadd': {
                 if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
                 const num = args[0]?.replace(/[^0-9]/g, '');
@@ -380,6 +395,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // GROUP MANAGEMENT
+            // ==========================================
             case 'tagall': {
                 if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
                 const groupMetadata = await sock.groupMetadata(from);
@@ -509,6 +527,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // AI MENU
+            // ==========================================
             case 'ai':
             case 'gpt':
             case 'claude':
@@ -531,20 +552,18 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // CONVERT MENU
+            // ==========================================
             case 'sticker':
             case 'stiker':
             case 's': {
-                const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                const isDirectImage = msg.message.imageMessage;
-                const isQuotedImage = quotedMsg?.imageMessage;
-
-                if (!isDirectImage && !isQuotedImage) {
-                    return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Reply to an image or send an image with .sticker!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-                }
+                const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+                if (!isImage) return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Reply to an image with .sticker!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
 
                 await sock.sendMessage(from, { text: '⏳ Converting image to sticker...' }, { quoted: msg });
                 try {
-                    const targetMessage = isDirectImage ? msg.message.imageMessage : quotedMsg.imageMessage;
+                    const targetMessage = msg.message.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
                     const stream = await downloadContentFromMessage(targetMessage, 'image');
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
@@ -554,10 +573,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                     fs.writeFileSync(tempImg, buffer);
 
                     exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
-                        if (err) {
-                            if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
-                            return sock.sendMessage(from, { text: '❌ Sticker conversion failed.' }, { quoted: msg });
-                        }
+                        if (err) return sock.sendMessage(from, { text: '❌ Sticker conversion failed.' }, { quoted: msg });
                         const stickerBuffer = fs.readFileSync(tempWebp);
                         await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
                         if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
@@ -584,6 +600,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // DOWNLOAD MENU
+            // ==========================================
             case 'applemusic':
             case 'capcut':
             case 'dl':
@@ -595,6 +614,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // GAME MENU
+            // ==========================================
             case 'memory': {
                 activeGames[from] = 'memory';
                 const cards = ['🍎', '🍌', '🍒', '🍇'];
@@ -630,11 +652,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
+            // ==========================================
+            // OTHER COMMANDS
+            // ==========================================
             case 'ping': {
                 const start = Date.now();
-                const sent = await sock.sendMessage(from, { text: '⚡ Testing speed...' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '⚡ Testing speed...' }, { quoted: msg });
                 const end = Date.now();
-                await sock.sendMessage(from, { text: `╭━━━〔 *LATENCY* 〕━━━┈\n✦ Speed: ${end - start}ms\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { edit: sent.key });
+                await sock.sendMessage(from, { text: `╭━━━〔 *LATENCY* 〕━━━┈\n✦ Speed: ${end - start}ms\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
 
