@@ -7,82 +7,50 @@ const {
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const exec = require('child_process').exec;
-const os = require('os');
 const https = require('https');
 
-// --- BOT CONFIGURATION ---
-const OWNER_NUMBER = "2347061696819";
-const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
-const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v10.0 ULTRA";
-const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
+const config = require('./config.json');
+const { 
+    db, saveDB, getPlayer, spawnWildPokemon, catchPokemon, addXPAndCheckMoves,
+    TYPE_CHART, MOVES_DATABASE 
+} = require('./pokemon_engine');
+
 const startTime = Date.now();
+let botMode = "public";
+const vipUsers = new Set([config.ownerNumber]);
 
-// --- STATE MANAGEMENT ---
-let botMode = "public"; // 'public' or 'private'
-const activeGames = {};
-const groupSettings = {};
-const vipUsers = new Set([OWNER_NUMBER]);
-
-// Helper for HTTP requests
-function fetchJson(url) {
-    return new Promise((resolve, reject) => {
-        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-            });
-        }).on('error', reject);
-    });
-}
+const settings = {
+    autoonline: false,
+    autorecording: false,
+    autostatuslike: false,
+    autostatusview: false,
+    autotyping: false,
+    antilink: {},
+    antidelete: {},
+    antiimage: {},
+    antispam: {}
+};
 
 async function startDemonBot() {
     const { state, saveCreds } = await useMultiFileAuthState('./demon_session');
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
-        version,
-        auth: state,
-        printQRInTerminal: false,
-        browser: ["Ubuntu", "Chrome", "20.0.04"],
-        syncFullHistory: false,
-        markOnlineOnConnect: true
+        version, auth: state, printQRInTerminal: false,
+        browser: ["Demon OS", "Chrome", "20.0.04"], syncFullHistory: false
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    if (!sock.authState.creds.registered) {
-        console.log('\n==================================================');
-        let phoneNumber = process.env.PHONE_NUMBER;
-        
-        if (!phoneNumber) {
-            console.log('❌ ERROR: Please set PHONE_NUMBER in Railway Environment Variables!');
-            return;
-        }
-
-        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-        
-        setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(phoneNumber);
-                console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${code}\x1b[0m\n`);
-            } catch (err) {
-                console.log('❌ Error requesting pairing code:', err.message);
-            }
-        }, 3000);
-    }
-
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-            if (statusCode !== DisconnectReason.loggedOut) {
-                console.log('⚡ Reconnecting Great Demon Bot...');
+            if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+                console.log('⚡ Reconnecting 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕...');
                 startDemonBot();
             }
         } else if (connection === 'open') {
-            console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
+            console.log(`\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 100+ COMMAND SYSTEM ONLINE (OWNED BY DEMON)! ⚡\n`);
         }
     });
 
@@ -96,21 +64,38 @@ async function startDemonBot() {
         const sender = msg.key.participant || msg.key.remoteJid;
         const senderNum = sender.split('@')[0];
 
-        // FIXED OWNER CHECK: Allows execution from self or owner number
-        const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
+        const isOwner = msg.key.fromMe || sender.includes(config.ownerNumber) || senderNum === config.ownerNumber;
         const isVip = isOwner || vipUsers.has(senderNum);
 
-        const body = msg.message.conversation || 
-                     msg.message.extendedTextMessage?.text || 
-                     msg.message.imageMessage?.caption || '';
+        if (from === 'status@broadcast') {
+            if (settings.autostatusview) await sock.readMessages([msg.key]);
+            if (settings.autostatuslike) {
+                try { await sock.sendMessage(from, { react: { text: '🖤', key: msg.key } }); } catch (e) {}
+            }
+            return;
+        }
+
+        if (settings.autoonline) await sock.sendPresenceUpdate('available', from);
+
+        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || '';
+        
+        if (isGroup && settings.antilink[from] && body.includes('chat.whatsapp.com')) {
+            const groupMetadata = await sock.groupMetadata(from);
+            const userObj = groupMetadata.participants.find(p => p.id === sender);
+            const isAdmin = userObj && (userObj.admin === 'admin' || userObj.admin === 'superadmin');
+            if (!isAdmin && !isOwner) {
+                await sock.sendMessage(from, { delete: msg.key });
+                await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                return;
+            }
+        }
 
         if (!body.startsWith('.')) return;
-
-        // PRIVATE MODE GUARD
         if (botMode === 'private' && !isVip) return;
 
         const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
+        const player = getPlayer(senderNum);
 
         let isAdmin = false;
         let isBotAdmin = false;
@@ -126,442 +111,213 @@ async function startDemonBot() {
             } catch (e) {}
         }
 
-        if (!groupSettings[from]) {
-            groupSettings[from] = { 
-                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false 
-            };
-        }
-
         switch (command) {
             // ==========================================
-            // MAIN MENU
+            // FULL SYSTEM & AUTOMATION TOGGLES
             // ==========================================
-            case 'menu':
-            case 'help': {
-                const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-                const hours = Math.floor(uptimeSeconds / 3600);
-                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-                const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
-
-                const menuText = 
-`╭━━━〔  *${BOT_NAME}*  〕━━━┈
-✦ *Owner:* ${OWNER_NAME}
-✦ *Prefix:* .
-✦ *Mode:* ${botMode.toUpperCase()}
-✦ *Runtime:* ${uptimeFormatted}
-✦ *Version:* ${BOT_VERSION}
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *OWNER MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .addowner, .antidelete, .antiviewonce
-⬡ .autoonline, .autorecording, .autostatuslike
-⬡ .autostatusview, .autotyping, .block
-⬡ .buatgc, .changebio, .devices, .getpp
-⬡ .joingroup, .leavegroup, .listfont, .listgroup
-⬡ .bancheck, .botlink, .fetchstatus, .listchannels
-⬡ .mode <public/private>, .pair <number>
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *VIP MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .connectedusers, .inspectsock, .vipadd
-⬡ .vipadmin, .vipallgroups, .vipdemote
-⬡ .vipdetails, .vipgroups, .viplist, .vipmenu
-⬡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *GROUP MANAGEMENT* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .activeusers, .addmember, .antiadd, .antibot
-⬡ .antidemote, .antigroupsmention, .antiimage, .antilink
-⬡ .antipromote, .antiremove, .antispam, .antitag
-⬡ .antitagadmin, .approveall, .close, .closetime
-⬡ .demoteall, .demoteuser, .disapproveall, .dor
-⬡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
-⬡ .grouponly, .hidetag, .inactiveusers, .kickall
-⬡ .left, .listgroups, .mediatag, .open, .opentime
-⬡ .promoteall, .promoteuser, .remove, .setgroupbio
-⬡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⬡ .tagall, .tagonline, .tagpoll, .warning, .welcome
-⬡ .pin, .status, .vv
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *AI MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .ai, .aimenu, .claude, .copilot
-⬡ .describe, .felo, .gpt, .imagine, .llama
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *CONVERT MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .audio, .convertmenu, .stickermeme, .stiker
-⬡ .swm, .telestick, .toaud, .togif, .toimg
-⬡ .tomp4, .toptt, .tourl
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *DOWNLOAD MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .applemusic, .capcut, .dl, .downloadmenu, .fb
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *GAME MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .2048, .activegames, .connect4, .dino
-⬡ .emojidecode, .endgame, .flappy, .galaxy
-⬡ .gamemenu, .letterblitz, .memory, .mines
-⬡ .pong, .reverseit
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *OTHER COMMANDS* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .androidcrash, .bugmenu, .gccrash, .hd
-⬡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
-⬡ .searchmenu, .spamngl, .toolmenu, .xnxx
-⬡ .xvideos, .yts, .ping
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝒉𝒊𝒔 𝒑𝒓𝒆𝒆𝒒 𝑰𝒔 𝒂𝒄𝒕𝒊𝒗𝒆_`;
-
-                try {
-                    await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
-                } catch (err) {
-                    await sock.sendMessage(from, { text: menuText }, { quoted: msg });
-                }
-                break;
-            }
-
-            // ==========================================
-            // OWNER & SYSTEM COMMANDS
-            // ==========================================
-            case 'mode':
-            case 'private':
-            case 'public': {
-                if (!isOwner) return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Owner only command!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-                
-                let selectedMode = args[0]?.toLowerCase();
-                if (command === 'private') selectedMode = 'private';
-                if (command === 'public') selectedMode = 'public';
-
-                if (selectedMode === 'public') {
-                    botMode = 'public';
-                    await sock.sendMessage(from, { text: '╭━━━〔 *MODE UPDATE* 〕━━━┈\n✦ Bot mode set to *PUBLIC* 🔓\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-                } else if (selectedMode === 'private') {
-                    botMode = 'private';
-                    await sock.sendMessage(from, { text: '╭━━━〔 *MODE UPDATE* 〕━━━┈\n✦ Bot mode set to *PRIVATE* 🔒\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-                } else {
-                    await sock.sendMessage(from, { text: `╭━━━〔 *BOT MODE* 〕━━━┈\n✦ Current Mode: *${botMode.toUpperCase()}*\n✦ Usage: \`.mode public\` or \`.mode private\`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
-                }
-                break;
-            }
-
-            case 'pair': {
-                const targetNum = args[0]?.replace(/[^0-9]/g, '');
-                if (!targetNum || targetNum.length < 10) {
-                    return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Provide phone number with country code!\n✦ Example: `.pair 2347061696819`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-                }
-
-                await sock.sendMessage(from, { text: `╭━━━〔 *PAIRING* 〕━━━┈\n✦ Generating Pairing Code for @${targetNum}...\n╰━━━━━━━━━━━━━━━━━━━━━━━┈`, mentions: [`${targetNum}@s.whatsapp.net`] }, { quoted: msg });
-
-                try {
-                    const tempSessionPath = `./session_sub_${targetNum}`;
-                    const { state: subState, saveCreds: subSaveCreds } = await useMultiFileAuthState(tempSessionPath);
-                    const { version } = await fetchLatestBaileysVersion();
-
-                    const subSock = makeWASocket({
-                        version,
-                        auth: subState,
-                        printQRInTerminal: false,
-                        browser: ["Ubuntu", "Chrome", "20.0.04"]
-                    });
-
-                    subSock.ev.on('creds.update', subSaveCreds);
-
-                    setTimeout(async () => {
-                        try {
-                            const code = await subSock.requestPairingCode(targetNum);
-                            await sock.sendMessage(from, { 
-                                text: `╭━━━〔 *SUB-BOT PAIRING CODE* 〕━━━┈\n✦ *Code:* \`\`\`${code}\`\`\`\n\n⬡ Go to WhatsApp > Linked Devices > Link a Device > Link with phone number\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
-                            }, { quoted: msg });
-                        } catch (err) {
-                            await sock.sendMessage(from, { text: `❌ Error: ${err.message}` }, { quoted: msg });
-                        }
-                    }, 3000);
-                } catch (e) {
-                    await sock.sendMessage(from, { text: `❌ Sub-session error: ${e.message}` }, { quoted: msg });
-                }
-                break;
-            }
-
-            case 'addowner': {
+            case 'autoonline': {
                 if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
-                const num = args[0]?.replace(/[^0-9]/g, '');
-                if (!num) return sock.sendMessage(from, { text: '❌ Provide phone number!' }, { quoted: msg });
-                vipUsers.add(num);
-                await sock.sendMessage(from, { text: `👑 Added @${num} as Owner/VIP!`, mentions: [`${num}@s.whatsapp.net`] }, { quoted: msg });
+                settings.autoonline = !settings.autoonline;
+                await sock.sendMessage(from, { text: `✅ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Auto Online: *${settings.autoonline ? 'ON' : 'OFF'}*` }, { quoted: msg });
                 break;
             }
-
-            case 'antidelete':
-            case 'antiviewonce':
-            case 'autoonline':
-            case 'autorecording':
-            case 'autostatuslike':
-            case 'autostatusview':
+            case 'autorecording': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
+                settings.autorecording = !settings.autorecording;
+                await sock.sendMessage(from, { text: `✅ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Auto Recording: *${settings.autorecording ? 'ON' : 'OFF'}*` }, { quoted: msg });
+                break;
+            }
+            case 'autostatuslike': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
+                settings.autostatuslike = !settings.autostatuslike;
+                await sock.sendMessage(from, { text: `✅ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Auto Status Like: *${settings.autostatuslike ? 'ON' : 'OFF'}*` }, { quoted: msg });
+                break;
+            }
+            case 'autostatusview': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
+                settings.autostatusview = !settings.autostatusview;
+                await sock.sendMessage(from, { text: `✅ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Auto Status View: *${settings.autostatusview ? 'ON' : 'OFF'}*` }, { quoted: msg });
+                break;
+            }
             case 'autotyping': {
-                if (!isOwner) return;
-                await sock.sendMessage(from, { text: `╭━━━〔 *OWNER SETTING* 〕━━━┈\n✦ Feature *${command.toUpperCase()}* updated.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
-                break;
-            }
-
-            case 'block': {
-                if (!isOwner) return;
-                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to block!' }, { quoted: msg });
-                await sock.updateBlockStatus(mentioned[0], 'block');
-                await sock.sendMessage(from, { text: '🚫 User blocked.' }, { quoted: msg });
-                break;
-            }
-
-            case 'changebio': {
-                if (!isOwner) return;
-                const newBio = args.join(' ');
-                if (!newBio) return sock.sendMessage(from, { text: '❌ Provide new bio text!' }, { quoted: msg });
-                await sock.updateProfileStatus(newBio);
-                await sock.sendMessage(from, { text: '✅ Profile status updated.' }, { quoted: msg });
-                break;
-            }
-
-            case 'devices': {
-                const totalMem = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(2);
-                const freeMem = (os.freemem() / (1024 * 1024 * 1024)).toFixed(2);
-                await sock.sendMessage(from, { text: `╭━━━〔 *SYSTEM STATUS* 〕━━━┈\n✦ Platform: ${os.platform()} (${os.arch()})\n✦ Cores: ${os.cpus().length}\n✦ RAM: ${freeMem}GB free / ${totalMem}GB total\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
-                break;
-            }
-
-            case 'buatgc':
-            case 'getpp':
-            case 'joingroup':
-            case 'leavegroup':
-            case 'listfont':
-            case 'listgroup':
-            case 'bancheck':
-            case 'botlink':
-            case 'fetchstatus':
-            case 'listchannels': {
-                if (!isOwner) return;
-                await sock.sendMessage(from, { text: `╭━━━〔 *OWNER TOOL* 〕━━━┈\n✦ Command .${command} executed successfully.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
+                settings.autotyping = !settings.autotyping;
+                await sock.sendMessage(from, { text: `✅ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Auto Typing: *${settings.autotyping ? 'ON' : 'OFF'}*` }, { quoted: msg });
                 break;
             }
 
             // ==========================================
-            // VIP MENU COMMANDS
+            // VIP & OWNER CONTROLS
             // ==========================================
             case 'vipadd': {
                 if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
-                const num = args[0]?.replace(/[^0-9]/g, '');
-                if (!num) return sock.sendMessage(from, { text: '❌ Provide number!' }, { quoted: msg });
-                vipUsers.add(num);
-                await sock.sendMessage(from, { text: `✅ Added @${num} to VIP list.`, mentions: [`${num}@s.whatsapp.net`] }, { quoted: msg });
+                const targetNum = args[0]?.replace(/[^0-9]/g, '');
+                if (!targetNum) return sock.sendMessage(from, { text: '❌ Provide number!' }, { quoted: msg });
+                vipUsers.add(targetNum);
+                await sock.sendMessage(from, { text: `👑 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Added @${targetNum} to Demon VIP list.`, mentions: [`${targetNum}@s.whatsapp.net`] }, { quoted: msg });
                 break;
             }
-
-            case 'viplist':
-            case 'vipmenu': {
-                let text = `╭━━━〔 *VIP USER LIST* 〕━━━┈\n`;
-                vipUsers.forEach(u => text += `⬡ @${u}\n`);
-                text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+            case 'viplist': {
+                if (!isVip) return sock.sendMessage(from, { text: '❌ VIP only!' }, { quoted: msg });
+                let text = `👑 *[𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] VIP USERS LIST*:\n`;
+                vipUsers.forEach(u => text += `• @${u}\n`);
                 await sock.sendMessage(from, { text, mentions: Array.from(vipUsers).map(u => `${u}@s.whatsapp.net`) }, { quoted: msg });
                 break;
             }
 
-            case 'connectedusers':
-            case 'inspectsock':
-            case 'vipadmin':
-            case 'vipallgroups':
-            case 'vipdemote':
-            case 'vipdetails':
-            case 'vipgroups':
-            case 'vippromote':
-            case 'vipreassign':
-            case 'vipremove':
-            case 'viptakeover':
-            case 'vipunclaim': {
-                if (!isVip) return sock.sendMessage(from, { text: '❌ VIP access required!' }, { quoted: msg });
-                await sock.sendMessage(from, { text: `╭━━━〔 *VIP CONTROL* 〕━━━┈\n✦ Command .${command} active and operational.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+            // ==========================================
+            // GROUP CREATION & MANAGEMENT
+            // ==========================================
+            case 'buatgc':
+            case 'creategroup': {
+                const title = args.join(' ');
+                if (!title) return sock.sendMessage(from, { text: '❌ Provide group title!' }, { quoted: msg });
+                try {
+                    await sock.groupCreate(title, [sender]);
+                    await sock.sendMessage(from, { text: `✅ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Group successfully created: *${title}*` }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: `❌ Error: ${e.message}` }, { quoted: msg });
+                }
                 break;
             }
-
-            // ==========================================
-            // GROUP MANAGEMENT
-            // ==========================================
+            case 'kick':
+            case 'remove': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
+                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag a user to kick!' }, { quoted: msg });
+                await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
+                await sock.sendMessage(from, { text: '⚡ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] User banished from the realm.' }, { quoted: msg });
+                break;
+            }
+            case 'kickall': {
+                if (!isGroup || !isOwner) return sock.sendMessage(from, { text: '❌ Demon Owner only!' }, { quoted: msg });
+                const meta = await sock.groupMetadata(from);
+                const participants = meta.participants.filter(p => !p.admin && p.id !== sock.user.id);
+                const pJids = participants.map(p => p.id);
+                await sock.groupParticipantsUpdate(from, pJids, 'remove');
+                await sock.sendMessage(from, { text: `⚡ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Cleared all non-admin members.` }, { quoted: msg });
+                break;
+            }
             case 'tagall': {
                 if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
-                const groupMetadata = await sock.groupMetadata(from);
-                let text = `╭━━━〔 *ATTENTION MEMBERS* 〕━━━┈\n`;
-                let mentions = groupMetadata.participants.map(p => p.id);
-                mentions.forEach(p => text += `⬡ @${p.split('@')[0]}\n`);
+                const meta = await sock.groupMetadata(from);
+                let text = `╭━━━〔 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 TAGALL* 〕━━━┈\n`;
+                const mentions = meta.participants.map(p => p.id);
+                mentions.forEach(m => text += `⬡ @${m.split('@')[0]}\n`);
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
                 await sock.sendMessage(from, { text, mentions }, { quoted: msg });
                 break;
             }
-
             case 'hidetag': {
                 if (!isGroup || (!isAdmin && !isOwner)) return;
-                const hidetagText = args.join(' ') || 'Attention everyone!';
-                const groupMetadata = await sock.groupMetadata(from);
-                const mentions = groupMetadata.participants.map(p => p.id);
-                await sock.sendMessage(from, { text: hidetagText, mentions });
+                const meta = await sock.groupMetadata(from);
+                const mentions = meta.participants.map(p => p.id);
+                await sock.sendMessage(from, { text: args.join(' ') || '𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 Broadcast', mentions });
                 break;
             }
-
             case 'tagadmin': {
                 if (!isGroup) return;
-                const groupMetadata = await sock.groupMetadata(from);
-                const admins = groupMetadata.participants.filter(p => p.admin !== null).map(p => p.id);
-                let text = `╭━━━〔 *GROUP ADMINS* 〕━━━┈\n`;
+                const meta = await sock.groupMetadata(from);
+                const admins = meta.participants.filter(p => p.admin !== null).map(p => p.id);
+                let text = `╭━━━〔 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 ADMINS* 〕━━━┈\n`;
                 admins.forEach(a => text += `⬡ @${a.split('@')[0]}\n`);
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
                 await sock.sendMessage(from, { text, mentions: admins }, { quoted: msg });
                 break;
             }
-
-            case 'open': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
+            case 'open':
+            case 'unlock': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
                 await sock.groupSettingUpdate(from, 'not_announcement');
-                await sock.sendMessage(from, { text: '🔓 Group opened for all members.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔓 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Group opened for all speakers.' }, { quoted: msg });
                 break;
             }
-
-            case 'close': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
+            case 'close':
+            case 'lock': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
                 await sock.groupSettingUpdate(from, 'announcement');
-                await sock.sendMessage(from, { text: '🔒 Group closed (Admins only).' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔒 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Group locked (Admins only).' }, { quoted: msg });
                 break;
             }
-
-            case 'kick':
-            case 'remove':
-            case 'dor': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
+            case 'promote': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
                 const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to remove!' }, { quoted: msg });
-                await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
-                await sock.sendMessage(from, { text: '✅ User removed.' }, { quoted: msg });
-                break;
-            }
-
-            case 'promote':
-            case 'promoteuser': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
-                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to promote!' }, { quoted: msg });
+                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user!' }, { quoted: msg });
                 await sock.groupParticipantsUpdate(from, [mentioned[0]], 'promote');
-                await sock.sendMessage(from, { text: '👑 User promoted to admin.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Promoted user to admin.' }, { quoted: msg });
                 break;
             }
-
-            case 'demote':
-            case 'demoteuser': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
+            case 'demote': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
                 const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to demote!' }, { quoted: msg });
+                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user!' }, { quoted: msg });
                 await sock.groupParticipantsUpdate(from, [mentioned[0]], 'demote');
-                await sock.sendMessage(from, { text: '📉 User demoted.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '📉 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Demoted user.' }, { quoted: msg });
                 break;
             }
-
-            case 'grouplink': {
-                if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only!' }, { quoted: msg });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ Make bot admin first!' }, { quoted: msg });
-                const code = await sock.groupInviteCode(from);
-                await sock.sendMessage(from, { text: `🔗 *Group Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
-                break;
-            }
-
-            case 'activeusers':
-            case 'addmember':
-            case 'antiadd':
-            case 'antibot':
-            case 'antidemote':
-            case 'antigroupsmention':
-            case 'antiimage':
-            case 'antilink':
-            case 'antipromote':
-            case 'antiremove':
-            case 'antispam':
-            case 'antitag':
-            case 'antitagadmin':
-            case 'approveall':
-            case 'closetime':
-            case 'demoteall':
-            case 'disapproveall':
-            case 'gcs':
-            case 'glostat':
-            case 'goodbye':
-            case 'groupmenu':
-            case 'grouponly':
-            case 'inactiveusers':
-            case 'kickall':
-            case 'left':
-            case 'listgroups':
-            case 'mediatag':
-            case 'opentime':
-            case 'promoteall':
-            case 'setgroupbio':
-            case 'setgroupname':
-            case 'setgrouppp':
-            case 'setwarning':
-            case 'tagonline':
-            case 'tagpoll':
-            case 'warning':
-            case 'welcome':
-            case 'pin':
-            case 'status':
-            case 'vv': {
-                if (!isGroup) return;
-                await sock.sendMessage(from, { text: `╭━━━〔 *GROUP COMMAND* 〕━━━┈\n✦ .${command} executed successfully.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
-                break;
-            }
-
-            // ==========================================
-            // AI MENU
-            // ==========================================
-            case 'ai':
-            case 'gpt':
-            case 'claude':
-            case 'copilot':
-            case 'llama':
-            case 'felo':
-            case 'describe':
-            case 'imagine':
-            case 'aimenu': {
-                const query = args.join(' ');
-                if (!query) return sock.sendMessage(from, { text: '╭━━━〔 *AI ENGINE* 〕━━━┈\n✦ Please ask a question!\n✦ Example: `.ai Explain Pain speech in Naruto`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-
-                await sock.sendMessage(from, { text: '⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 AI Thinking...*' }, { quoted: msg });
-                try {
-                    const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(query)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
-                    await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ ${res.response}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
-                } catch (e) {
-                    await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ Processed prompt: "${query}"\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+            case 'antilink': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
+                const val = args[0]?.toLowerCase();
+                if (val === 'on') {
+                    settings.antilink[from] = true;
+                    await sock.sendMessage(from, { text: '🛡️ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Anti-Link enabled.' }, { quoted: msg });
+                } else if (val === 'off') {
+                    settings.antilink[from] = false;
+                    await sock.sendMessage(from, { text: '🛡️ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Anti-Link disabled.' }, { quoted: msg });
+                } else {
+                    await sock.sendMessage(from, { text: '❌ Use `.antilink on` or `.antilink off`' }, { quoted: msg });
                 }
                 break;
             }
+            case 'approveall': {
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
+                try {
+                    const pending = await sock.groupRequestParticipantsList(from);
+                    if (pending.length === 0) return sock.sendMessage(from, { text: 'ℹ️ No pending requests.' }, { quoted: msg });
+                    const jids = pending.map(p => p.id);
+                    await sock.groupRequestParticipantsUpdate(from, jids, 'approve');
+                    await sock.sendMessage(from, { text: `✅ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Approved ${jids.length} requests.` }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: `❌ Error: ${e.message}` }, { quoted: msg });
+                }
+                break;
+            }
+            case 'grouplink':
+            case 'invite': {
+                if (!isGroup || !isBotAdmin) return sock.sendMessage(from, { text: '❌ Make bot admin first!' }, { quoted: msg });
+                const code = await sock.groupInviteCode(from);
+                await sock.sendMessage(from, { text: `🔗 https://chat.whatsapp.com/${code}` }, { quoted: msg });
+                break;
+            }
 
             // ==========================================
-            // CONVERT MENU
+            // MEDIA & VIEW ONCE (.VV)
             // ==========================================
+            case 'vv':
+            case 'viewonce': {
+                const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                if (!quoted) return sock.sendMessage(from, { text: '❌ Reply to a view-once message!' }, { quoted: msg });
+                const viewOnceMsg = quoted.viewOnceMessage?.message || quoted.viewOnceMessageV2?.message;
+                if (!viewOnceMsg) return sock.sendMessage(from, { text: '❌ Not a view-once message!' }, { quoted: msg });
+                
+                const mediaType = Object.keys(viewOnceMsg)[0];
+                const mediaMsg = viewOnceMsg[mediaType];
+                const stream = await downloadContentFromMessage(mediaMsg, mediaType.replace('Message', ''));
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                if (mediaType === 'imageMessage') {
+                    await sock.sendMessage(from, { image: buffer, caption: '🔓 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Unlocked View-Once Image' }, { quoted: msg });
+                } else if (mediaType === 'videoMessage') {
+                    await sock.sendMessage(from, { video: buffer, caption: '🔓 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Unlocked View-Once Video' }, { quoted: msg });
+                }
+                break;
+            }
             case 'sticker':
-            case 'stiker':
             case 's': {
                 const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
-                if (!isImage) return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Reply to an image with .sticker!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
-
-                await sock.sendMessage(from, { text: '⏳ Converting image to sticker...' }, { quoted: msg });
+                if (!isImage) return sock.sendMessage(from, { text: '❌ Reply to an image!' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '⏳ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Forging sticker...' }, { quoted: msg });
                 try {
                     const targetMessage = msg.message.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
                     const stream = await downloadContentFromMessage(targetMessage, 'image');
@@ -573,112 +329,192 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝒉𝒊𝒔 𝒑𝒓
                     fs.writeFileSync(tempImg, buffer);
 
                     exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
-                        if (err) return sock.sendMessage(from, { text: '❌ Sticker conversion failed.' }, { quoted: msg });
-                        const stickerBuffer = fs.readFileSync(tempWebp);
-                        await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+                        if (err) return sock.sendMessage(from, { text: '❌ Failed.' }, { quoted: msg });
+                        await sock.sendMessage(from, { sticker: fs.readFileSync(tempWebp) }, { quoted: msg });
                         if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
                         if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
                     });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ Error processing sticker.' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ Error.' }, { quoted: msg });
                 }
                 break;
             }
 
-            case 'audio':
-            case 'convertmenu':
-            case 'stickermeme':
-            case 'swm':
-            case 'telestick':
-            case 'toaud':
-            case 'togif':
-            case 'toimg':
-            case 'tomp4':
-            case 'toptt':
-            case 'tourl': {
-                await sock.sendMessage(from, { text: `╭━━━〔 *CONVERT ENGINE* 〕━━━┈\n✦ Command .${command} executed.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+            // ==========================================
+            // ANIME & POKÉMON GACHA ENGINE (TIER S GIFS)
+            // ==========================================
+            case 'spawn': {
+                const card = spawnWildPokemon(from);
+                try {
+                    await sock.sendMessage(from, { 
+                        image: { url: card.image },
+                        caption: `╭━━━〔 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 SPAWN* 〕━━━┈\n✦ Name: *${card.name}*\n✦ Tier: *${card.tier}*\n✦ Type: ${card.type.toUpperCase()}\n✦ Type \`.catch ${card.name}\` to claim!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈`
+                    }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: `A wild *${card.name}* [${card.tier}] appeared! Type \`.catch ${card.name}\`` }, { quoted: msg });
+                }
+                break;
+            }
+            case 'catch': {
+                const target = args.join(' ');
+                const caught = catchPokemon(from, senderNum, target);
+                if (!caught) return sock.sendMessage(from, { text: '❌ No matching wild card to catch!' }, { quoted: msg });
+
+                try {
+                    await sock.sendMessage(from, { 
+                        image: { url: caught.image },
+                        caption: `🎉 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] @${senderNum} successfully caught *${caught.name}* (${caught.tier})! Added to deck.`,
+                        mentions: [`${senderNum}@s.whatsapp.net`]
+                    }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: `🎉 @${senderNum} caught *${caught.name}*!`, mentions: [`${senderNum}@s.whatsapp.net`] }, { quoted: msg });
+                }
+                break;
+            }
+            case 'deck':
+            case 'profile': {
+                let text = `╭━━━〔 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 DECK* 〕━━━┈\n✦ Trainer: @${senderNum}\n✦ Coins: $${player.coins}\n✦ Cards: ${player.deck.length}\n\n『 *COLLECTION* 』\n`;
+                if (player.deck.length === 0) {
+                    text += `⬡ No cards yet! Use \`.spawn\`\n`;
+                } else {
+                    player.deck.forEach((p, idx) => {
+                        const activeTag = idx === player.activeSlot ? ' [ACTIVE ⚔️]' : '';
+                        text += `⬡ [${idx + 1}] *${p.name}* [${p.tier}] (Lvl${p.level}/100)${activeTag}\n   └ Moves: ${p.moves.join(', ')}\n`;
+                    });
+                }
+                text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+                await sock.sendMessage(from, { text, mentions: [`${senderNum}@s.whatsapp.net`] }, { quoted: msg });
+                break;
+            }
+            case 'select': {
+                const slot = parseInt(args[0]) - 1;
+                if (isNaN(slot) || !player.deck[slot]) return sock.sendMessage(from, { text: '❌ Invalid slot!' }, { quoted: msg });
+                player.activeSlot = slot;
+                saveDB();
+                await sock.sendMessage(from, { text: `✅ Active card set to *${player.deck[slot].name}*!` }, { quoted: msg });
+                break;
+            }
+            case 'train':
+            case 'defeat': {
+                if (player.deck.length === 0) return sock.sendMessage(from, { text: '❌ Catch a card first!' }, { quoted: msg });
+
+                const activePoke = player.deck[player.activeSlot || 0];
+                const xpGain = Math.floor(Math.random() * 80) + 120;
+                const result = addXPAndCheckMoves(player, activePoke, xpGain);
+
+                let reply = `╭━━━〔 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 TRAINING* 〕━━━┈\n✦ *${activePoke.name}* won battle!\n✦ XP: +${xpGain} \vert{} Level: *Lvl${activePoke.level}/100*\n`;
+                if (result.leveledUp) reply += `🎉 *LEVEL UP!* Reached Level ${activePoke.level}!\n`;
+                reply += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+                await sock.sendMessage(from, { text: reply }, { quoted: msg });
                 break;
             }
 
             // ==========================================
-            // DOWNLOAD MENU
+            // CASINO & ECONOMY
             // ==========================================
-            case 'applemusic':
-            case 'capcut':
-            case 'dl':
-            case 'downloadmenu':
-            case 'fb': {
-                const query = args.join(' ');
-                if (!query) return sock.sendMessage(from, { text: `╭━━━〔 *DOWNLOADER* 〕━━━┈\n✦ Provide link or query for .${command}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
-                await sock.sendMessage(from, { text: `📥 Fetching download content for *${query}*...` }, { quoted: msg });
+            case 'slots': {
+                const bet = parseInt(args[0]) || 50;
+                if (player.coins < bet) return sock.sendMessage(from, { text: `❌ Need $${bet} coins!` }, { quoted: msg });
+
+                const icons = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
+                const r1 = icons[Math.floor(Math.random() * icons.length)];
+                const r2 = icons[Math.floor(Math.random() * icons.length)];
+                const r3 = icons[Math.floor(Math.random() * icons.length)];
+
+                let win = 0;
+                if (r1 === r2 && r2 === r3) win = bet * 5;
+                else if (r1 === r2 || r2 === r3 || r1 === r3) win = bet * 2;
+
+                player.coins = player.coins - bet + win;
+                saveDB();
+
+                await sock.sendMessage(from, { text: `╭━━━〔 🎰 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 SLOTS* 🎰 〕━━━┈\n[ ${r1} \vert{}${r2} | ${r3} ]\n\n✦ ${win > 0 ? `🎉 WON $${win}!` : `❌ Lost $${bet}`}\n✦ Wallet: $${player.coins}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                break;
+            }
+            case 'daily': {
+                player.coins += 500;
+                saveDB();
+                await sock.sendMessage(from, { text: `🎁 [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Daily claimed: +$500 coins!\n✦ Wallet: $${player.coins}` }, { quoted: msg });
+                break;
+            }
+            case 'pay':
+            case 'givemoney': {
+                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                const amount = parseInt(args[1]) || parseInt(args[0]);
+                if (mentioned.length === 0 || isNaN(amount) || amount <= 0) return sock.sendMessage(from, { text: '❌ Usage: `.pay @user <amount>`' }, { quoted: msg });
+                if (player.coins < amount) return sock.sendMessage(from, { text: '❌ Insufficient balance!' }, { quoted: msg });
+
+                const targetNum = mentioned[0].split('@')[0];
+                getPlayer(targetNum).coins += amount;
+                player.coins -= amount;
+                saveDB();
+
+                await sock.sendMessage(from, { text: `💸 Sent $${amount} to @${targetNum}!`, mentions: [mentioned[0]] }, { quoted: msg });
                 break;
             }
 
             // ==========================================
-            // GAME MENU
+            // SYSTEM & MENU
             // ==========================================
-            case 'memory': {
-                activeGames[from] = 'memory';
-                const cards = ['🍎', '🍌', '🍒', '🍇'];
-                const shuffled = [...cards, ...cards].sort(() => Math.random() - 0.5);
-                await sock.sendMessage(from, { text: `🧠 *MEMORY GAME*\nRemember these cards:\n[ ${shuffled.join(' | ')} ]\nGuess their position!` }, { quoted: msg });
+            case 'pair': {
+                const targetNum = args[0]?.replace(/[^0-9]/g, '');
+                if (!targetNum || targetNum.length < 10) {
+                    return sock.sendMessage(from, { text: '❌ Usage: `.pair <number>`' }, { quoted: msg });
+                }
+                await sock.sendMessage(from, { text: `🔑 Requesting pairing code for @${targetNum}...`, mentions: [`${targetNum}@s.whatsapp.net`] }, { quoted: msg });
+                try {
+                    const { state: subState, saveCreds: subSaveCreds } = await useMultiFileAuthState(`./session_${targetNum}`);
+                    const { version } = await fetchLatestBaileysVersion();
+                    const subSock = makeWASocket({ version, auth: subState, printQRInTerminal: false });
+                    subSock.ev.on('creds.update', subSaveCreds);
+                    setTimeout(async () => {
+                        const code = await subSock.requestPairingCode(targetNum);
+                        await sock.sendMessage(from, { text: `🔑 Pairing Code: \`\`\`${code}\`\`\`` }, { quoted: msg });
+                    }, 3000);
+                } catch (e) {
+                    await sock.sendMessage(from, { text: `❌ Error: ${e.message}` }, { quoted: msg });
+                }
                 break;
             }
-
-            case '2048':
-            case 'connect4':
-            case 'dino':
-            case 'emojidecode':
-            case 'flappy':
-            case 'galaxy':
-            case 'gamemenu':
-            case 'letterblitz':
-            case 'mines':
-            case 'pong':
-            case 'reverseit': {
-                activeGames[from] = command;
-                await sock.sendMessage(from, { text: `🎮 *${command.toUpperCase()} GAME ACTIVATED*\nHave fun playing!` }, { quoted: msg });
-                break;
-            }
-
-            case 'activegames': {
-                await sock.sendMessage(from, { text: `🎮 Active game in chat: *${activeGames[from] || 'None'}*` }, { quoted: msg });
-                break;
-            }
-
-            case 'endgame': {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: '🛑 Active game ended.' }, { quoted: msg });
-                break;
-            }
-
-            // ==========================================
-            // OTHER COMMANDS
-            // ==========================================
-            case 'ping': {
+            case 'ping':
+            case 'speed': {
                 const start = Date.now();
-                await sock.sendMessage(from, { text: '⚡ Testing speed...' }, { quoted: msg });
-                const end = Date.now();
-                await sock.sendMessage(from, { text: `╭━━━〔 *LATENCY* 〕━━━┈\n✦ Speed: ${end - start}ms\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `⚡ [𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏] Latency: ${Date.now() - start}ms` }, { quoted: msg });
                 break;
             }
+            case 'mode': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
+                let target = args[0]?.toLowerCase();
+                if (target === 'public' || target === 'private') {
+                    botMode = target;
+                    await sock.sendMessage(from, { text: `✅ Mode updated to *${botMode.toUpperCase()}*` }, { quoted: msg });
+                }
+                break;
+            }
+            case 'menu':
+            case 'help': {
+                const uptime = Math.floor((Date.now() - startTime) / 1000);
+                const menuText = 
+`╭━━━〔  *${config.botName}*  〕━━━┈
+✦ *Creator / Owner:* ${config.ownerName}
+✦ *Mode:* ${botMode.toUpperCase()}
+✦ *Uptime:* ${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-            case 'androidcrash':
-            case 'bugmenu':
-            case 'gccrash':
-            case 'hd':
-            case 'iosfc':
-            case 'lyrics':
-            case 'ocr':
-            case 'removebg':
-            case 'screenshot':
-            case 'searchmenu':
-            case 'spamngl':
-            case 'toolmenu':
-            case 'xnxx':
-            case 'xvideos':
-            case 'yts': {
-                await sock.sendMessage(from, { text: `╭━━━〔 *UTILITY & TOOLS* 〕━━━┈\n✦ Command .${command} executed.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+『 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 100+ COMMAND MEGA MENU* 』
+• *Automation:* .autoonline, .autorecording, .autostatusview, .autostatuslike, .autotyping
+• *VIP Controls:* .vipadd, .viplist
+• *Group & Mod:* .buatgc, .kick, .kickall, .tagall, .hidetag, .tagadmin, .open, .close, .promote, .demote, .antilink, .approveall, .grouplink, .setgroupname, .setgroupdesc
+• *Media / Unlocker:* .vv (View-once), .sticker / .s
+• *Anime / Pokémon Gacha:* .spawn (Tier S GIFs!), .catch, .deck, .select, .train
+• *Casino & Economy:* .slots, .daily, .pay
+• *System:* .pair, .ping, .mode`;
+
+                try {
+                    await sock.sendMessage(from, { image: { url: config.menuImage }, caption: menuText }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: menuText }, { quoted: msg });
+                }
                 break;
             }
         }
