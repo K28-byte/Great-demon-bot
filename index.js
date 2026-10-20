@@ -1,4 +1,3 @@
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -25,7 +24,7 @@ http.createServer((req, res) => {
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v20.0 ULTIMATE";
+const BOT_VERSION = "v21.0 ULTIMATE CARDS WITH IMAGES";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -42,7 +41,7 @@ function saveCardsDb() {
     fs.writeFileSync(CARDS_DB_FILE, JSON.stringify(userCards, null, 2));
 }
 
-// --- THOUSANDS OF CARDS PROCEDURAL GENERATOR ---
+// --- THOUSANDS OF CARDS PROCEDURAL GENERATOR WITH IMAGES ---
 const FIRST_NAMES = [
     "Levi", "Gojo", "Naruto", "Luffy", "Ichigo", "Tanjiro", "Eren", "Ken", "Nezuko", "Pain",
     "Sasuke", "Zoro", "Kakashi", "Goku", "Vegeta", "Saitama", "Sukuna", "Denji", "Power", "Makima",
@@ -57,8 +56,14 @@ const TITLES = [
 ];
 
 const ANIMES = [
-    "Attack on Titan", "Jujutsu Kaisen", "Naruto Shippuden", "One Piece", "Bleach", "Demon Slayer",
-    "Tokyo Ghoul", "Hunter x Hunter", "Black Clover", "Solo Leveling", "Re:Zero", "Overlord", "Chainsaw Man"
+    { name: "Attack on Titan", img: "https://i.postimg.cc/m2V3Z977/aot.jpg" },
+    { name: "Jujutsu Kaisen", img: "https://i.postimg.cc/Kv7yZ68g/jjk.jpg" },
+    { name: "Naruto Shippuden", img: "https://i.postimg.cc/jd2f7C0W/naruto.jpg" },
+    { name: "One Piece", img: "https://i.postimg.cc/9Q5f6X38/luffy.jpg" },
+    { name: "Bleach", img: "https://i.postimg.cc/85w9W5Yg/bleach.jpg" },
+    { name: "Demon Slayer", img: "https://i.postimg.cc/fb5d6V0j/demonslayer.jpg" },
+    { name: "Solo Leveling", img: "https://i.postimg.cc/q732z35D/sololeveling.jpg" },
+    { name: "Chainsaw Man", img: "https://i.postimg.cc/029Yg8J7/chainsaw.jpg" }
 ];
 
 const RARITIES = [
@@ -73,7 +78,7 @@ const RARITIES = [
 function generateRandomCard() {
     const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
     const title = TITLES[Math.floor(Math.random() * TITLES.length)];
-    const anime = ANIMES[Math.floor(Math.random() * ANIMES.length)];
+    const selectedAnime = ANIMES[Math.floor(Math.random() * ANIMES.length)];
     
     const roll = Math.random() * 100;
     let cumulative = 0;
@@ -92,7 +97,8 @@ function generateRandomCard() {
     return {
         id: cardId,
         name: `${firstName}${title}`,
-        anime: anime,
+        anime: selectedAnime.name,
+        image: selectedAnime.img,
         rarity: chosenRarity.name,
         power: power
     };
@@ -127,14 +133,12 @@ async function startDemonBot() {
 
     if (!sock.authState.creds.registered) {
         let phoneNumber = process.env.PHONE_NUMBER;
-        
         if (!phoneNumber) {
             console.log('❌ ERROR: Please set PHONE_NUMBER in Railway Environment Variables!');
             return;
         }
 
         phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-        
         setTimeout(async () => {
             try {
                 const code = await sock.requestPairingCode(phoneNumber);
@@ -152,8 +156,6 @@ async function startDemonBot() {
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('⚡ Reconnecting Great Demon Bot...');
                 setTimeout(startDemonBot, 3000);
-            } else {
-                console.log('❌ Logged out from WhatsApp.');
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
@@ -217,9 +219,9 @@ async function startDemonBot() {
 
 『 *ANIME CARD SYSTEM* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .spawncard - Spawn card (Thousands of combinations!)
-⬡ .catch - Catch spawned card
-⬡ .mycards - View your collection
+⬡ .spawncard - Spawn card with image!
+⬡ .catch - Claim spawned card
+⬡ .mycards - View collection
 ⬡ .leaderboard - Top collectors
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
@@ -227,33 +229,18 @@ async function startDemonBot() {
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
 ⬡ .addowner, .block, .changebio, .devices, .getpp
 ⬡ .joingroup, .leavegroup, .listgroup, .mode <public/private>
-⬡ .pair <number> - Generate session pairing code
+⬡ .pair <number> - Generate pairing code
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *VIP MENU* 』
+『 *VIP & GROUPS* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .connectedusers, .inspectsock, .vipadd, .vipadmin
-⬡ .vipgroups, .viplist, .vippromote, .vipremove
+⬡ .connectedusers, .vipadd, .tagall, .hidetag
+⬡ .kick, .open, .close, .grouplink, .pin, .vv
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *GROUP MANAGEMENT* 』
+『 *AI & TOOLS* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .activeusers, .addmember, .antiadd, .antibot, .antidemote
-⬡ .antiimage, .antilink, .antispam, .antitag, .approveall
-⬡ .close, .demoteuser, .grouplink, .hidetag, .kick
-⬡ .open, .promoteuser, .tagadmin, .tagall, .welcome, .pin, .vv
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *AI & CONVERT MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .ai, .claude, .copilot, .gpt, .llama, .felo
-⬡ .sticker / .s, .toimg, .tomp4, .tourl, .audio
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *DOWNLOAD & GAMES* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .dl, .fb, .capcut, .yts, .ping
-⬡ .2048, .memory, .mines, .pong, .activegames
+⬡ .ai, .gpt, .claude, .sticker / .s, .ping
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
@@ -268,7 +255,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
             case 'spawncard': {
                 const newCard = generateRandomCard();
-                const spawnText = 
+                const spawnCaption = 
 `🃏 *WILD ANIME CARD SPAWNED!* 🃏
 ✨ Over 10,000 unique card combinations!
 
@@ -280,8 +267,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
 👉 Reply to this message with **.catch** to claim it!`;
 
-                const sentMsg = await sock.sendMessage(from, { text: spawnText }, { quoted: msg });
-                activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
+                try {
+                    const sentMsg = await sock.sendMessage(from, { image: { url: newCard.image }, caption: spawnCaption }, { quoted: msg });
+                    activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
+                } catch (e) {
+                    const sentMsg = await sock.sendMessage(from, { text: spawnCaption }, { quoted: msg });
+                    activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
+                }
                 break;
             }
 
@@ -437,58 +429,4 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             case 'tagall': {
-                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Group Admin only!' }, { quoted: msg });
-                const groupMetadata = await sock.groupMetadata(from);
-                let text = `╭━━━〔 *ATTENTION MEMBERS* 〕━━━┈\n`;
-                let mentions = groupMetadata.participants.map(p => p.id);
-                mentions.forEach(p => text += `⬡ @${p.split('@')[0]}\n`);
-                text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
-                await sock.sendMessage(from, { text, mentions }, { quoted: msg });
-                break;
-            }
-
-            case 'hidetag': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
-                const hidetagText = args.join(' ') || 'Attention everyone!';
-                const groupMetadata = await sock.groupMetadata(from);
-                const mentions = groupMetadata.participants.map(p => p.id);
-                await sock.sendMessage(from, { text: hidetagText, mentions });
-                break;
-            }
-
-            case 'open': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
-                await sock.groupSettingUpdate(from, 'not_announcement');
-                await sock.sendMessage(from, { text: '🔓 Group opened for all members.' }, { quoted: msg });
-                break;
-            }
-
-            case 'close': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
-                await sock.groupSettingUpdate(from, 'announcement');
-                await sock.sendMessage(from, { text: '🔒 Group closed (Admins only).' }, { quoted: msg });
-                break;
-            }
-
-            case 'kick':
-            case 'remove': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
-                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to remove!' }, { quoted: msg });
-                await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
-                await sock.sendMessage(from, { text: '✅ User removed from group.' }, { quoted: msg });
-                break;
-            }
-
-            case 'grouplink': {
-                if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only!' }, { quoted: msg });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ Make bot admin first!' }, { quoted: msg });
-                const code = await sock.groupInviteCode(from);
-                await sock.sendMessage(from, { text: `🔗 *Group Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
-                break;
-            }
-        }
-    });
-}
-
-startDemonBot();
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.
