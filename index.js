@@ -11,15 +11,19 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 
+// Prevent unexpected crashes from killing the container
+process.on('uncaughtException', (err) => console.log('Uncaught Exception:', err.message));
+process.on('unhandledRejection', (err) => console.log('Unhandled Rejection:', err?.message || err));
+
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v39.0 STABLE PAIRING EDITION";
+const BOT_VERSION = "v40.0 BULLETPROOF EDITION";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
-// --- RAILWAY HTTP KEEPALIVE SERVER (Prevents "Sleeping" State) ---
+// --- RAILWAY HTTP KEEPALIVE SERVER ---
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -31,7 +35,6 @@ http.createServer((req, res) => {
 // --- STATE & DATABASE MANAGEMENT ---
 let botMode = "public"; 
 const activeGames = {};
-const groupSettings = {};
 const vipUsers = new Set([OWNER_NUMBER]);
 
 const CARDS_DB_FILE = './anime_cards.json';
@@ -142,7 +145,7 @@ async function startDemonBot() {
                 } catch (err) {
                     console.log('❌ Error requesting pairing code:', err.message);
                 }
-            }, 4000);
+            }, 5000);
         }
     }
 
