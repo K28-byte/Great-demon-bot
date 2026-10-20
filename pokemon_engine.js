@@ -88,7 +88,7 @@ function addXPAndCheckMoves(player, pokemon, xpGained) {
         return { leveledUp: false, pendingMove: null };
     }
 
-    pokemon.xp += xpGained;
+    pokemon.xp += xpGainedd;
     let neededXP = pokemon.level * 50;
     let leveledUp = false;
     let pendingMove = null;
