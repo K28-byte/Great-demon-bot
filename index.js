@@ -15,7 +15,17 @@ const {
 const fs = require('fs');
 const exec = require('child_process').exec;
 const https = require('https');
+const http = require('http');
 const pino = require('pino');
+
+// Railway keep-alive web server to prevent SIGTERM crashes
+const PORT = process.env.PORT || 8080;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 is active and running 24/7!\n');
+}).listen(PORT, () => {
+    console.log(`🌐 Keep-alive HTTP server running on port ${PORT}`);
+});
 
 const config = require('./config.json');
 const { 
