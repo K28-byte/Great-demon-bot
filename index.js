@@ -1,19 +1,4 @@
-const http = require('http');
-const https = require('https');
-const fs = require('fs');
-const exec = require('child_process').exec;
 const crypto = require('crypto');
-const os = require('os');
-
-// --- RAILWAY HTTP KEEPALIVE SERVER ---
-const PORT = process.env.PORT || 8080;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Great Demon Bot is Online and Running 24/7!');
-}).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server active on port ${PORT}`);
-});
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -21,16 +6,16 @@ const {
     fetchLatestBaileysVersion, 
     downloadContentFromMessage 
 } = require('@whiskeysockets/baileys');
-
-// Prevent unexpected crashes from killing the container
-process.on('uncaughtException', (err) => console.log('Uncaught Exception:', err.message));
-process.on('unhandledRejection', (err) => console.log('Unhandled Rejection:', err?.message || err));
+const fs = require('fs');
+const exec = require('child_process').exec;
+const os = require('os');
+const https = require('https');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v43.0 ULTRA STABLE";
+const BOT_VERSION = "v10.0 ULTRA";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -69,18 +54,24 @@ async function startDemonBot() {
     sock.ev.on('creds.update', saveCreds);
 
     if (!sock.authState.creds.registered) {
+        console.log('\n==================================================');
         let phoneNumber = process.env.PHONE_NUMBER;
-        if (phoneNumber) {
-            phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-            setTimeout(async () => {
-                try {
-                    const code = await sock.requestPairingCode(phoneNumber);
-                    console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${code}\x1b[0m\n`);
-                } catch (err) {
-                    console.log('❌ Error requesting pairing code:', err.message);
-                }
-            }, 4000);
+        
+        if (!phoneNumber) {
+            console.log('❌ ERROR: Please set PHONE_NUMBER in Railway Environment Variables!');
+            return;
         }
+
+        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+        
+        setTimeout(async () => {
+            try {
+                const code = await sock.requestPairingCode(phoneNumber);
+                console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${code}\x1b[0m\n`);
+            } catch (err) {
+                console.log('❌ Error requesting pairing code:', err.message);
+            }
+        }, 3000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -89,9 +80,7 @@ async function startDemonBot() {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('⚡ Reconnecting Great Demon Bot...');
-                setTimeout(startDemonBot, 3000);
-            } else {
-                console.log('❌ Logged out from WhatsApp.');
+                startDemonBot();
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
@@ -108,6 +97,7 @@ async function startDemonBot() {
         const sender = msg.key.participant || msg.key.remoteJid;
         const senderNum = sender.split('@')[0];
 
+        // FIXED OWNER CHECK: Allows execution from self or owner number
         const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
         const isVip = isOwner || vipUsers.has(senderNum);
 
@@ -155,7 +145,7 @@ async function startDemonBot() {
                 const hours = Math.floor(uptimeSeconds / 3600);
                 const minutes = Math.floor((uptimeSeconds % 3600) / 60);
                 const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m${seconds}s`;
+                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
 
                 const menuText = 
 `╭━━━〔  *${BOT_NAME}*  〕━━━┈
@@ -196,8 +186,8 @@ async function startDemonBot() {
 ⬡ .grouponly, .hidetag, .inactiveusers, .kickall
 ⬡ .left, .listgroups, .mediatag, .open, .opentime
 ⬡ .promoteall, .promoteuser, .remove, .setgroupbio
-⡡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⡡ .tagall, .tagonline, .tagpoll, .warning, .welcome
+⬡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
+⬡ .tagall, .tagonline, .tagpoll, .warning, .welcome
 ⬡ .pin, .status, .vv
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
@@ -211,7 +201,7 @@ async function startDemonBot() {
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
 ⬡ .audio, .convertmenu, .stickermeme, .stiker
 ⬡ .swm, .telestick, .toaud, .togif, .toimg
-⬡ .tomp4, .toptt, .tourl, .sticker
+⬡ .tomp4, .toptt, .tourl
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *DOWNLOAD MENU* 』
@@ -238,29 +228,10 @@ async function startDemonBot() {
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
                 try {
-                    https.get(MENU_IMAGE_URL, (res) => {
-                        let data = [];
-                        res.on('data', chunk => data.push(chunk));
-                        res.on('end', async () => {
-                            await sock.sendMessage(from, { image: Buffer.concat(data), caption: menuText }, { quoted: msg });
-                        });
-                    }).on('error', async () => {
-                        await sock.sendMessage(from, { text: menuText }, { quoted: msg });
-                    });
+                    await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: menuText }, { quoted: msg });
                 }
-                break;
-            }
-
-            // ==========================================
-            // PING COMMAND (FAST & RESPONSIVE)
-            // ==========================================
-            case 'ping': {
-                const start = Date.now();
-                const sent = await sock.sendMessage(from, { text: '🏓 Pinging...' }, { quoted: msg });
-                const latency = Date.now() - start;
-                await sock.sendMessage(from, { text: `🏓 *Pong!* \`${latency}ms\`` }, { edit: sent.key });
                 break;
             }
 
@@ -270,7 +241,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'mode':
             case 'private':
             case 'public': {
-                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                if (!isOwner) return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Owner only command!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
                 
                 let selectedMode = args[0]?.toLowerCase();
                 if (command === 'private') selectedMode = 'private';
@@ -278,24 +249,23 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
                 if (selectedMode === 'public') {
                     botMode = 'public';
-                    await sock.sendMessage(from, { text: '✅ Bot mode set to *PUBLIC* 🔓' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '╭━━━〔 *MODE UPDATE* 〕━━━┈\n✦ Bot mode set to *PUBLIC* 🔓\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
                 } else if (selectedMode === 'private') {
                     botMode = 'private';
-                    await sock.sendMessage(from, { text: '🔒 Bot mode set to *PRIVATE*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '╭━━━〔 *MODE UPDATE* 〕━━━┈\n✦ Bot mode set to *PRIVATE* 🔒\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: `ℹ️ Current Mode: *${botMode.toUpperCase()}*. Use \`.mode public\` or \`.mode private\`` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `╭━━━〔 *BOT MODE* 〕━━━┈\n✦ Current Mode: *${botMode.toUpperCase()}*\n✦ Usage: \`.mode public\` or \`.mode private\`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 }
                 break;
             }
 
             case 'pair': {
-                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
                 const targetNum = args[0]?.replace(/[^0-9]/g, '');
                 if (!targetNum || targetNum.length < 10) {
-                    return sock.sendMessage(from, { text: '❌ Provide phone number with country code!\n✦ Example: `.pair 2347061696819`' }, { quoted: msg });
+                    return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Provide phone number with country code!\n✦ Example: `.pair 2347061696819`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
                 }
 
-                await sock.sendMessage(from, { text: `🔑 Generating pairing code for @${targetNum}...`, mentions: [`${targetNum}@s.whatsapp.net`] }, { quoted: msg });
+                await sock.sendMessage(from, { text: `╭━━━〔 *PAIRING* 〕━━━┈\n✦ Generating Pairing Code for @${targetNum}...\n╰━━━━━━━━━━━━━━━━━━━━━━━┈`, mentions: [`${targetNum}@s.whatsapp.net`] }, { quoted: msg });
 
                 try {
                     const tempSessionPath = `./session_sub_${targetNum}`;
@@ -314,13 +284,15 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                     setTimeout(async () => {
                         try {
                             const code = await subSock.requestPairingCode(targetNum);
-                            await sock.sendMessage(from, { text: `🔑 *PAIRING CODE:* \`\`\`${code}\`\`\`\n\nGo to WhatsApp > Linked Devices > Link with phone number.` }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: `╭━━━〔 *SUB-BOT PAIRING CODE* 〕━━━┈\n✦ *Code:* \`\`\`${code}\`\`\`\n\n⬡ Go to WhatsApp > Linked Devices > Link a Device > Link with phone number\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
+                            }, { quoted: msg });
                         } catch (err) {
-                            await sock.sendMessage(from, { text: `❌ Pairing error: ${err.message}` }, { quoted: msg });
+                            await sock.sendMessage(from, { text: `❌ Error: ${err.message}` }, { quoted: msg });
                         }
                     }, 3000);
                 } catch (e) {
-                    await sock.sendMessage(from, { text: `❌ Session error: ${e.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `❌ Sub-session error: ${e.message}` }, { quoted: msg });
                 }
                 break;
             }
@@ -342,7 +314,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'autostatusview':
             case 'autotyping': {
                 if (!isOwner) return;
-                await sock.sendMessage(from, { text: `✅ Feature *${command.toUpperCase()}* toggled successfully.` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `╭━━━〔 *OWNER SETTING* 〕━━━┈\n✦ Feature *${command.toUpperCase()}* updated.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
 
@@ -351,7 +323,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
                 if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to block!' }, { quoted: msg });
                 await sock.updateBlockStatus(mentioned[0], 'block');
-                await sock.sendMessage(from, { text: '🚫 User blocked successfully.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🚫 User blocked.' }, { quoted: msg });
                 break;
             }
 
@@ -382,7 +354,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'fetchstatus':
             case 'listchannels': {
                 if (!isOwner) return;
-                await sock.sendMessage(from, { text: `✅ Command \`.${command}\` executed successfully.` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `╭━━━〔 *OWNER TOOL* 〕━━━┈\n✦ Command .${command} executed successfully.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
 
@@ -420,7 +392,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'viptakeover':
             case 'vipunclaim': {
                 if (!isVip) return sock.sendMessage(from, { text: '❌ VIP access required!' }, { quoted: msg });
-                await sock.sendMessage(from, { text: `✅ VIP command \`.${command}\` active.` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `╭━━━〔 *VIP CONTROL* 〕━━━┈\n✦ Command .${command} active and operational.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
 
@@ -552,7 +524,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'status':
             case 'vv': {
                 if (!isGroup) return;
-                await sock.sendMessage(from, { text: `✅ Command \`.${command}\` executed successfully.` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `╭━━━〔 *GROUP COMMAND* 〕━━━┈\n✦ .${command} executed successfully.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
 
@@ -569,7 +541,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'imagine':
             case 'aimenu': {
                 const query = args.join(' ');
-                if (!query) return sock.sendMessage(from, { text: '❌ Please provide a prompt for the AI!' }, { quoted: msg });
+                if (!query) return sock.sendMessage(from, { text: '╭━━━〔 *AI ENGINE* 〕━━━┈\n✦ Please ask a question!\n✦ Example: `.ai Explain Pain speech in Naruto`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
 
                 await sock.sendMessage(from, { text: '⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 AI Thinking...*' }, { quoted: msg });
                 try {
@@ -582,7 +554,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             // ==========================================
-            // CONVERT & STICKER MENU (FULLY FIXED)
+            // CONVERT MENU (STICKER FIXED)
             // ==========================================
             case 'sticker':
             case 'stiker':
@@ -592,7 +564,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 const isQuotedImage = quotedMsg?.imageMessage;
 
                 if (!isDirectImage && !isQuotedImage) {
-                    return sock.sendMessage(from, { text: '❌ Please send an image or reply to an image with `.sticker`!' }, { quoted: msg });
+                    return sock.sendMessage(from, { text: '╭━━━〔 *ERROR* 〕━━━┈\n✦ Reply to an image or send an image with .sticker!\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
                 }
 
                 await sock.sendMessage(from, { text: '⏳ Converting image to sticker...' }, { quoted: msg });
@@ -602,9 +574,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-                    const timestamp = Date.now();
-                    const tempImg = `./temp_${timestamp}.jpg`;
-                    const tempWebp = `./temp_${timestamp}.webp`;
+                    const tempImg = `./temp_${Date.now()}.jpg`;
+                    const tempWebp = `./temp_${Date.now()}.webp`;
                     fs.writeFileSync(tempImg, buffer);
 
                     exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
@@ -614,12 +585,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                         }
                         const stickerBuffer = fs.readFileSync(tempWebp);
                         await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
-                        
                         if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
                         if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
                     });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ Error processing sticker conversion.' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ Error processing sticker.' }, { quoted: msg });
                 }
                 break;
             }
@@ -635,7 +605,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'tomp4':
             case 'toptt':
             case 'tourl': {
-                await sock.sendMessage(from, { text: `✅ Command \`.${command}\` executed successfully.` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `╭━━━〔 *CONVERT ENGINE* 〕━━━┈\n✦ Command .${command} executed.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
 
@@ -648,7 +618,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'downloadmenu':
             case 'fb': {
                 const query = args.join(' ');
-                if (!query) return sock.sendMessage(from, { text: `❌ Provide link or query for \`.${command}\`` }, { quoted: msg });
+                if (!query) return sock.sendMessage(from, { text: `╭━━━〔 *DOWNLOADER* 〕━━━┈\n✦ Provide link or query for .${command}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 await sock.sendMessage(from, { text: `📥 Fetching download content for *${query}*...` }, { quoted: msg });
                 break;
             }
@@ -694,6 +664,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             // ==========================================
             // OTHER COMMANDS
             // ==========================================
+            case 'ping': {
+                const start = Date.now();
+                const sent = await sock.sendMessage(from, { text: '⚡ Testing speed...' }, { quoted: msg });
+                const end = Date.now();
+                await sock.sendMessage(from, { text: `╭━━━〔 *LATENCY* 〕━━━┈\n✦ Speed: ${end - start}ms\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { edit: sent.key });
+                break;
+            }
+
             case 'androidcrash':
             case 'bugmenu':
             case 'gccrash':
@@ -709,7 +687,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'xnxx':
             case 'xvideos':
             case 'yts': {
-                await sock.sendMessage(from, { text: `✅ Command \`.${command}\` executed successfully.` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `╭━━━〔 *UTILITY & TOOLS* 〕━━━┈\n✦ Command .${command} executed.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
         }
