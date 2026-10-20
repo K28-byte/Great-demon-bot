@@ -11,18 +11,18 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 
-// --- RAILWAY HEALTH-CHECK WEB SERVER ---
+// --- LIGHTWEIGHT LOCAL PORT BINDING FOR FREE RAILWAY HOSTING ---
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Online 24/7');
+    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Online');
 }).listen(PORT, '0.0.0.0');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v25.0 INFINITE KEEP-ALIVE";
+const BOT_VERSION = "v27.0 FULL RESTORE";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -198,14 +198,6 @@ async function startDemonBot() {
                 const botObj = groupMetadata.participants.find(p => p.id === botJid);
                 isBotAdmin = botObj && (botObj.admin === 'admin' || botObj.admin === 'superadmin');
             } catch (e) {}
-        }
-
-        if (!groupSettings[from]) {
-            groupSettings[from] = { 
-                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false 
-            };
         }
 
         switch (command) {
@@ -543,6 +535,3 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 }
 
 startDemonBot();
-
-// --- INFINITE KEEP-ALIVE LOOP (PREVENTS EXIT & SIGTERM) ---
-setInterval(() => {}, 1000 * 60 * 60);
