@@ -37,6 +37,12 @@ function fetchJson(url) {
         }).on('error', reject);
     });
 }
+// --- ANTISPAM CONFIGURATION ---
+const spamMap = new Map();
+const SPAM_LIMIT = 3;
+const SPAM_TIME = 5000;       // 5 seconds
+const COOLDOWN_TIME = 10000;  // 10 seconds
+
 
 async function startDemonBot() {
     const { state, saveCreds } = await useMultiFileAuthState('./demon_session');
@@ -125,6 +131,41 @@ async function startDemonBot() {
                 antispam: false, antitag: false, welcome: false, goodbye: false 
             };
         }
+// --- ANTISPAM LOGIC ---
+const senderId = msg.key.participant || msg.key.remoteJid;
+
+if (isCmd) {
+    const currentTime = Date.now();
+    
+    if (spamMap.has(senderId)) {
+        const userData = spamMap.get(senderId);
+        
+        if (userData.inCooldown) {
+            if (currentTime < userData.cooldownUntil) {
+                await sock.sendMessage(from, { text: "⚠️ *Anti-Spam:* Please wait before sending another command!" }, { quoted: msg });
+                return;
+            } else {
+                spamMap.delete(senderId);
+            }
+        } else {
+            if (currentTime - userData.firstMsgTime < SPAM_TIME) {
+                userData.msgCount += 1;
+                
+                if (userData.msgCount >= SPAM_LIMIT) {
+                    userData.inCooldown = true;
+                    userData.cooldownUntil = currentTime + COOLDOWN_TIME;
+                    await sock.sendMessage(from, { text: "🚫 *Anti-Spam Triggered:* You are sending commands too fast! Muted for 10 seconds." }, { quoted: msg });
+                    return;
+                }
+            } else {
+                spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
+            }
+        }
+    } else {
+        spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
+    }
+}
+
 
         switch (command) {
             case 'menu':
@@ -213,7 +254,7 @@ async function startDemonBot() {
 ⬡ .xvideos, .yts, .ping
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
+_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 moonlight sonata is Active_`;
 
                 try {
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
@@ -239,6 +280,15 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 }
                 break;
             }
+    case 'antispam':
+        await sock.sendMessage(from, { 
+            text: `🛡️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Spam Security*\n\n` +
+                  `• *Limit:* ${SPAM_LIMIT} commands per ${SPAM_TIME / 1000}s\n` +
+                  `• *Penalty:* ${COOLDOWN_TIME / 1000}s temporary mute\n` +
+                  `• *Status:* Active ✅` 
+        }, { quoted: info });
+        break;
+
 
             case 'tagall': {
                 if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: 'Admin only!' }, { quoted: msg });
