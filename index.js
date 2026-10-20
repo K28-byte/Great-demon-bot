@@ -11,20 +11,26 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 
-// --- RAILWAY HEALTH-CHECK WEB SERVER ---
+// --- RAILWAY STABLE WEB SERVER (KEEPS CONTAINER AWAKE FREE) ---
 const PORT = process.env.PORT || 8080;
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 is online and running 24/7!\n');
-}).listen(PORT, '0.0.0.0', () => {
+    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Online 24/7');
+});
+
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 HTTP server listening on port ${PORT}`);
 });
+
+// Prevent unhandled errors from terminating the process
+process.on('uncaughtException', (err) => console.log('Caught exception:', err));
+process.on('unhandledRejection', (reason) => console.log('Unhandled rejection:', reason));
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v20.0 ULTIMATE";
+const BOT_VERSION = "v28.0 STABLE FREE";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -491,3 +497,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 }
 
 startDemonBot();
+
+// --- INFINITE KEEP-ALIVE INTERVAL (PREVENTS EXIT & SIGTERM) ---
+setInterval(() => {}, 1000 * 60 * 60);
