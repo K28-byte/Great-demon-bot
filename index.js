@@ -9,22 +9,12 @@ const fs = require('fs');
 const exec = require('child_process').exec;
 const os = require('os');
 const https = require('https');
-const http = require('http');
-
-// --- LIGHTWEIGHT HTTP SERVER FOR RAILWAY WEB HEALTH CHECK ---
-const PORT = process.env.PORT || 8080;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Online 24/7');
-}).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server active on port ${PORT}`);
-});
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v33.0 RAILWAY STABLE";
+const BOT_VERSION = "v35.0 WORKER EDITION";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -104,7 +94,6 @@ function generateRandomCard() {
     };
 }
 
-// Helper for HTTP requests
 function fetchJson(url) {
     return new Promise((resolve, reject) => {
         https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
@@ -159,7 +148,7 @@ async function startDemonBot() {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('⚡ Reconnecting Great Demon Bot...');
-                startDemonBot();
+                setTimeout(startDemonBot, 3000);
             } else {
                 console.log('❌ Logged out from WhatsApp.');
             }
@@ -540,3 +529,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 }
 
 startDemonBot();
+
+// Keep worker alive indefinitely
+setInterval(() => {}, 1000 * 60 * 60);
