@@ -1,3 +1,4 @@
+
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -96,7 +97,6 @@ async function startDemonBot() {
         const sender = msg.key.participant || msg.key.remoteJid;
         const senderNum = sender.split('@')[0];
 
-        // FIXED OWNER CHECK: Allows execution from self or owner number
         const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
         const isVip = isOwner || vipUsers.has(senderNum);
 
@@ -106,7 +106,6 @@ async function startDemonBot() {
 
         if (!body.startsWith('.')) return;
 
-        // PRIVATE MODE GUARD
         if (botMode === 'private' && !isVip) return;
 
         const args = body.slice(1).trim().split(/ +/);
@@ -135,9 +134,6 @@ async function startDemonBot() {
         }
 
         switch (command) {
-            // ==========================================
-            // MAIN MENU
-            // ==========================================
             case 'menu':
             case 'help': {
                 const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
@@ -234,9 +230,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // OWNER & SYSTEM COMMANDS
-            // ==========================================
             case 'mode':
             case 'private':
             case 'public': {
@@ -357,9 +350,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // VIP MENU COMMANDS
-            // ==========================================
             case 'vipadd': {
                 if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only!' }, { quoted: msg });
                 const num = args[0]?.replace(/[^0-9]/g, '');
@@ -395,9 +385,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // GROUP MANAGEMENT
-            // ==========================================
             case 'tagall': {
                 if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Admin only!' }, { quoted: msg });
                 const groupMetadata = await sock.groupMetadata(from);
@@ -527,9 +514,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // AI MENU
-            // ==========================================
             case 'ai':
             case 'gpt':
             case 'claude':
@@ -552,9 +536,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // CONVERT MENU
-            // ==========================================
             case 'sticker':
             case 'stiker':
             case 's': {
@@ -600,9 +581,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // DOWNLOAD MENU
-            // ==========================================
             case 'applemusic':
             case 'capcut':
             case 'dl':
@@ -614,9 +592,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // GAME MENU
-            // ==========================================
             case 'memory': {
                 activeGames[from] = 'memory';
                 const cards = ['🍎', '🍌', '🍒', '🍇'];
@@ -652,9 +627,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 break;
             }
 
-            // ==========================================
-            // OTHER COMMANDS
-            // ==========================================
             case 'ping': {
                 const start = Date.now();
                 await sock.sendMessage(from, { text: '⚡ Testing speed...' }, { quoted: msg });
