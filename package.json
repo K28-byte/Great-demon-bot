@@ -7,6 +7,10 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.8",
-    "pino": "^8.0.0"
+    "pino": "^8.0.0",
+    "axios": "^1.6.0",
+    "file-type": "^18.2.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "node-cache": "^5.1.2"
   }
 }
