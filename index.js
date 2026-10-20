@@ -280,14 +280,15 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 moonlight sonata is A
                 }
                 break;
             }
-    case 'antispam':
+        case 'antispam':
         await sock.sendMessage(from, { 
             text: `🛡️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Spam Security*\n\n` +
                   `• *Limit:* ${SPAM_LIMIT} commands per ${SPAM_TIME / 1000}s\n` +
                   `• *Penalty:* ${COOLDOWN_TIME / 1000}s temporary mute\n` +
                   `• *Status:* Active ✅` 
-        }, { quoted: info });
+        }, { quoted: msg });
         break;
+
 
 
             case 'tagall': {
