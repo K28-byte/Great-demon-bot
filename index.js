@@ -5,7 +5,7 @@ const {
     DisconnectReason, 
     fetchLatestBaileysVersion, 
     downloadContentFromMessage 
-} = require('@whiskeysockets/baileys');
+} = require('@whisockets/baileys');
 const fs = require('fs');
 const exec = require('child_process').exec;
 const os = require('os');
@@ -145,7 +145,7 @@ async function startDemonBot() {
                 const hours = Math.floor(uptimeSeconds / 3600);
                 const minutes = Math.floor((uptimeSeconds % 3600) / 60);
                 const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
+                const uptimeFormatted = `${hours}h ${minutes}m${seconds}s`;
 
                 const menuText = 
 `╭━━━〔  *${BOT_NAME}*  〕━━━┈
@@ -541,7 +541,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'imagine':
             case 'aimenu': {
                 const query = args.join(' ');
-                if (!query) return sock.sendMessage(from, { text: '╭━━━〔 *AI ENGINE* 〕━━━┈\n✦ Please ask a question!\n✦ Example: `.ai Explain Pain speech in Naruto`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈' }, { quoted: msg });
+                if (!query) return sock.sendMessage(from, { text: '╭━━━〔 *AI ENGINE* 〕━━━┈\n✦ Please ask a question!\n✦ Example: `.ai Explain Pain speech in Naruto`\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
 
                 await sock.sendMessage(from, { text: '⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 AI Thinking...*' }, { quoted: msg });
                 try {
@@ -554,7 +554,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             // ==========================================
-            // CONVERT MENU (STICKER FIXED)
+            // CONVERT MENU
             // ==========================================
             case 'sticker':
             case 'stiker':
@@ -666,9 +666,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             // ==========================================
             case 'ping': {
                 const start = Date.now();
-                const sent = await sock.sendMessage(from, { text: '⚡ Testing speed...' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '⚡ Testing speed...' }, { quoted: msg });
                 const end = Date.now();
-                await sock.sendMessage(from, { text: `╭━━━〔 *LATENCY* 〕━━━┈\n✦ Speed: ${end - start}ms\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { edit: sent.key });
+                await sock.sendMessage(from, { text: `╭━━━〔 *LATENCY* 〕━━━┈\n✦ Speed: ${end - start}ms\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 break;
             }
 
