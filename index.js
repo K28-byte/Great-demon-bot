@@ -11,18 +11,20 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 
-// --- LIGHTWEIGHT LOCAL PORT BINDING FOR FREE RAILWAY HOSTING ---
+// --- RAILWAY HEALTH-CHECK WEB SERVER ---
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Online');
-}).listen(PORT, '0.0.0.0');
+    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 is online and running 24/7!\n');
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 HTTP server listening on port ${PORT}`);
+});
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v27.0 FULL RESTORE";
+const BOT_VERSION = "v20.0 ULTIMATE";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -39,7 +41,7 @@ function saveCardsDb() {
     fs.writeFileSync(CARDS_DB_FILE, JSON.stringify(userCards, null, 2));
 }
 
-// --- THOUSANDS OF CARDS PROCEDURAL GENERATOR WITH IMAGES ---
+// --- THOUSANDS OF CARDS PROCEDURAL GENERATOR ---
 const FIRST_NAMES = [
     "Levi", "Gojo", "Naruto", "Luffy", "Ichigo", "Tanjiro", "Eren", "Ken", "Nezuko", "Pain",
     "Sasuke", "Zoro", "Kakashi", "Goku", "Vegeta", "Saitama", "Sukuna", "Denji", "Power", "Makima",
@@ -54,14 +56,8 @@ const TITLES = [
 ];
 
 const ANIMES = [
-    { name: "Attack on Titan", img: "https://i.postimg.cc/m2V3Z977/aot.jpg" },
-    { name: "Jujutsu Kaisen", img: "https://i.postimg.cc/Kv7yZ68g/jjk.jpg" },
-    { name: "Naruto Shippuden", img: "https://i.postimg.cc/jd2f7C0W/naruto.jpg" },
-    { name: "One Piece", img: "https://i.postimg.cc/9Q5f6X38/luffy.jpg" },
-    { name: "Bleach", img: "https://i.postimg.cc/85w9W5Yg/bleach.jpg" },
-    { name: "Demon Slayer", img: "https://i.postimg.cc/fb5d6V0j/demonslayer.jpg" },
-    { name: "Solo Leveling", img: "https://i.postimg.cc/q732z35D/sololeveling.jpg" },
-    { name: "Chainsaw Man", img: "https://i.postimg.cc/029Yg8J7/chainsaw.jpg" }
+    "Attack on Titan", "Jujutsu Kaisen", "Naruto Shippuden", "One Piece", "Bleach", "Demon Slayer",
+    "Tokyo Ghoul", "Hunter x Hunter", "Black Clover", "Solo Leveling", "Re:Zero", "Overlord", "Chainsaw Man"
 ];
 
 const RARITIES = [
@@ -76,7 +72,7 @@ const RARITIES = [
 function generateRandomCard() {
     const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
     const title = TITLES[Math.floor(Math.random() * TITLES.length)];
-    const selectedAnime = ANIMES[Math.floor(Math.random() * ANIMES.length)];
+    const anime = ANIMES[Math.floor(Math.random() * ANIMES.length)];
     
     const roll = Math.random() * 100;
     let cumulative = 0;
@@ -95,8 +91,7 @@ function generateRandomCard() {
     return {
         id: cardId,
         name: `${firstName}${title}`,
-        anime: selectedAnime.name,
-        image: selectedAnime.img,
+        anime: anime,
         rarity: chosenRarity.name,
         power: power
     };
@@ -130,7 +125,6 @@ async function startDemonBot() {
     sock.ev.on('creds.update', saveCreds);
 
     if (!sock.authState.creds.registered) {
-        console.log('\n==================================================');
         let phoneNumber = process.env.PHONE_NUMBER;
         
         if (!phoneNumber) {
@@ -147,7 +141,7 @@ async function startDemonBot() {
             } catch (err) {
                 console.log('❌ Error requesting pairing code:', err.message);
             }
-        }, 3000);
+        }, 4000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -157,6 +151,8 @@ async function startDemonBot() {
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('⚡ Reconnecting Great Demon Bot...');
                 setTimeout(startDemonBot, 3000);
+            } else {
+                console.log('❌ Logged out from WhatsApp.');
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
@@ -218,81 +214,45 @@ async function startDemonBot() {
 ✦ *Version:* ${BOT_VERSION}
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *ANIME CARD COLLECTION* 』
+『 *ANIME CARD SYSTEM* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .spawncard - Spawn card with image!
-⬡ .catch - Claim spawned card
-⬡ .mycards - View collection
+⬡ .spawncard - Spawn card (Thousands of combinations!)
+⬡ .catch - Catch spawned card
+⬡ .mycards - View your collection
 ⬡ .leaderboard - Top collectors
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *OWNER MENU* 』
+『 *OWNER & PAIRING MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .addowner, .antidelete, .antiviewonce
-⬡ .autoonline, .autorecording, .autostatuslike
-⬡ .autostatusview, .autotyping, .block
-⬡ .buatgc, .changebio, .devices, .getpp
-⬡ .joingroup, .leavegroup, .listfont, .listgroup
-⬡ .bancheck, .botlink, .fetchstatus, .listchannels
-⬡ .mode <public/private>, .pair <number>
+⬡ .addowner, .block, .changebio, .devices, .getpp
+⬡ .joingroup, .leavegroup, .listgroup, .mode <public/private>
+⬡ .pair <number> - Generate session pairing code
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *VIP MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .connectedusers, .inspectsock, .vipadd
-⬡ .vipadmin, .vipallgroups, .vipdemote
-⬡ .vipdetails, .vipgroups, .viplist, .vipmenu
-⬡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
+⬡ .connectedusers, .inspectsock, .vipadd, .vipadmin
+⬡ .vipgroups, .viplist, .vippromote, .vipremove
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *GROUP MANAGEMENT* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .activeusers, .addmember, .antiadd, .antibot
-⬡ .antidemote, .antigroupsmention, .antiimage, .antilink
-⬡ .antipromote, .antiremove, .antispam, .antitag
-⬡ .antitagadmin, .approveall, .close, .closetime
-⬡ .demoteall, .demoteuser, .disapproveall, .dor
-⬡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
-⬡ .grouponly, .hidetag, .inactiveusers, .kickall
-⬡ .left, .listgroups, .mediatag, .open, .opentime
-⬡ .promoteall, .promoteuser, .remove, .setgroupbio
-⬡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⬡ .tagall, .tagonline, .tagpoll, .warning, .welcome
-⬡ .pin, .status, .vv
+⬡ .activeusers, .addmember, .antiadd, .antibot, .antidemote
+⬡ .antiimage, .antilink, .antispam, .antitag, .approveall
+⬡ .close, .demoteuser, .grouplink, .hidetag, .kick
+⬡ .open, .promoteuser, .tagadmin, .tagall, .welcome, .pin, .vv
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *AI MENU* 』
+『 *AI & CONVERT MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .ai, .aimenu, .claude, .copilot
-⬡ .describe, .felo, .gpt, .imagine, .llama
+⬡ .ai, .claude, .copilot, .gpt, .llama, .felo
+⬡ .sticker / .s, .toimg, .tomp4, .tourl, .audio
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *CONVERT MENU* 』
+『 *DOWNLOAD & GAMES* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .audio, .convertmenu, .stickermeme, .stiker
-⬡ .swm, .telestick, .toaud, .togif, .toimg
-⬡ .tomp4, .toptt, .tourl
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *DOWNLOAD MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .applemusic, .capcut, .dl, .downloadmenu, .fb
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *GAME MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .2048, .activegames, .connect4, .dino
-⬡ .emojidecode, .endgame, .flappy, .galaxy
-⬡ .gamemenu, .letterblitz, .memory, .mines
-⬡ .pong, .reverseit
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *OTHER COMMANDS* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .androidcrash, .bugmenu, .gccrash, .hd
-⬡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
-⬡ .searchmenu, .spamngl, .toolmenu, .xnxx
-⬡ .xvideos, .yts, .ping
+⬡ .dl, .fb, .capcut, .yts, .ping
+⬡ .2048, .memory, .mines, .pong, .activegames
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
@@ -307,7 +267,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
             case 'spawncard': {
                 const newCard = generateRandomCard();
-                const spawnCaption = 
+                const spawnText = 
 `🃏 *WILD ANIME CARD SPAWNED!* 🃏
 ✨ Over 10,000 unique card combinations!
 
@@ -319,13 +279,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
 👉 Reply to this message with **.catch** to claim it!`;
 
-                try {
-                    const sentMsg = await sock.sendMessage(from, { image: { url: newCard.image }, caption: spawnCaption }, { quoted: msg });
-                    activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
-                } catch (e) {
-                    const sentMsg = await sock.sendMessage(from, { text: spawnCaption }, { quoted: msg });
-                    activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
-                }
+                const sentMsg = await sock.sendMessage(from, { text: spawnText }, { quoted: msg });
+                activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
                 break;
             }
 
@@ -384,8 +339,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             case 'mode':
-            case 'private':
-            case 'public': {
+            case 'public':
+            case 'private': {
                 if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
                 let selectedMode = args[0]?.toLowerCase();
                 if (command === 'private') selectedMode = 'private';
@@ -400,6 +355,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             case 'pair': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
                 const targetNum = args[0]?.replace(/[^0-9]/g, '');
                 if (!targetNum || targetNum.length < 10) {
                     return sock.sendMessage(from, { text: '❌ Provide phone number with country code!\n✦ Example: `.pair 2347061696819`' }, { quoted: msg });
