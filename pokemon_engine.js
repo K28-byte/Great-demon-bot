@@ -1,114 +1,153 @@
+/**
+ * =====================================================================
+ * 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 - Master Pokémon & Anime Card Engine v3.0
+ * =====================================================================
+ */
+
 const fs = require('fs');
-const https = require('https');
-const { TYPE_CHART, MOVES_DATABASE } = require('./pokedex');
+const { POKEMON_ROSTER } = require('./pokedex');
 
-const DB_FILE = './pokemon_db.json';
-let db = { players: {}, activeSpawns: {}, pendingMoves: {}, activeBattles: {} };
+// Type Advantage Chart
+const TYPE_CHART = {
+    fire: { strongAgainst: ['grass', 'bug', 'steel'], weakAgainst: ['water', 'fire', 'rock', 'dragon'] },
+    water: { strongAgainst: ['fire', 'ground', 'rock'], weakAgainst: ['water', 'grass', 'dragon'] },
+    grass: { strongAgainst: ['water', 'ground', 'rock'], weakAgainst: ['fire', 'grass', 'poison', 'flying', 'bug', 'dragon', 'steel'] },
+    electric: { strongAgainst: ['water', 'flying'], weakAgainst: ['electric', 'grass', 'dragon'], immuneTo: ['ground'] },
+    psychic: { strongAgainst: ['fighting', 'poison'], weakAgainst: ['psychic', 'steel'], immuneTo: ['dark'] },
+    fighting: { strongAgainst: ['normal', 'rock', 'steel', 'dark'], weakAgainst: ['poison', 'flying', 'psychic', 'bug', 'fairy'], immuneTo: ['ghost'] },
+    dragon: { strongAgainst: ['dragon'], weakAgainst: ['steel'], immuneTo: ['fairy'] },
+    ghost: { strongAgainst: ['psychic', 'ghost'], weakAgainst: ['dark'], immuneTo: ['normal'] },
+    dark: { strongAgainst: ['psychic', 'ghost'], weakAgainst: ['fighting', 'dark', 'fairy'] },
+    normal: { strongAgainst: [], weakAgainst: ['rock', 'steel'], immuneTo: ['ghost'] },
+    anime: { strongAgainst: ['anime', 'monster'], weakAgainst: ['webnovel'] },
+    webnovel: { strongAgainst: ['anime', 'monster', 'psychic'], weakAgainst: [] }
+};
 
-if (fs.existsSync(DB_FILE)) {
-    try { db = JSON.parse(fs.readFileSync(DB_FILE)); } catch (e) { console.log('Initializing DB...'); }
+// Comprehensive Moves Database for Pokémon, Anime, and Web Novels
+const MOVES_DATABASE = {
+    fire: ["Flamethrower 🔥", "Fire Blast 💥", "Flame Charge ⚡", "Heat Wave 🌊"],
+    water: ["Hydro Pump 🌊", "Surf 🏄‍♂️", "Water Gun 💧", "Waterfall 🌊"],
+    grass: ["Solar Beam ☀️", "Vine Whip 🌿", "Energy Ball 🍃", "Leaf Blade ⚔️"],
+    electric: ["Thunderbolt ⚡", "Thunder 🌩️", "Electro Ball ⚡", "Volt Tackle ⚡"],
+    psychic: ["Psychic 🔮", "Shadow Ball 👻", "Psybeam ✨", "Future Sight 👁️"],
+    fighting: ["Close Combat 👊", "Dynamic Punch 💥", "Aura Sphere 🌀", "Mach Punch ⚡"],
+    dragon: ["Dragon Claw 🐉", "Outrage 🌀", "Dragon Pulse 💫", "Draco Meteor ☄️"],
+    ghost: ["Shadow Ball 👻", "Shadow Claw 🗡️", "Night Shade 🌑", "Hex 🌀"],
+    dark: ["Dark Pulse 🌌", "Crunch 🦷", "Night Slash 🗡️", "Sucker Punch ⚡"],
+    normal: ["Tackle 🐾", "Quick Attack ⚡", "Hyper Beam 💥", "Body Slam 💢"],
+    bug: ["Bug Buzz 🐝", "X-Scissor ✂️", "Megahorn 🦄", "String Shot 🧵"],
+    rock: ["Rock Slide 🪨", "Stone Edge ⛰️", "Ancient Power ⏳", "Rock Throw 🪨"],
+    steel: ["Iron Head 🦾", "Flash Cannon 💫", "Bullet Punch 🥊", "Metal Claw 🛡️"],
+    poison: ["Sludge Bomb ☠️", "Poison Jab 🗡️", "Gunk Shot ☣️", "Acid 🧪"],
+    flying: ["Air Slash 🦅", "Brave Bird 🕊️", "Hurricane 🌪️", "Wing Attack 🶶"],
+    fairy: ["Moonblast 🌙", "Dazzling Gleam ✨", "Draining Kiss 💕", "Play Rough 🐾"],
+    ground: ["Earthquake 🌍", "Earth Power 🌋", "Bulldoze TR", "Mud Slap 💩"],
+    anime: ["Shinra Tensei 🌌", "Final Getsuga Tensho ⚔️", "Ultra Impact 💥", "Blade Whirlwind 🌀", "Domain Expansion ⛩️"],
+    webnovel: ["Spring Autumn Cicada 🐛", "Fog of History 🌫️", "Chaos Sword Intent 🗡️", "Divination 🔮", "Aperture Refinement 💎"]
+};
+
+// Database Storage
+let db = {};
+if (fs.existsSync('./database.json')) {
+    try {
+        db = JSON.parse(fs.readFileSync('./database.json', 'utf8'));
+    } catch (e) {
+        db = {};
+    }
 }
 
 function saveDB() {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+    fs.writeFileSync('./database.json', JSON.stringify(db, null, 2));
 }
 
 function getPlayer(senderNum) {
-    if (!db.players[senderNum]) {
-        db.players[senderNum] = {
+    if (!db[senderNum]) {
+        db[senderNum] = {
             coins: 1000,
-            level: 1,
-            xp: 0,
-            deck: [],
-            activeSlot: 0
+            activeSlot: 0,
+            deck: []
         };
         saveDB();
     }
-    return db.players[senderNum];
+    return db[senderNum];
 }
 
-// Massive pool of Tier S Animated GIFs, SSR, and untiered normal cards
-const DYNAMIC_POOL = [
-    // --- TIER S ANIMATED GIF / SHINY CARDS ---
-    { name: "Pain (Shinra Tensei)", tier: "TIER S 🌟", type: "dark", isAnimated: true, image: "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExaG13cmR0NGJzMW1zNXh6MTkya3NxbGpxaXVpd215bmR0eTZ6eW9mdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/Ld77zD3fF3Rem8avEt/giphy.gif" },
-    { name: "Gojo Satoru (Hollow Purple)", tier: "TIER S 🌟", type: "psychic", isAnimated: true, image: "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExOGx2aHJrcmN2Y3ZzNWg2cW1kZ3I2bnBxeW92bW5oN2QzaHY5ZjE5ZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/4lu5FuhtrbaOQgKN57/giphy.gif" },
-    { name: "Ichigo (Mugetsu)", tier: "TIER S 🌟", type: "dark", isAnimated: true, image: "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMWkyaWF0aTMyajB3OWJ6MmVjOHJmZ2Vncnk5NHd0cXlqdWdlZ2V4ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/10LKovKon8DENO/giphy.gif" },
-    { name: "Goku (Super Saiyan Blue)", tier: "TIER S 🌟", type: "electric", isAnimated: true, image: "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMXl6NG1jM2RpbDlkYmFxd2NwdTZucWNwbWhudnZreWp6OW9xeXFvZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3oKIPnAiaMCws8nOsE/giphy.gif" },
+let activeSpawns = {};
 
-    // --- SSR CARDS ---
-    { name: "Levi Ackerman", tier: "SSR", type: "fighting", isAnimated: false, image: "https://i.postimg.cc/qM0pLg3n/levi.jpg" },
-    { name: "Naruto Uzumaki", tier: "SSR", type: "psychic", isAnimated: false, image: "https://i.postimg.cc/D0h9Gf7S/naruto.jpg" },
-    { name: "Sasuke Uchiha", tier: "SSR", type: "electric", isAnimated: false, image: "https://i.postimg.cc/3wMvC2t7/sasuke.jpg" },
-
-    // --- NORMAL / UNTIERED CARDS (Standard collection fillers) ---
-    { name: "Standard Villager", tier: "NORMAL", type: "normal", isAnimated: false, image: "https://i.postimg.cc/KzT5fM8k/osamu.jpg" },
-    { name: "Academy Student", tier: "NORMAL", type: "normal", isAnimated: false, image: "https://i.postimg.cc/26Z8PZ3n/thorfinn.jpg" },
-    { name: "Recruit Soldier", tier: "NORMAL", type: "fighting", isAnimated: false, image: "https://i.postimg.cc/50R02Qk8/tanjiro.jpg" },
-    { name: "Wild Rookie", tier: "NORMAL", type: "water", isAnimated: false, image: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png" }
-];
-
-function spawnWildPokemon(chatJid) {
-    // Randomly pick from thousands of possibilities or dynamic pool
-    const randCard = DYNAMIC_POOL[Math.floor(Math.random() * DYNAMIC_POOL.length)];
+function spawnWildPokemon(from) {
+    const randomCard = POKEMON_ROSTER[Math.floor(Math.random() * POKEMON_ROSTER.length)];
     
-    db.activeSpawns[chatJid] = {
-        name: randCard.name,
-        category: randCard.tier.includes("TIER S") ? "Legendary Anime" : "Anime / Card",
-        tier: randCard.tier,
-        type: randCard.type,
-        isAnimated: randCard.isAnimated,
-        image: randCard.image,
-        level: 5,
+    // Assign random moves based on its type
+    const typeMoves = MOVES_DATABASE[randomCard.type] || MOVES_DATABASE["normal"];
+    const shuffled = [...typeMoves].sort(() => 0.5 - Math.random());
+    const assignedMoves = shuffled.slice(0, 2);
+
+    // 5% chance for a Shiny / Awakened variant card
+    const isShiny = Math.random() < 0.05;
+    const cardName = isShiny ? `✨ Shiny ${randomCard.name}` : randomCard.name;
+
+    const wildCard = {
+        name: cardName,
+        tier: randomCard.tier,
+        type: randomCard.type,
+        image: randomCard.image,
+        level: Math.floor(Math.random() * 15) + 1,
         xp: 0,
-        hp: 250,
-        maxHp: 250,
-        atk: 85,
-        spd: 90,
-        moves: ["Tackle", "Scratch"]
+        moves: assignedMoves,
+        isShiny: isShiny
     };
-    saveDB();
-    return db.activeSpawns[chatJid];
+    
+    activeSpawns[from] = wildCard;
+    return wildCard;
 }
 
-function catchPokemon(chatJid, senderNum, targetName) {
-    const spawn = db.activeSpawns[chatJid];
-    if (!spawn || spawn.name.toLowerCase() !== targetName.toLowerCase()) return null;
+function catchPokemon(from, senderNum, targetName) {
+    const wild = activeSpawns[from];
+    if (!wild) return null;
+    
+    // Clean target name check (ignores shiny prefix if user types base name)
+    const cleanWildName = wild.name.replace('✨ Shiny ', '').toLowerCase();
+    const cleanTarget = targetName ? targetName.replace('✨ Shiny ', '').toLowerCase() : '';
 
-    delete db.activeSpawns[chatJid];
+    if (targetName && cleanWildName !== cleanTarget) return null;
+
     const player = getPlayer(senderNum);
-    const caught = { ...spawn, uid: Date.now().toString().slice(-5) };
-    player.deck.push(caught);
+    player.deck.push({ ...wild });
     saveDB();
-    return caught;
+    delete activeSpawns[from];
+    return wild;
 }
 
-function addXPAndCheckMoves(player, pokemon, xpGained) {
-    if (pokemon.level >= 100) {
-        pokemon.level = 100;
-        return { leveledUp: false, pendingMove: null };
-    }
-
-    pokemon.xp += xpGainedd;
-    let neededXP = pokemon.level * 50;
+function addXPAndCheckMoves(player, poke, xpGain) {
+    poke.xp += xpGain;
     let leveledUp = false;
-    let pendingMove = null;
-
-    while (pokemon.xp >= neededXP && pokemon.level < 100) {
-        pokemon.xp -= neededXP;
-        pokemon.level += 1;
-        pokemon.maxHp += 12;
-        pokemon.hp = pokemon.maxHp;
-        pokemon.atk += 4;
+    const nextLevelXP = poke.level * 100;
+    if (poke.xp >= nextLevelXP) {
+        poke.level += 1;
+        poke.xp = 0;
         leveledUp = true;
-        neededXP = pokemon.level * 50;
-    }
 
-    if (pokemon.level >= 100) pokemon.level = 100;
+        // Learn a new move if available (up to 4 moves)
+        const typeMoves = MOVES_DATABASE[poke.type] || MOVES_DATABASE["normal"];
+        if (poke.moves.length < 4) {
+            const availableMoves = typeMoves.filter(m => !poke.moves.includes(m));
+            if (availableMoves.length > 0) {
+                const newMove = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+                poke.moves.push(newMove);
+            }
+        }
+    }
     saveDB();
-    return { leveledUp, pendingMove };
+    return { leveledUp };
 }
 
 module.exports = {
-    db, saveDB, getPlayer, spawnWildPokemon, catchPokemon, addXPAndCheckMoves,
-    TYPE_CHART, MOVES_DATABASE
+    db,
+    saveDB,
+    getPlayer,
+    spawnWildPokemon,
+    catchPokemon,
+    addXPAndCheckMoves,
+    TYPE_CHART,
+    MOVES_DATABASE
 };
