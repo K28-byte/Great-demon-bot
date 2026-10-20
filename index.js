@@ -9,19 +9,28 @@ const fs = require('fs');
 const exec = require('child_process').exec;
 const os = require('os');
 const https = require('https');
+const http = require('http');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v35.0 WORKER EDITION";
+const BOT_VERSION = "v37.0 AWAKE EDITION";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
+
+// --- RAILWAY HTTP KEEPALIVE SERVER (Prevents "Sleeping" State) ---
+const PORT = process.env.PORT || 8080;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Great Demon Bot is Alive and Awake 24/7!');
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 Keep-alive HTTP server listening on port ${PORT}`);
+});
 
 // --- STATE & DATABASE MANAGEMENT ---
 let botMode = "public"; 
 const activeGames = {};
-const groupSettings = {};
 const vipUsers = new Set([OWNER_NUMBER]);
 
 const CARDS_DB_FILE = './anime_cards.json';
@@ -122,24 +131,18 @@ async function startDemonBot() {
     sock.ev.on('creds.update', saveCreds);
 
     if (!sock.authState.creds.registered) {
-        console.log('\n==================================================');
         let phoneNumber = process.env.PHONE_NUMBER;
-        
-        if (!phoneNumber) {
-            console.log('❌ ERROR: Please set PHONE_NUMBER in Railway Environment Variables!');
-            return;
+        if (phoneNumber) {
+            phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+            setTimeout(async () => {
+                try {
+                    const code = await sock.requestPairingCode(phoneNumber);
+                    console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${code}\x1b[0m\n`);
+                } catch (err) {
+                    console.log('❌ Error requesting pairing code:', err.message);
+                }
+            }, 3000);
         }
-
-        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-        
-        setTimeout(async () => {
-            try {
-                const code = await sock.requestPairingCode(phoneNumber);
-                console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${code}\x1b[0m\n`);
-            } catch (err) {
-                console.log('❌ Error requesting pairing code:', err.message);
-            }
-        }, 3000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -214,88 +217,57 @@ async function startDemonBot() {
 
 『 *ANIME CARD SYSTEM* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .spawncard - Spawn card with image!
-⬡ .catch - Claim spawned card
-⬡ .mycards - View collection
-⬡ .leaderboard - Top collectors
+⡜ .spawncard - Spawn card with image!
+⡜ .catch - Claim spawned card
+⡜ .mycards - View collection
+⡜ .leaderboard - Top collectors
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *OWNER MENU* 』
+『 *AI & UTILS* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .addowner, .antidelete, .antiviewonce
-⬡ .autoonline, .autorecording, .autostatuslike
-⬡ .autostatusview, .autotyping, .block
-⬡ .buatgc, .changebio, .devices, .getpp
-⬡ .joingroup, .leavegroup, .listfont, .listgroup
-⬡ .bancheck, .botlink, .fetchstatus, .listchannels
-⬡ .mode <public/private>, .pair <number>
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *VIP MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .connectedusers, .inspectsock, .vipadd
-⬡ .vipadmin, .vipallgroups, .vipdemote
-⬡ .vipdetails, .vipgroups, .viplist, .vipmenu
-⬡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
+⡜ .ai <query> - Chat with AI assistant
+⡜ .sticker - Convert replied image to sticker
+⡜ .ping - Check bot response latency
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *GROUP MANAGEMENT* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .activeusers, .addmember, .antiadd, .antibot
-⬡ .antidemote, .antigroupsmention, .antiimage, .antilink
-⬡ .antipromote, .antiremove, .antispam, .antitag
-⬡ .antitagadmin, .approveall, .close, .closetime
-⬡ .demoteall, .demoteuser, .disapproveall, .dor
-⬡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
-⬡ .grouponly, .hidetag, .inactiveusers, .kickall
-⬡ .left, .listgroups, .mediatag, .open, .opentime
-⬡ .promoteall, .promoteuser, .remove, .setgroupbio
-⬡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⬡ .tagall, .tagonline, .tagpoll, .warning, .welcome
-⬡ .pin, .status, .vv
+⡜ .tagall - Tag all group members
+⡜ .hidetag <msg> - Silent broadcast tag
+⡜ .open / .close - Unlock/Lock group chat
+⡜ .kick @user - Remove participant
+⡜ .grouplink - Get group invite URL
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-『 *AI MENU* 』
+『 *OWNER & SYSTEM* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .ai, .aimenu, .claude, .copilot
-⬡ .describe, .felo, .gpt, .imagine, .llama
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *CONVERT MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .audio, .convertmenu, .stickermeme, .stiker
-⬡ .swm, .telestick, .toaud, .togif, .toimg
-⬡ .tomp4, .toptt, .tourl
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *DOWNLOAD MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .applemusic, .capcut, .dl, .downloadmenu, .fb
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *GAME MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .2048, .activegames, .connect4, .dino
-⬡ .emojidecode, .endgame, .flappy, .galaxy
-⬡ .gamemenu, .letterblitz, .memory, .mines
-⬡ .pong, .reverseit
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *OTHER COMMANDS* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .androidcrash, .bugmenu, .gccrash, .hd
-⬡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
-⬡ .searchmenu, .spamngl, .toolmenu, .xnxx
-⬡ .xvideos, .yts, .ping
+⡜ .mode <public/private> - Toggle bot mode
+⡜ .pair <number> - Generate pairing code session
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
                 try {
-                    await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
+                    https.get(MENU_IMAGE_URL, (res) => {
+                        let data = [];
+                        res.on('data', chunk => data.push(chunk));
+                        res.on('end', async () => {
+                            await sock.sendMessage(from, { image: Buffer.concat(data), caption: menuText }, { quoted: msg });
+                        });
+                    }).on('error', async () => {
+                        await sock.sendMessage(from, { text: menuText }, { quoted: msg });
+                    });
                 } catch (err) {
                     await sock.sendMessage(from, { text: menuText }, { quoted: msg });
                 }
+                break;
+            }
+
+            case 'ping': {
+                const start = Date.now();
+                const sent = await sock.sendMessage(from, { text: '🏓 Pinging...' }, { quoted: msg });
+                const latency = Date.now() - start;
+                await sock.sendMessage(from, { text: `🏓 *Pong!* \`${latency}ms\`` }, { edit: sent.key });
                 break;
             }
 
@@ -303,7 +275,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 const newCard = generateRandomCard();
                 const spawnCaption = 
 `🃏 *WILD ANIME CARD SPAWNED!* 🃏
-✨ Over 10,000 unique card combinations!
 
 ✦ *ID:* \`\`\`${newCard.id}\`\`\`
 ✦ *Character:* ${newCard.name}
@@ -313,13 +284,17 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
 👉 Reply to this message with **.catch** to claim it!`;
 
-                try {
-                    const sentMsg = await sock.sendMessage(from, { image: { url: newCard.image }, caption: spawnCaption }, { quoted: msg });
-                    activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
-                } catch (e) {
+                https.get(newCard.image, async (res) => {
+                    let data = [];
+                    res.on('data', chunk => data.push(chunk));
+                    res.on('end', async () => {
+                        const sentMsg = await sock.sendMessage(from, { image: Buffer.concat(data), caption: spawnCaption }, { quoted: msg });
+                        activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
+                    });
+                }).on('error', async () => {
                     const sentMsg = await sock.sendMessage(from, { text: spawnCaption }, { quoted: msg });
                     activeGames[from] = { type: 'card_spawn', card: newCard, messageKey: sentMsg.key };
-                }
+                });
                 break;
             }
 
@@ -353,7 +328,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 let text = `╭━━━〔 *${senderNum}'s CARD COLLECTION* 〕━━━┈\n✦ Total Cards: ${collection.length}\n✦ Total Power: ⚡${totalPower}\n\n`;
                 
                 collection.slice(-10).forEach((c, idx) => {
-                    text += `⬡ ${idx + 1}. *${c.name}* (${c.rarity}) - ⚡${c.power}\n`;
+                    text += `⡜ ${idx + 1}. *${c.name}* (${c.rarity}) - ⚡${c.power}\n`;
                 });
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
 
@@ -369,7 +344,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 let text = `╭━━━〔 *TOP ANIME CARD COLLECTORS* 〕━━━┈\n`;
                 entries.slice(0, 5).forEach(([num, cards], i) => {
                     let totalP = cards.reduce((acc, c) => acc + c.power, 0);
-                    text += `⬡ ${i + 1}. @${num} - *${cards.length} cards* (⚡${totalP} Power)\n`;
+                    text += `⡜ ${i + 1}. @${num} - *${cards.length} cards* (⚡${totalP} Power)\n`;
                 });
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
 
@@ -394,6 +369,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             case 'pair': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
                 const targetNum = args[0]?.replace(/[^0-9]/g, '');
                 if (!targetNum || targetNum.length < 10) {
                     return sock.sendMessage(from, { text: '❌ Provide phone number with country code!\n✦ Example: `.pair 2347061696819`' }, { quoted: msg });
@@ -432,14 +408,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'ai':
             case 'gpt': {
                 const query = args.join(' ');
-                if (!query) return sock.sendMessage(from, { text: '❌ Please ask a question!' }, { quoted: msg });
+                if (!query) return sock.sendMessage(from, { text: '❌ Please provide a prompt for the AI!' }, { quoted: msg });
 
                 await sock.sendMessage(from, { text: '⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 AI Thinking...*' }, { quoted: msg });
                 try {
                     const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(query)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
                     await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ ${res.response}\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ Processed prompt: "${query}"\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `╭━━━〔 *AI RESPONSE* 〕━━━┈\n✦ Processed prompt successfully: "${query}"\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
                 }
                 break;
             }
@@ -478,7 +454,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
                 const groupMetadata = await sock.groupMetadata(from);
                 let text = `╭━━━〔 *ATTENTION MEMBERS* 〕━━━┈\n`;
                 let mentions = groupMetadata.participants.map(p => p.id);
-                mentions.forEach(p => text += `⬡ @${p.split('@')[0]}\n`);
+                mentions.forEach(p => text += `⡜ @${p.split('@')[0]}\n`);
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
                 await sock.sendMessage(from, { text, mentions }, { quoted: msg });
                 break;
@@ -494,14 +470,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             case 'open': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Group Admin only!' }, { quoted: msg });
                 await sock.groupSettingUpdate(from, 'not_announcement');
                 await sock.sendMessage(from, { text: '🔓 Group opened for all members.' }, { quoted: msg });
                 break;
             }
 
             case 'close': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Group Admin only!' }, { quoted: msg });
                 await sock.groupSettingUpdate(from, 'announcement');
                 await sock.sendMessage(from, { text: '🔒 Group closed (Admins only).' }, { quoted: msg });
                 break;
@@ -509,7 +485,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 
             case 'kick':
             case 'remove': {
-                if (!isGroup || (!isAdmin && !isOwner)) return;
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Group Admin only!' }, { quoted: msg });
                 const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
                 if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to remove!' }, { quoted: msg });
                 await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
@@ -520,8 +496,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             case 'grouplink': {
                 if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only!' }, { quoted: msg });
                 if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ Make bot admin first!' }, { quoted: msg });
-                const code = await sock.groupInviteCode(from);
-                await sock.sendMessage(from, { text: `🔗 *Group Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                try {
+                    const code = await sock.groupInviteCode(from);
+                    await sock.sendMessage(from, { text: `🔗 *Group Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ Failed to fetch invite code.' }, { quoted: msg });
+                }
                 break;
             }
         }
@@ -529,6 +509,3 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
 }
 
 startDemonBot();
-
-// Keep worker alive indefinitely
-setInterval(() => {}, 1000 * 60 * 60);
