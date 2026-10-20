@@ -9,22 +9,12 @@ const fs = require('fs');
 const exec = require('child_process').exec;
 const os = require('os');
 const https = require('https');
-const http = require('http');
-
-// --- RAILWAY HEALTH-CHECK WEB SERVER ---
-const PORT = process.env.PORT || 8080;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 is online and running 24/7!\n');
-}).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP server listening on port ${PORT}`);
-});
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v21.0 ULTIMATE CARDS WITH IMAGES";
+const BOT_VERSION = "v22.0 STABLE PURE";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -132,13 +122,16 @@ async function startDemonBot() {
     sock.ev.on('creds.update', saveCreds);
 
     if (!sock.authState.creds.registered) {
+        console.log('\n==================================================');
         let phoneNumber = process.env.PHONE_NUMBER;
+        
         if (!phoneNumber) {
             console.log('❌ ERROR: Please set PHONE_NUMBER in Railway Environment Variables!');
             return;
         }
 
         phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+        
         setTimeout(async () => {
             try {
                 const code = await sock.requestPairingCode(phoneNumber);
@@ -146,7 +139,7 @@ async function startDemonBot() {
             } catch (err) {
                 console.log('❌ Error requesting pairing code:', err.message);
             }
-        }, 4000);
+        }, 3000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -155,7 +148,7 @@ async function startDemonBot() {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('⚡ Reconnecting Great Demon Bot...');
-                setTimeout(startDemonBot, 3000);
+                startDemonBot();
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
@@ -429,4 +422,58 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Engine Active_`;
             }
 
             case 'tagall': {
-                if (!isGroup || (!isAdmin && !isOwner)) return sock.
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '❌ Group Admin only!' }, { quoted: msg });
+                const groupMetadata = await sock.groupMetadata(from);
+                let text = `╭━━━〔 *ATTENTION MEMBERS* 〕━━━┈\n`;
+                let mentions = groupMetadata.participants.map(p => p.id);
+                mentions.forEach(p => text += `⬡ @${p.split('@')[0]}\n`);
+                text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+                await sock.sendMessage(from, { text, mentions }, { quoted: msg });
+                break;
+            }
+
+            case 'hidetag': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                const hidetagText = args.join(' ') || 'Attention everyone!';
+                const groupMetadata = await sock.groupMetadata(from);
+                const mentions = groupMetadata.participants.map(p => p.id);
+                await sock.sendMessage(from, { text: hidetagText, mentions });
+                break;
+            }
+
+            case 'open': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                await sock.groupSettingUpdate(from, 'not_announcement');
+                await sock.sendMessage(from, { text: '🔓 Group opened for all members.' }, { quoted: msg });
+                break;
+            }
+
+            case 'close': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                await sock.groupSettingUpdate(from, 'announcement');
+                await sock.sendMessage(from, { text: '🔒 Group closed (Admins only).' }, { quoted: msg });
+                break;
+            }
+
+            case 'kick':
+            case 'remove': {
+                if (!isGroup || (!isAdmin && !isOwner)) return;
+                const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                if (mentioned.length === 0) return sock.sendMessage(from, { text: '❌ Tag user to remove!' }, { quoted: msg });
+                await sock.groupParticipantsUpdate(from, [mentioned[0]], 'remove');
+                await sock.sendMessage(from, { text: '✅ User removed from group.' }, { quoted: msg });
+                break;
+            }
+
+            case 'grouplink': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ Group command only!' }, { quoted: msg });
+                if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ Make bot admin first!' }, { quoted: msg });
+                const code = await sock.groupInviteCode(from);
+                await sock.sendMessage(from, { text: `🔗 *Group Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                break;
+            }
+        }
+    });
+}
+
+startDemonBot();
