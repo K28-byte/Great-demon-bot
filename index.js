@@ -1,7 +1,11 @@
 const http = require('http');
-const PORT = process.env.PORT || 8080;
+const https = require('https');
+const fs = require('fs');
+const exec = require('child_process').exec;
+const crypto = require('crypto');
 
-// 1. Bind HTTP server instantly so Railway never kills the container with SIGTERM
+// 1. Bind HTTP server instantly so Railway never kills the container
+const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Great Demon Bot is Online!');
@@ -16,9 +20,6 @@ const {
     fetchLatestBaileysVersion, 
     downloadContentFromMessage 
 } = require('@whiskeysockets/baileys');
-const fs = require('fs');
-const exec = require('child_process').exec;
-const https = require('https');
 
 process.on('uncaughtException', (err) => console.log('Uncaught Exception:', err.message));
 process.on('unhandledRejection', (err) => console.log('Unhandled Rejection:', err?.message || err));
@@ -26,7 +27,7 @@ process.on('unhandledRejection', (err) => console.log('Unhandled Rejection:', er
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v41.0 ULTIMATE STABLE";
+const BOT_VERSION = "v42.0 FIXED EDITION";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -141,7 +142,7 @@ async function startDemonBot() {
                 } catch (err) {
                     console.log('❌ Error requesting pairing code:', err.message);
                 }
-            }, 4000);
+            }, 5000);
         }
     }
 
