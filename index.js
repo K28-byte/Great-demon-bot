@@ -949,3 +949,14 @@ case 'pair': {
 }
 
 startDemonBot();
+
+// --- KEEP ALIVE HTTP SERVER FOR RENDER ---
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Great Demon Bot is active 24/7!\n');
+}).listen(PORT, () => {
+    console.log(`🌐 Keep-alive server running on port ${PORT}`);
+});
