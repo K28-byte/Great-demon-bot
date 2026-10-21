@@ -7,6 +7,8 @@ const {
     downloadContentFromMessage 
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
+const path = require('path');
+const pino = require('pino');
 const exec = require('child_process').exec;
 const os = require('os');
 const https = require('https');
@@ -393,7 +395,55 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 moonlight sonata is A
         }, { quoted: msg });
         break;
 
+case 'pair': {
+    let targetNum = args[0] ? args[0].replace(/[^0-9]/g, '') : '';
 
+    if (!targetNum || targetNum.length < 10) {
+        return reply("❌ *Please provide a valid phone number with country code!*\n\n*Example:* `.pair 2349046797695`");
+    }
+
+    try {
+        await reply(`⏳ *Generating pairing code for +${targetNum}... Please wait 3-5 seconds.*`);
+
+        const tempSessionPath = path.join(__dirname, 'sessions', `session_${targetNum}`);
+        const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
+
+        const tempSock = makeWASocket({
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: false,
+            auth: state,
+            browser: ["Great Demon Bot", "Chrome", "1.0.0"]
+        });
+
+        tempSock.ev.on('creds.update', saveCreds);
+
+        setTimeout(async () => {
+            try {
+                let code = await tempSock.requestPairingCode(targetNum);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+
+                let pairMsg = `🔑 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 PAIRING CODE*\n\n` +
+                              `📱 *Target Number:* +${targetNum}\n` +
+                              `⚡ *Pairing Code:* \`${code}\`\n\n` +
+                              `*Instructions:*\n` +
+                              `1. Open WhatsApp on +${targetNum}\n` +
+                              `2. Go to **Settings / Linked Devices** > **Link a Device**\n` +
+                              `3. Tap **Link with phone number instead**\n` +
+                              `4. Enter the code above within 30 seconds!`;
+
+                await reply(pairMsg);
+            } catch (innerErr) {
+                console.error("Pairing Code Error:", innerErr.message || innerErr);
+                await reply("❌ *Failed to get pairing code from WhatsApp. Ensure the number is active and try again.*");
+            }
+        }, 3000);
+
+    } catch (err) {
+        console.error("Pair Command Error:", err.message || err);
+        await reply("❌ *An error occurred while processing the pair request.*");
+    }
+    break;
+}
 
             case 'tagall': {
                 if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: 'Admin only!' }, { quoted: msg });
