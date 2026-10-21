@@ -24,6 +24,9 @@ let botMode = "public"; // 'public' or 'private'
 const activeGames = {};
 const groupSettings = {};
 const vipUsers = new Set([OWNER_NUMBER]);
+let prefix = ".";
+const blockedUsers = new Set();
+const deletedMessages = new Map();
 
 // Helper for HTTP requests
 function fetchJson(url) {
@@ -165,6 +168,54 @@ if (isCmd) {
         spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
     }
 }
+if (isGroup && groupSettings[from]) {
+    const sender = msg.key.participant || msg.key.remoteJid;
+    const isSenderAdmin = isAdmin || isOwner;
+
+    if (groupSettings[from].antilink && !isSenderAdmin) {
+        const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
+        if (linkRegex.test(body)) {
+            await sock.sendMessage(from, { delete: msg.key });
+            await sock.sendMessage(from, { 
+                text: `⚠️ *@${sender.split('@')[0]}*, links are strictly prohibited in this group!`,
+                mentions: [sender]
+            });
+            return;
+        }
+    }
+
+    if (groupSettings[from].antibot && msg.key.id.startsWith('BAE5') && !msg.key.fromMe) {
+        await sock.sendMessage(from, { text: `🚨 External bot detected! Removing...` });
+        await sock.sendMessage(from, { delete: msg.key });
+        if (isBotAdmin) {
+            await sock.groupParticipantsUpdate(from, [sender], 'remove');
+        }
+        return;
+    }
+}
+
+if (msg.messageStubType === 68 || msg.type === 'protocolMessage') {
+    const targetKey = msg.message?.protocolMessage?.key;
+    if (targetKey && deletedMessages.has(targetKey.id)) {
+        const deletedMsg = deletedMessages.get(targetKey.id);
+        const chatJid = deletedMsg.key.remoteJid;
+
+        if (groupSettings[chatJid]?.antidelete) {
+            await sock.sendMessage(chatJid, {
+                text: `🕵️‍♂️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Delete*\n\n` +
+                      `👤 *Sender:* @${deletedMsg.sender.split('@')[0]}\n` +
+                      `💬 *Deleted Content:* ${deletedMsg.text || '[Media/Non-text message]'}`,
+                mentions: [deletedMsg.sender]
+            });
+        }
+    }
+} else if (msg.key?.id) {
+    deletedMessages.set(msg.key.id, {
+        key: msg.key,
+        sender: msg.key.participant || msg.key.remoteJid,
+        text: body
+    });
+}
 
 
         switch (command) {
@@ -301,6 +352,77 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 moonlight sonata is A
                 await sock.sendMessage(from, { text, mentions }, { quoted: msg });
                 break;
             }
+    case 'antilink':
+    case 'antibot':
+    case 'antidelete':
+    case 'welcome':
+    case 'goodbye': {
+        if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
+
+        if (!groupSettings[from]) groupSettings[from] = {};
+        const setting = command;
+        const state = args[0]?.toLowerCase();
+
+        if (state === 'on') {
+            groupSettings[from][setting] = true;
+            await sock.sendMessage(from, { text: `✅ *${setting.toUpperCase()}* has been *ENABLED* for this group.` }, { quoted: msg });
+        } else if (state === 'off') {
+            groupSettings[from][setting] = false;
+            await sock.sendMessage(from, { text: `❌ *${setting.toUpperCase()}* has been *DISABLED* for this group.` }, { quoted: msg });
+        } else {
+            await sock.sendMessage(from, { text: `💡 Usage: *${prefix}${setting} on* or *${prefix}${setting} off*` }, { quoted: msg });
+        }
+        break;
+    }
+
+    case 'setprefix': {
+        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+        if (!args[0]) return sock.sendMessage(from, { text: `💡 Usage: *${prefix}setprefix <new_prefix>*` }, { quoted: msg });
+        prefix = args[0];
+        await sock.sendMessage(from, { text: `⚙️ Prefix successfully changed to: *${prefix}*` }, { quoted: msg });
+        break;
+    }
+
+    case 'block': {
+        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        if (!target) return sock.sendMessage(from, { text: '💡 Tag or mention a user to block.' }, { quoted: msg });
+        
+        await sock.updateBlockStatus(target, 'block');
+        blockedUsers.add(target);
+        await sock.sendMessage(from, { text: `🚫 Successfully blocked user.` }, { quoted: msg });
+        break;
+    }
+
+    case 'unblock': {
+        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        if (!target) return sock.sendMessage(from, { text: '💡 Tag or mention a user to unblock.' }, { quoted: msg });
+        
+        await sock.updateBlockStatus(target, 'unblock');
+        blockedUsers.delete(target);
+        await sock.sendMessage(from, { text: `✅ Successfully unblocked user.` }, { quoted: msg });
+        break;
+    }
+
+    case 'broadcast':
+    case 'bc': {
+        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+        const bcText = q;
+        if (!bcText) return sock.sendMessage(from, { text: '💡 Usage: *.broadcast <your message here>*</your>' }, { quoted: msg });
+
+        const groups = Object.keys(await sock.groupFetchAllParticipating());
+        await sock.sendMessage(from, { text: `📢 Sending broadcast to ${groups.length} groups...` }, { quoted: msg });
+
+        for (const groupId of groups) {
+            await sock.sendMessage(groupId, {
+                text: `📢 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 BROADCAST*\n\n${bcText}\n\n_~ Sent by Owner_`
+            });
+        }
+        await sock.sendMessage(from, { text: `✅ Broadcast sent successfully!` }, { quoted: msg });
+        break;
+    }
 
             case 'hidetag': {
                 if (!isGroup || (!isAdmin && !isOwner)) return;
