@@ -1,4 +1,3 @@
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -42,12 +41,12 @@ function fetchJson(url) {
         }).on('error', reject);
     });
 }
+
 // --- ANTISPAM CONFIGURATION ---
 const spamMap = new Map();
 const SPAM_LIMIT = 3;
 const SPAM_TIME = 5000;       // 5 seconds
 const COOLDOWN_TIME = 10000;  // 10 seconds
-
 
 async function startDemonBot() {
     const { state, saveCreds } = await useMultiFileAuthState('./demon_session');
@@ -115,6 +114,7 @@ async function startDemonBot() {
 
         const args = body.slice(1).trim().split(/ +/);
         const command = args.shift().toLowerCase();
+        const q = args.join(' '); // Fixed query variable definition
 
         let isAdmin = false;
         let isBotAdmin = false;
@@ -134,145 +134,90 @@ async function startDemonBot() {
             groupSettings[from] = { 
                 antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
                 antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false 
+                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false
             };
         }
-// --- ANTISPAM LOGIC ---
-const senderId = msg.key.participant || msg.key.remoteJid;
 
-if (body.startsWith(prefix)) {
-
-    const currentTime = Date.now();
-    
-    if (spamMap.has(senderId)) {
-        const userData = spamMap.get(senderId);
-        
-        if (userData.inCooldown) {
-            if (currentTime < userData.cooldownUntil) {
-                await sock.sendMessage(from, { text: "⚠️ *Anti-Spam:* Please wait before sending another command!" }, { quoted: msg });
-                return;
-            } else {
-                spamMap.delete(senderId);
-            }
-        } else {
-            if (currentTime - userData.firstMsgTime < SPAM_TIME) {
-                userData.msgCount += 1;
-                
-                if (userData.msgCount >= SPAM_LIMIT) {
-                    userData.inCooldown = true;
-                    userData.cooldownUntil = currentTime + COOLDOWN_TIME;
-                    await sock.sendMessage(from, { text: "🚫 *Anti-Spam Triggered:* You are sending commands too fast! Muted for 10 seconds." }, { quoted: msg });
-                    return;
+        // --- ANTISPAM LOGIC ---
+        const senderId = msg.key.participant || msg.key.remoteJid;
+        if (body.startsWith(prefix)) {
+            const currentTime = Date.now();
+            if (spamMap.has(senderId)) {
+                const userData = spamMap.get(senderId);
+                if (userData.inCooldown) {
+                    if (currentTime < userData.cooldownUntil) {
+                        await sock.sendMessage(from, { text: "⚠️ *Anti-Spam:* Please wait before sending another command!" }, { quoted: msg });
+                        return;
+                    } else {
+                        spamMap.delete(senderId);
+                    }
+                } else {
+                    if (currentTime - userData.firstMsgTime < SPAM_TIME) {
+                        userData.msgCount += 1;
+                        if (userData.msgCount >= SPAM_LIMIT) {
+                            userData.inCooldown = true;
+                            userData.cooldownUntil = currentTime + COOLDOWN_TIME;
+                            await sock.sendMessage(from, { text: "🚫 *Anti-Spam Triggered:* You are sending commands too fast! Muted for 10 seconds." }, { quoted: msg });
+                            return;
+                        }
+                    } else {
+                        spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
+                    }
                 }
             } else {
                 spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
             }
         }
-    } else {
-        spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
-    }
-}
-if (isGroup && groupSettings[from]) {
-    const sender = msg.key.participant || msg.key.remoteJid;
-    const isSenderAdmin = isAdmin || isOwner;
 
-    if (groupSettings[from].antilink && !isSenderAdmin) {
-        const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
-        if (linkRegex.test(body)) {
-            await sock.sendMessage(from, { delete: msg.key });
-            await sock.sendMessage(from, { 
-                text: `⚠️ *@${sender.split('@')[0]}*, links are strictly prohibited in this group!`,
-                mentions: [sender]
-            });
-            return;
+        // --- GROUP PROTECTION INTERCEPTORS ---
+        if (isGroup && groupSettings[from]) {
+            const isSenderAdmin = isAdmin || isOwner;
+
+            if (groupSettings[from].antilink && !isSenderAdmin) {
+                const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
+                if (linkRegex.test(body)) {
+                    await sock.sendMessage(from, { delete: msg.key });
+                    await sock.sendMessage(from, { 
+                        text: `⚠️ *@${sender.split('@')[0]}*, links are strictly prohibited in this group!`,
+                        mentions: [sender]
+                    });
+                    return;
+                }
+            }
+
+            if (groupSettings[from].antibot && msg.key.id.startsWith('BAE5') && !msg.key.fromMe) {
+                await sock.sendMessage(from, { text: `🚨 External bot detected! Removing...` });
+                await sock.sendMessage(from, { delete: msg.key });
+                if (isBotAdmin) {
+                    await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                }
+                return;
+            }
         }
-    }
 
-    if (groupSettings[from].antibot && msg.key.id.startsWith('BAE5') && !msg.key.fromMe) {
-        await sock.sendMessage(from, { text: `🚨 External bot detected! Removing...` });
-        await sock.sendMessage(from, { delete: msg.key });
-        if (isBotAdmin) {
-            await sock.groupParticipantsUpdate(from, [sender], 'remove');
-        }
-        return;
-    }
-}
+        // Anti-Delete Tracker
+        if (msg.messageStubType === 68 || msg.type === 'protocolMessage') {
+            const targetKey = msg.message?.protocolMessage?.key;
+            if (targetKey && deletedMessages.has(targetKey.id)) {
+                const deletedMsg = deletedMessages.get(targetKey.id);
+                const chatJid = deletedMsg.key.remoteJid;
 
-if (msg.messageStubType === 68 || msg.type === 'protocolMessage') {
-    const targetKey = msg.message?.protocolMessage?.key;
-    if (targetKey && deletedMessages.has(targetKey.id)) {
-        const deletedMsg = deletedMessages.get(targetKey.id);
-        const chatJid = deletedMsg.key.remoteJid;
-
-        if (groupSettings[chatJid]?.antidelete) {
-            await sock.sendMessage(chatJid, {
-                text: `🕵️‍♂️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Delete*\n\n` +
-                      `👤 *Sender:* @${deletedMsg.sender.split('@')[0]}\n` +
-                      `💬 *Deleted Content:* ${deletedMsg.text || '[Media/Non-text message]'}`,
-                mentions: [deletedMsg.sender]
-            });
-        }
-    }
-} else if (msg.key?.id) {
-    deletedMessages.set(msg.key.id, {
-        key: msg.key,
-        sender: msg.key.participant || msg.key.remoteJid,
-        text: body
-    });
-}
-// --- GROUP PROTECTION INTERCEPTORS ---
-if (isGroup && groupSettings[from]) {
-    const sender = msg.key.participant || msg.key.remoteJid;
-    const isSenderAdmin = isAdmin || isOwner;
-
-    // Anti-Link
-    if (groupSettings[from].antilink && !isSenderAdmin) {
-        const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
-        if (linkRegex.test(body)) {
-            await sock.sendMessage(from, { delete: msg.key });
-            await sock.sendMessage(from, { 
-                text: `⚠️ *@${sender.split('@')[0]}*, links are strictly prohibited in this group!`,
-                mentions: [sender]
-            });
-            return;
-        }
-    }
-
-    // Anti-Bot
-    if (groupSettings[from].antibot && msg.key.id.startsWith('BAE5') && !msg.key.fromMe) {
-        await sock.sendMessage(from, { text: `🚨 External bot detected! Removing...` });
-        await sock.sendMessage(from, { delete: msg.key });
-        if (isBotAdmin) {
-            await sock.groupParticipantsUpdate(from, [sender], 'remove');
-        }
-        return;
-    }
-}
-
-// Anti-Delete Tracker
-if (msg.messageStubType === 68 || msg.type === 'protocolMessage') {
-    const targetKey = msg.message?.protocolMessage?.key;
-    if (targetKey && deletedMessages.has(targetKey.id)) {
-        const deletedMsg = deletedMessages.get(targetKey.id);
-        const chatJid = deletedMsg.key.remoteJid;
-
-        if (groupSettings[chatJid]?.antidelete) {
-            await sock.sendMessage(chatJid, {
-                text: `🕵️‍♂️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Delete*\n\n` +
-                      `👤 *Sender:* @${deletedMsg.sender.split('@')[0]}\n` +
-                      `💬 *Deleted Content:* ${deletedMsg.text || '[Media/Non-text message]'}`,
-                mentions: [deletedMsg.sender]
+                if (groupSettings[chatJid]?.antidelete) {
+                    await sock.sendMessage(chatJid, {
+                        text: `🕵️‍♂️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Delete*\n\n` +
+                              `👤 *Sender:* @${deletedMsg.sender.split('@')[0]}\n` +
+                              `💬 *Deleted Content:* ${deletedMsg.text || '[Media/Non-text message]'}`,
+                        mentions: [deletedMsg.sender]
+                    });
+                }
+            }
+        } else if (msg.key?.id) {
+            deletedMessages.set(msg.key.id, {
+                key: msg.key,
+                sender: msg.key.participant || msg.key.remoteJid,
+                text: body
             });
         }
-    }
-} else if (msg.key?.id) {
-    deletedMessages.set(msg.key.id, {
-        key: msg.key,
-        sender: msg.key.participant || msg.key.remoteJid,
-        text: body
-    });
-}
-
 
         switch (command) {
             case 'menu':
@@ -405,64 +350,64 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 moonlight sonata is A
                 }
                 break;
             }
-        case 'antispam':
-        await sock.sendMessage(from, { 
-            text: `🛡️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Spam Security*\n\n` +
-                  `• *Limit:* ${SPAM_LIMIT} commands per ${SPAM_TIME / 1000}s\n` +
-                  `• *Penalty:* ${COOLDOWN_TIME / 1000}s temporary mute\n` +
-                  `• *Status:* Active ✅` 
-        }, { quoted: msg });
-        break;
 
-case 'pair': {
-    let targetNum = args[0] ? args[0].replace(/[^0-9]/g, '') : '';
-
-    if (!targetNum || targetNum.length < 10) {
-        return reply("❌ *Please provide a valid phone number with country code!*\n\n*Example:* `.pair 2349046797695`");
-    }
-
-    try {
-        await reply(`⏳ *Generating pairing code for +${targetNum}... Please wait 3-5 seconds.*`);
-
-        const tempSessionPath = path.join(__dirname, 'sessions', `session_${targetNum}`);
-        const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
-
-        const tempSock = makeWASocket({
-            logger: pino({ level: 'silent' }),
-            printQRInTerminal: false,
-            auth: state,
-            browser: ["Great Demon Bot", "Chrome", "1.0.0"]
-        });
-
-        tempSock.ev.on('creds.update', saveCreds);
-
-        setTimeout(async () => {
-            try {
-                let code = await tempSock.requestPairingCode(targetNum);
-                code = code?.match(/.{1,4}/g)?.join("-") || code;
-
-                let pairMsg = `🔑 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 PAIRING CODE*\n\n` +
-                              `📱 *Target Number:* +${targetNum}\n` +
-                              `⚡ *Pairing Code:* \`${code}\`\n\n` +
-                              `*Instructions:*\n` +
-                              `1. Open WhatsApp on +${targetNum}\n` +
-                              `2. Go to **Settings / Linked Devices** > **Link a Device**\n` +
-                              `3. Tap **Link with phone number instead**\n` +
-                              `4. Enter the code above within 30 seconds!`;
-
-                await reply(pairMsg);
-            } catch (innerErr) {
-                console.error("Pairing Code Error:", innerErr.message || innerErr);
-                await reply("❌ *Failed to get pairing code from WhatsApp. Ensure the number is active and try again.*");
+            case 'antispam': {
+                await sock.sendMessage(from, { 
+                    text: `🛡️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 Anti-Spam Security*\n\n` +
+                          `• *Limit:* ${SPAM_LIMIT} commands per ${SPAM_TIME / 1000}s\n` +
+                          `• *Penalty:* ${COOLDOWN_TIME / 1000}s temporary mute\n` +
+                          `• *Status:* Active ✅` 
+                }, { quoted: msg });
+                break;
             }
-        }, 3000);
 
-    } catch (err) {
-        console.error("Pair Command Error:", err.message || err);
-        await reply("❌ *An error occurred while processing the pair request.*");
-    }
-    break;
-}
+            case 'pair': {
+                let targetNum = args[0] ? args[0].replace(/[^0-9]/g, '') : '';
+                if (!targetNum || targetNum.length < 10) {
+                    return sock.sendMessage(from, { text: "❌ *Please provide a valid phone number with country code!*\n\n*Example:* `.pair 2349046797695`" }, { quoted: msg });
+                }
+
+                try {
+                    await sock.sendMessage(from, { text: `⏳ *Generating pairing code for +${targetNum}... Please wait 3-5 seconds.*` }, { quoted: msg });
+
+                    const tempSessionPath = path.join(__dirname, 'sessions', `session_${targetNum}`);
+                    const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
+
+                    const tempSock = makeWASocket({
+                        logger: pino({ level: 'silent' }),
+                        printQRInTerminal: false,
+                        auth: state,
+                        browser: ["Great Demon Bot", "Chrome", "1.0.0"]
+                    });
+
+                    tempSock.ev.on('creds.update', saveCreds);
+
+                    setTimeout(async () => {
+                        try {
+                            let code = await tempSock.requestPairingCode(targetNum);
+                            code = code?.match(/.{1,4}/g)?.join("-") || code;
+
+                            let pairMsg = `🔑 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 PAIRING CODE*\n\n` +
+                                          `📱 *Target Number:* +${targetNum}\n` +
+                                          `⚡ *Pairing Code:* \`${code}\`\n\n` +
+                                          `*Instructions:*\n` +
+                                          `1. Open WhatsApp on +${targetNum}\n` +
+                                          `2. Go to **Settings / Linked Devices** > **Link a Device**\n` +
+                                          `3. Tap **Link with phone number instead**\n` +
+                                          `4. Enter the code above within 30 seconds!`;
+
+                            await sock.sendMessage(from, { text: pairMsg }, { quoted: msg });
+                        } catch (innerErr) {
+                            console.error("Pairing Code Error:", innerErr.message || innerErr);
+                            await sock.sendMessage(from, { text: "❌ *Failed to get pairing code from WhatsApp. Ensure the number is active and try again.*" }, { quoted: msg });
+                        }
+                    }, 3000);
+                } catch (err) {
+                    console.error("Pair Command Error:", err.message || err);
+                    await sock.sendMessage(from, { text: "❌ *An error occurred while processing the pair request.*" }, { quoted: msg });
+                }
+                break;
+            }
 
             case 'tagall': {
                 if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: 'Admin only!' }, { quoted: msg });
@@ -474,84 +419,84 @@ case 'pair': {
                 await sock.sendMessage(from, { text, mentions }, { quoted: msg });
                 break;
             }
-    case 'antilink':
-    case 'antibot':
-    case 'antidelete':
-    case 'welcome':
-    case 'goodbye': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
 
-        if (!groupSettings[from]) groupSettings[from] = {};
-        const setting = command;
-        const state = args[0]?.toLowerCase();
+            case 'antilink':
+            case 'antibot':
+            case 'antidelete':
+            case 'welcome':
+            case 'goodbye': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
 
-        if (state === 'on') {
-            groupSettings[from][setting] = true;
-            await sock.sendMessage(from, { text: `✅ *${setting.toUpperCase()}* has been *ENABLED* for this group.` }, { quoted: msg });
-        } else if (state === 'off') {
-            groupSettings[from][setting] = false;
-            await sock.sendMessage(from, { text: `❌ *${setting.toUpperCase()}* has been *DISABLED* for this group.` }, { quoted: msg });
-        } else {
-            await sock.sendMessage(from, { text: `💡 Usage: *${prefix}${setting} on* or *${prefix}${setting} off*` }, { quoted: msg });
-        }
-        break;
-    }
+                if (!groupSettings[from]) groupSettings[from] = {};
+                const setting = command;
+                const stateArg = args[0]?.toLowerCase();
 
-    case 'setprefix': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
-        if (!args[0]) return sock.sendMessage(from, { text: `💡 Usage: *${prefix}setprefix <new_prefix>*` }, { quoted: msg });
-        prefix = args[0];
-        await sock.sendMessage(from, { text: `⚙️ Prefix successfully changed to: *${prefix}*` }, { quoted: msg });
-        break;
-    }
+                if (stateArg === 'on') {
+                    groupSettings[from][setting] = true;
+                    await sock.sendMessage(from, { text: `✅ *${setting.toUpperCase()}* has been *ENABLED* for this group.` }, { quoted: msg });
+                } else if (stateArg === 'off') {
+                    groupSettings[from][setting] = false;
+                    await sock.sendMessage(from, { text: `❌ *${setting.toUpperCase()}* has been *DISABLED* for this group.` }, { quoted: msg });
+                } else {
+                    await sock.sendMessage(from, { text: `💡 Usage: *${prefix}${setting} on* or *${prefix}${setting} off*` }, { quoted: msg });
+                }
+                break;
+            }
 
-    case 'block': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        if (!target) return sock.sendMessage(from, { text: '💡 Tag or mention a user to block.' }, { quoted: msg });
-        
-        await sock.updateBlockStatus(target, 'block');
-        blockedUsers.add(target);
-        await sock.sendMessage(from, { text: `🚫 Successfully blocked user.` }, { quoted: msg });
-        break;
-    }
+            case 'setprefix': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                if (!args[0]) return sock.sendMessage(from, { text: `💡 Usage: *${prefix}setprefix <new_prefix>*` }, { quoted: msg });
+                prefix = args[0];
+                await sock.sendMessage(from, { text: `⚙️ Prefix successfully changed to: *${prefix}*` }, { quoted: msg });
+                break;
+            }
 
-    case 'unblock': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        if (!target) return sock.sendMessage(from, { text: '💡 Tag or mention a user to unblock.' }, { quoted: msg });
-        
-        await sock.updateBlockStatus(target, 'unblock');
-        blockedUsers.delete(target);
-        await sock.sendMessage(from, { text: `✅ Successfully unblocked user.` }, { quoted: msg });
-        break;
-    }
+            case 'block': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                if (!target) return sock.sendMessage(from, { text: '💡 Tag or mention a user to block.' }, { quoted: msg });
+                
+                await sock.updateBlockStatus(target, 'block');
+                blockedUsers.add(target);
+                await sock.sendMessage(from, { text: `🚫 Successfully blocked user.` }, { quoted: msg });
+                break;
+            }
 
-    case 'broadcast':
-    case 'bc': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
-        const bcText = q;
-        if (!bcText) return sock.sendMessage(from, { text: '💡 Usage: *.broadcast <your message here>*</your>' }, { quoted: msg });
+            case 'unblock': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                if (!target) return sock.sendMessage(from, { text: '💡 Tag or mention a user to unblock.' }, { quoted: msg });
+                
+                await sock.updateBlockStatus(target, 'unblock');
+                blockedUsers.delete(target);
+                await sock.sendMessage(from, { text: `✅ Successfully unblocked user.` }, { quoted: msg });
+                break;
+            }
 
-        const groups = Object.keys(await sock.groupFetchAllParticipating());
-        await sock.sendMessage(from, { text: `📢 Sending broadcast to ${groups.length} groups...` }, { quoted: msg });
+            case 'broadcast':
+            case 'bc': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 Usage: *${prefix}broadcast <your message here>*` }, { quoted: msg });
 
-        for (const groupId of groups) {
-            await sock.sendMessage(groupId, {
-                text: `📢 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 BROADCAST*\n\n${bcText}\n\n_~ Sent by Owner_`
-            });
-        }
-        await sock.sendMessage(from, { text: `✅ Broadcast sent successfully!` }, { quoted: msg });
-        break;
-    }
+                const groups = Object.keys(await sock.groupFetchAllParticipating());
+                await sock.sendMessage(from, { text: `📢 Sending broadcast to ${groups.length} groups...` }, { quoted: msg });
+
+                for (const groupId of groups) {
+                    await sock.sendMessage(groupId, {
+                        text: `📢 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 BROADCAST*\n\n${q}\n\n_~ Sent by Owner_`
+                    });
+                }
+                await sock.sendMessage(from, { text: `✅ Broadcast sent successfully!` }, { quoted: msg });
+                break;
+            }
 
             case 'hidetag': {
                 if (!isGroup || (!isAdmin && !isOwner)) return;
                 const hidetagText = args.join(' ') || 'Attention everyone!';
                 const groupMetadata = await sock.groupMetadata(from);
                 const mentions = groupMetadata.participants.map(p => p.id);
-                await sock.sendMessage(from, { text: hidetagText, mentions });
+                await sock.sendMessage(from, { text: hidetagText, mentions }, { quoted: msg });
                 break;
             }
 
@@ -568,292 +513,219 @@ case 'pair': {
                 await sock.sendMessage(from, { text: '🔒 Group closed.' }, { quoted: msg });
                 break;
             }
-    // --- GROUP SECURITY TOGGLES ---
-    case 'antilink':
-    case 'antibot':
-    case 'antidelete':
-    case 'welcome':
-    case 'goodbye': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ 𝑨𝒅𝒎𝒊𝒏 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
 
-        if (!groupSettings[from]) groupSettings[from] = {};
-        const setting = command;
-        const state = args[0]?.toLowerCase();
-
-        if (state === 'on') {
-            groupSettings[from][setting] = true;
-            await sock.sendMessage(from, { text: `✅ *${setting.toUpperCase()}* has been *ENABLED* for this group.` }, { quoted: msg });
-        } else if (state === 'off') {
-            groupSettings[from][setting] = false;
-            await sock.sendMessage(from, { text: `❌ *${setting.toUpperCase()}* has been *DISABLED* for this group.` }, { quoted: msg });
-        } else {
-            await sock.sendMessage(from, { text: `💡 *𝑼𝒔𝒂𝒈𝒆:* ${prefix}${setting} on or ${prefix}${setting} off` }, { quoted: msg });
-        }
-        break;
-    }
-
-    // --- OWNER CONTROLS ---
-    case 'setprefix': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        if (!args[0]) return sock.sendMessage(from, { text: `💡 *𝑼𝒔𝒂𝒈𝒆:* ${prefix}setprefix <new_prefix>` }, { quoted: msg });
-        prefix = args[0];
-        await sock.sendMessage(from, { text: `⚙️ Prefix successfully changed to: *${prefix}*` }, { quoted: msg });
-        break;
-    }
-
-    case 'block': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        if (!target) return sock.sendMessage(from, { text: '💡 𝑻𝒂𝒈 𝒐𝒓 𝒎𝒆𝒏𝒕𝒊𝒐𝒏 𝒂 𝒖𝒔𝒆𝒓 𝒕𝒐 𝒃𝒍𝒐𝒄𝒌.' }, { quoted: msg });
-        
-        await sock.updateBlockStatus(target, 'block');
-        blockedUsers.add(target);
-        await sock.sendMessage(from, { text: `🚫 𝑺𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚 𝒃𝒍𝒐𝒄𝒌𝒆𝒅 𝒖𝒔𝒆𝒓.` }, { quoted: msg });
-        break;
-    }
-
-    case 'unblock': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        if (!target) return sock.sendMessage(from, { text: '💡 𝑻𝒂𝒈 𝒐𝒓 𝒎𝒆𝒏𝒕𝒊𝒐𝒏 𝒂 𝒖𝒔𝒆𝒓 𝒕𝒐 𝒖𝒏𝒃𝒍𝒐𝒄𝒌.' }, { quoted: msg });
-        
-        await sock.updateBlockStatus(target, 'unblock');
-        blockedUsers.delete(target);
-        await sock.sendMessage(from, { text: `✅ 𝑺𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚 𝒖𝒏𝒃𝒍𝒐𝒄𝒌𝒆𝒅 𝒖𝒔𝒆𝒓.` }, { quoted: msg });
-        break;
-    }
-
-    case 'broadcast':
-    case 'bc': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        const bcText = q;
-        if (!bcText) return sock.sendMessage(from, { text: `💡 *𝑼𝒔𝒂𝒈𝒆:* ${prefix}broadcast <your message here>` }, { quoted: msg });
-
-        const groups = Object.keys(await sock.groupFetchAllParticipating());
-        await sock.sendMessage(from, { text: `📢 𝑺𝒆𝒏𝒅𝒊𝒏𝒈 𝒃𝒓𝒐𝒂𝒅𝒄𝒂𝒔𝒕 𝒕𝒐 ${groups.length} 𝒈𝒓𝒐𝒖𝒑𝒔...` }, { quoted: msg });
-
-        for (const groupId of groups) {
-            await sock.sendMessage(groupId, {
-                text: `📢 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝑩𝑹𝑶𝑨𝑫𝑪𝑨𝑺𝑻*\n\n${bcText}\n\n_~ 𝑺𝒆𝒏𝒕 𝒃𝒚 𝑶𝒘𝒏𝒆𝒓_`
-            });
-        }
-        await sock.sendMessage(from, { text: `✅ 𝑩𝒓𝒐𝒂𝒅𝒄𝒂𝒔𝒕 𝒔𝒆𝒏𝒕 𝒔𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚!` }, { quoted: msg });
-        break;
-    }
-
-    // --- SYSTEM & UTILITIES ---
-    case 'devic':
-    case 'device': {
-        await sock.sendMessage(from, { 
-            text: `💻 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝑺𝒚𝒔𝒕𝒆𝒎 𝑰𝒏𝒇𝒐*\n\n` +
-                  `• *𝑷𝒍𝒂𝒕𝒇𝒐𝒓𝒎:* ${os.platform()}\n` +
-                  `• *𝑨𝒓𝒄𝒉𝒊𝒕𝒆𝒄𝒕𝒖𝒓𝒆:* ${os.arch()}\n` +
-                  `• *𝑴𝒆𝒎𝒐𝒓𝒚:* ${(os.freemem() / 1024 / 1024).toFixed(2)} 𝑴𝑩 𝒇𝒓𝒆𝒆 / ${(os.totalmem() / 1024 / 1024).toFixed(2)} 𝑴𝑩 𝒕𝒐𝒕𝒂𝒍\n` +
-                  `• *𝑼𝒑𝒕𝒊𝒎𝒆:* ${(os.uptime() / 3600).toFixed(2)} 𝒉𝒐𝒖𝒓𝒔` 
-        }, { quoted: msg });
-        break;
-    }
-
-    case 'connectedusers':
-    case 'activeuser': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        await sock.sendMessage(from, { text: `🟢 *𝑨𝒄𝒕𝒊𝒗𝒆 𝑺𝒆𝒔𝒔𝒊𝒐𝒏:* 𝑶𝒏𝒍𝒊𝒏𝒆 𝒂𝒏𝒅 𝒓𝒖𝒏𝒏𝒊𝒏𝒈 𝒔𝒕𝒂𝒃𝒍𝒚 𝒐𝒏 𝒄𝒍𝒐𝒖𝒅 𝒄ontainer.` }, { quoted: msg });
-        break;
-    }
-
-    case 'botlink': {
-        await sock.sendMessage(from, { text: `🔗 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕*\n\n𝑯𝒐𝒔𝒕𝒆𝒅 𝒔𝒆𝒄𝒖𝒓𝒆𝒍𝒚 𝒐𝒏 𝑹𝒂𝒊𝒍𝒘𝒂𝒚 𝟐𝟒/𝟕.` }, { quoted: msg });
-        break;
-    }
-
-    case 'inspecsock':
-    case 'status': {
-        await sock.sendMessage(from, { 
-            text: `⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝑯𝒆𝒂𝒍𝒕𝒉 𝑪𝒉𝒆𝒄𝒌*\n\n` +
-                  `• *𝑺𝒐𝒄𝒌𝒆𝒕 𝑺𝒕𝒂𝒕𝒖𝒔:* Connected & Synced ✅\n` +
-                  `• *𝑳𝒂𝒕𝒆𝒏𝒄𝒚:* Optimal\n` +
-                  `• *𝑬𝒏𝒄𝒓𝒚𝒑𝒕𝒊𝒐𝒏:* Active`
-        }, { quoted: msg });
-        break;
-    }
-
-    // --- PROFILE & MEDIA TOOLS ---
-    case 'getpp': {
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net' || from;
-        try {
-            const ppUrl = await sock.profilePictureUrl(target, 'image');
-            await sock.sendMessage(from, { image: { url: ppUrl }, caption: `📸 *𝑷𝒓𝒐𝒇𝒊𝒍𝒆 𝑷𝒊𝒄𝒕𝒖𝒓𝒆 𝑭𝒆𝒕𝒄𝒉𝒆𝒅*` }, { quoted: msg });
-        } catch {
-            await sock.sendMessage(from, { text: `❌ *𝑭𝒂𝒊𝒍𝒆𝒅 𝒕𝒐 𝒇𝒆𝒕𝒄𝒉 𝒑𝒓𝒐𝒇𝒊𝒍𝒆 𝒑𝒊𝒄𝒕𝒖𝒓𝒆.*` }, { quoted: msg });
-        }
-        break;
-    }
-
-    case 'listfont': {
-        await sock.sendMessage(from, { 
-            text: `✒️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝑭𝒐𝒏𝒕 𝑺𝒕𝒚𝒍𝒆𝒔*\n\n` +
-                  `1. *𝑩𝒐𝒍𝒅 𝑺𝒆𝒓𝒊𝒇:* 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏\n` +
-                  `2. *𝑴𝒐𝒏𝒐𝒔𝒑𝒂𝒄𝒆:* \`Great demon\`\n` +
-                  `3. *𝑰𝒕𝒂𝒍𝒊𝒄 𝑺𝒆𝒓𝒊𝒇:* _Great demon_`
-        }, { quoted: msg });
-        break;
-    }
-
-    case 'vv':
-    case 'antiviewonce': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-            return sock.sendMessage(from, { text: `💡 𝑹𝒆𝒑𝒍𝒚 𝒕𝒐 𝒂 𝑽𝒊𝒆𝒘 𝑶𝒏𝒄𝒆 𝒎𝒆𝒔𝒔𝒂𝒈𝒆 𝒕𝒐 𝒅𝒐𝒘𝒏𝒍𝒐𝒂𝒅 𝒊𝒕.` }, { quoted: msg });
-        }
-        await sock.sendMessage(from, { text: `🕵️‍♂️ *𝑽𝒊𝒆𝒘𝑶𝒏𝒄𝒆 𝑹𝒆𝒄𝒐𝒗𝒆𝒓𝒚:* 𝑷𝒓𝒐𝒄𝒆𝒔𝒔𝒊𝒏𝒈 𝒎𝒆𝒅𝒊𝒂...` }, { quoted: msg });
-        break;
-    }
-
-    // --- ADVANCED GROUP MANAGEMENT ---
-    case 'grouplink':
-    case 'getlink': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ 𝑩𝒐𝒕 𝒎𝒖𝒔𝒕 𝒃𝒆 𝒂𝒏 𝒂𝒅𝒎𝒊𝒏 𝒕𝒐 𝒈𝒆𝒕 𝒕𝒉𝒆 𝒊𝒏𝒗𝒊𝒕𝒆 𝒍𝒊𝒏𝒌!' }, { quoted: msg });
-        try {
-            const code = await sock.groupInviteCode(from);
-            await sock.sendMessage(from, { text: `🔗 *𝑮𝒓𝒐𝒖𝒑 𝑰𝒏𝒗𝒊𝒕𝒆 𝑳𝒊𝒏𝒌:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
-        } catch {
-            await sock.sendMessage(from, { text: `❌ 𝑭𝒂𝒊𝒍𝒆𝒅 𝒕𝒐 𝒇𝒆𝒕𝒄𝒉 𝒈𝒓𝒐𝒖𝒑 𝒍𝒊𝒏𝒌.` }, { quoted: msg });
-        }
-        break;
-    }
-
-    case 'leavegroup':
-    case 'left': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        await sock.sendMessage(from, { text: `👋 𝑮𝒐𝒐𝒅𝒃𝒚𝒆! 𝑳𝒆𝒂𝒗𝒊𝒏𝒈 𝒈𝒓𝒐𝒖𝒑...` }, { quoted: msg });
-        await sock.groupLeave(from);
-        break;
-    }
-
-    case 'listgroup':
-    case 'listgruop': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        const groups = Object.keys(await sock.groupFetchAllParticipating());
-        let txt = `📋 *𝑪𝒐𝒏𝒏𝒆𝒄𝒕𝒆𝒅 𝑮𝒓𝒐𝒖𝒑𝒔 (${groups.length}):*\n\n`;
-        for (let gId of groups) {
-            const meta = await sock.groupMetadata(gId).catch(() => ({}));
-            txt += `• ${meta.subject || 'Unknown'} (${gId})\n`;
-        }
-        await sock.sendMessage(from, { text: txt }, { quoted: msg });
-        break;
-    }
-
-    case 'setgroupbio': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ 𝑨𝒅𝒎𝒊𝒏 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        if (!q) return sock.sendMessage(from, { text: `💡 *𝑼𝒔𝒂𝒈𝒆:* ${prefix}setgroupbio <new description>` }, { quoted: msg });
-        
-        await sock.groupUpdateDescription(from, q);
-        await sock.sendMessage(from, { text: `✅ 𝑮𝒓𝒐𝒖𝒑 𝒅𝒆𝒔𝒄𝒓𝒊𝒑𝒕𝒊𝒐𝒏 𝒖𝒑𝒅𝒂𝒕𝒆𝒅 𝒔𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚!` }, { quoted: msg });
-        break;
-    }
-
-    case 'pin': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ 𝑨𝒅𝒎𝒊𝒏 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-            return sock.sendMessage(from, { text: `💡 𝑹𝒆𝒑𝒍𝒚 𝒕𝒐 𝒂 𝒎𝒆𝒔𝒔𝒂𝒈𝒆 𝒘𝒊𝒕𝒉 *${prefix}pin* 𝒕𝒐 𝒑𝒊𝒏 𝒊𝒕.` }, { quoted: msg });
-        }
-        await sock.sendMessage(from, { text: `📌 𝑴𝒆𝒔𝒔𝒂𝒈𝒆 𝒑𝒊𝒏𝒏𝒆𝒅 𝒔𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚.` }, { quoted: msg });
-        break;
-    }
-
-    case 'antigroupsmention': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ 𝑨𝒅𝒎𝒊𝒏 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        
-        if (!groupSettings[from]) groupSettings[from] = {};
-        groupSettings[from].antigroupsmention = !groupSettings[from].antigroupsmention;
-        await sock.sendMessage(from, { text: `🛡️ *𝑨𝒏𝒕𝒊-𝑮𝒓𝒐𝒖𝒑 𝑴𝒆𝒏𝒕𝒊𝒐𝒏𝒔:* ${groupSettings[from].antigroupsmention ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
-        break;
-    }
-
-    case 'approveall': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ 𝑨𝒅𝒎𝒊𝒏 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        
-        try {
-            const requests = await sock.groupRequestParticipantsList(from);
-            if (!requests || requests.length === 0) return sock.sendMessage(from, { text: '💡 *𝑵𝒐 𝒑𝒆𝒏𝒅𝒊𝒏𝒈 𝒋𝒐𝒊𝒏 𝒓𝒆𝒒𝒖𝒆𝒔𝒕𝒔 𝒇𝒐𝒖𝒏𝒅.*' }, { quoted: msg });
-            
-            for (let req of requests) {
-                await sock.groupRequestParticipantsUpdate(from, [req.jid], 'approve');
+            case 'devic':
+            case 'device': {
+                await sock.sendMessage(from, { 
+                    text: `💻 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝑺𝒚𝒔𝒕𝒆𝒎 𝑰𝒏𝒇𝒐*\n\n` +
+                          `• *Platform:* ${os.platform()}\n` +
+                          `• *Architecture:* ${os.arch()}\n` +
+                          `• *Memory:* ${(os.freemem() / 1024 / 1024).toFixed(2)} MB free / ${(os.totalmem() / 1024 / 1024).toFixed(2)} MB total\n` +
+                          `• *Uptime:* ${(os.uptime() / 3600).toFixed(2)} hours` 
+                }, { quoted: msg });
+                break;
             }
-            await sock.sendMessage(from, { text: `✅ *𝑨𝒑𝒑𝒓𝒐𝒗𝒆𝒅 ${requests.length} 𝒑𝒆𝒏𝒅𝒊𝒏𝒈 𝒎𝒆𝒎𝒃𝒆𝒓(𝒔)!*` }, { quoted: msg });
-        } catch {
-            await sock.sendMessage(from, { text: '❌ *𝑭𝒂𝒊𝒍𝒆𝒅 𝒕𝒐 𝒂𝒑𝒑𝒓𝒐𝒗𝒆 𝒋𝒐𝒊𝒏 𝒓𝒆𝒒𝒖𝒆𝒔𝒕𝒔.*' }, { quoted: msg });
-        }
-        break;
-    }
 
-    case 'closetime': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ 𝑨𝒅𝒎𝒊𝒏 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        
-        const timer = parseInt(args[0]);
-        if (isNaN(timer)) return sock.sendMessage(from, { text: `💡 *𝑼𝒔𝒂𝒈𝒆:* ${prefix}closetime <minutes>` }, { quoted: msg });
+            case 'connectedusers':
+            case 'activeuser': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🟢 *Active Session:* Online and running stably on cloud container.` }, { quoted: msg });
+                break;
+            }
 
-        await sock.sendMessage(from, { text: `⏳ *𝑮𝒓𝒐𝒖𝒑 𝒘𝒊𝒍𝒍 𝒃𝒆 𝒄𝒍𝒐𝒔𝒆𝒅 𝒊𝒏 ${timer} 𝒎𝒊𝒏𝒖𝒕𝒆(𝒔).*` }, { quoted: msg });
-        setTimeout(async () => {
-            await sock.groupSettingUpdate(from, 'announcement');
-            await sock.sendMessage(from, { text: '🔒 *𝑮𝒓𝒐𝒖𝒑 𝒊𝒔 𝒏𝒐𝒘 𝒄𝒍𝒐𝒔𝒆𝒅! (𝑨𝒅𝒎𝒊𝒏𝒔 𝑶𝒏𝒍𝒚)*' });
-        }, timer * 60 * 1000);
-        break;
-    }
+            case 'botlink': {
+                await sock.sendMessage(from, { text: `🔗 *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕*\n\nHosted securely 24/7.` }, { quoted: msg });
+                break;
+            }
 
-    case 'warning':
-    case 'setwarning': {
-        if (!isGroup) return sock.sendMessage(from, { text: '❌ 𝑻𝒉𝒊𝒔 𝒄𝒐ｍｍ𝒂𝒏𝒅 𝒄𝒂𝒏 𝒐𝒏𝒍𝒚 𝒃𝒆 𝒖𝒔𝒆𝒅 𝒊𝒏 𝒈𝒓𝒐𝒖𝒑𝒔!' }, { quoted: msg });
-        if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ 𝑨𝒅𝒎𝒊𝒏 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant;
-        if (!target) return sock.sendMessage(from, { text: '💡 *𝑹𝒆𝒑𝒍𝒚 𝒕𝒐 𝒐𝒓 𝒕𝒂𝒈 𝒂 𝒖𝒔𝒆𝒓 𝒕𝒐 𝒘𝒂𝒓𝒏.*' }, { quoted: msg });
+            case 'inspecsock':
+            case 'status': {
+                await sock.sendMessage(from, { 
+                    text: `⚡ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝑯𝒆𝒂𝒍𝒕𝒉 𝑪𝒉𝒆𝒄𝒌*\n\n` +
+                          `• *Socket Status:* Connected & Synced ✅\n` +
+                          `• *Latency:* Optimal\n` +
+                          `• *Encryption:* Active`
+                }, { quoted: msg });
+                break;
+            }
 
-        await sock.sendMessage(from, { 
-            text: `⚠️ *@${target.split('@')[0]}*, 𝒚𝒐𝒖 𝒉𝒂𝒗𝒆 𝒃𝒆𝒆𝒏 𝒊𝒔𝒔𝒖𝒆𝒅 𝒂 𝒘𝒂𝒓𝒏𝒊𝒏𝒈! 𝑷𝒍𝒆𝒂𝒔𝒆 𝒇𝒐𝒍𝒍𝒐𝒘 𝒈𝒓𝒐𝒖𝒑 𝒓𝒖𝒍𝒆𝒔.`,
-            mentions: [target]
-        }, { quoted: msg });
-        break;
-    }
+            case 'getpp': {
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net' || from;
+                try {
+                    const ppUrl = await sock.profilePictureUrl(target, 'image');
+                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: `📸 *Profile Picture Fetched*` }, { quoted: msg });
+                } catch {
+                    await sock.sendMessage(from, { text: `❌ *Failed to fetch profile picture.*` }, { quoted: msg });
+                }
+                break;
+            }
 
-    // --- VIP & ADMIN HIERARCHY ---
-    case 'vippromote':
-    case 'vipassign':
-    case 'vipadd':
-    case 'vipadmin': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        if (!target) return sock.sendMessage(from, { text: `💡 𝑻𝒂𝒈 𝒐𝒓 𝒎𝒆𝒏𝒕𝒊𝒐𝒏 𝒂 𝒖𝒔𝒆𝒓 𝒕𝒐 𝒂𝒅𝒅 𝒕𝒐 𝑽𝑰𝑷.` }, { quoted: msg });
-        
-        vipUsers.add(target);
-        await sock.sendMessage(from, { text: `⭐ 𝑺𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚 𝒂𝒅𝒅𝒆𝒅 𝒖𝒔𝒆𝒓 𝒕𝒐 𝒕𝒉𝒆 𝑽𝑰𝑷 𝒍𝒊𝒔𝒕.` }, { quoted: msg });
-        break;
-    }
+            case 'listfont': {
+                await sock.sendMessage(from, { 
+                    text: `✒️ *𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 𝑭𝒐𝒏𝒕 𝑺𝒕𝒚𝒍𝒆𝒔*\n\n` +
+                          `1. *Bold Serif:* 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏\n` +
+                          `2. *Monospace:* \`Great demon\`\n` +
+                          `3. *Italic Serif:* _Great demon_`
+                }, { quoted: msg });
+                break;
+            }
 
-    case 'vipdemote':
-    case 'vipremove': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-        if (!target) return sock.sendMessage(from, { text: `💡 𝑻𝒂𝒈 𝒐𝒓 𝒎𝒆𝒏𝒕𝒊𝒐𝒏 𝒂 𝒖𝒔𝒆𝒓 𝒕𝒐 𝒓𝒆𝒎𝒐𝒗𝒆 𝒇𝒓𝒐𝒎 𝑽𝑰𝑷.` }, { quoted: msg });
-        
-        vipUsers.delete(target);
-        await sock.sendMessage(from, { text: `❌ 𝑺𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚 𝒓𝒆𝒎𝒐𝒗𝒆𝒅 𝒖𝒔𝒆𝒓 𝒇𝒓𝒐𝒎 𝒕𝒉𝒆 𝑽𝑰𝑷 𝒍𝒊𝒔𝒕.` }, { quoted: msg });
-        break;
-    }
+            case 'vv':
+            case 'antiviewonce': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                    return sock.sendMessage(from, { text: `💡 Reply to a View Once message to download it.` }, { quoted: msg });
+                }
+                await sock.sendMessage(from, { text: `🕵️‍♂️ *ViewOnce Recovery:* Processing media...` }, { quoted: msg });
+                break;
+            }
 
-    case 'viptakeover': {
-        if (!isOwner) return sock.sendMessage(from, { text: '❌ 𝑶𝒘𝒏𝒆𝒓 𝒐𝒏𝒍𝒚 𝒄𝒐ｍｍ𝒂𝒏𝒅!' }, { quoted: msg });
-        await sock.sendMessage(from, { text: `👑 *𝑽𝑰𝑷 𝑶𝒗𝒆𝒓𝒓𝒊𝒅𝒆 𝑨𝒄𝒕𝒊𝒗𝒂𝒕𝒆𝒅:* 𝑭𝒖𝒍𝒍 𝒂𝒅𝒎𝒊𝒏 𝒄𝒐𝒏𝒕𝒓𝒐𝒍 𝒈𝒓𝒂𝒏𝒕𝒆𝒅.` }, { quoted: msg });
-        break;
-    }
+            case 'grouplink':
+            case 'getlink': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ Bot must be an admin to get the invite link!' }, { quoted: msg });
+                try {
+                    const code = await sock.groupInviteCode(from);
+                    await sock.sendMessage(from, { text: `🔗 *Group Invite Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                } catch {
+                    await sock.sendMessage(from, { text: `❌ Failed to fetch group link.` }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'leavegroup':
+            case 'left': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                await sock.sendMessage(from, { text: `👋 Goodbye! Leaving group...` }, { quoted: msg });
+                await sock.groupLeave(from);
+                break;
+            }
+
+            case 'listgroup':
+            case 'listgruop': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                const groups = Object.keys(await sock.groupFetchAllParticipating());
+                let txt = `📋 *Connected Groups (${groups.length}):*\n\n`;
+                for (let gId of groups) {
+                    const meta = await sock.groupMetadata(gId).catch(() => ({}));
+                    txt += `• ${meta.subject || 'Unknown'} (${gId})\n`;
+                }
+                await sock.sendMessage(from, { text: txt }, { quoted: msg });
+                break;
+            }
+
+            case 'setgroupbio': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 Usage: ${prefix}setgroupbio <new description>` }, { quoted: msg });
+                
+                await sock.groupUpdateDescription(from, q);
+                await sock.sendMessage(from, { text: `✅ Group description updated successfully!` }, { quoted: msg });
+                break;
+            }
+
+            case 'pin': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
+                if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                    return sock.sendMessage(from, { text: `💡 Reply to a message with *${prefix}pin* to pin it.` }, { quoted: msg });
+                }
+                await sock.sendMessage(from, { text: `📌 Message pinned successfully.` }, { quoted: msg });
+                break;
+            }
+
+            case 'antigroupsmention': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
+                
+                if (!groupSettings[from]) groupSettings[from] = {};
+                groupSettings[from].antigroupsmention = !groupSettings[from].antigroupsmention;
+                await sock.sendMessage(from, { text: `🛡️ *Anti-Group Mentions:* ${groupSettings[from].antigroupsmention ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                break;
+            }
+
+            case 'approveall': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
+                
+                try {
+                    const requests = await sock.groupRequestParticipantsList(from);
+                    if (!requests || requests.length === 0) return sock.sendMessage(from, { text: '💡 *No pending join requests found.*' }, { quoted: msg });
+                    
+                    for (let req of requests) {
+                        await sock.groupRequestParticipantsUpdate(from, [req.jid], 'approve');
+                    }
+                    await sock.sendMessage(from, { text: `✅ *Approved ${requests.length} pending member(s)!*` }, { quoted: msg });
+                } catch {
+                    await sock.sendMessage(from, { text: '❌ *Failed to approve join requests.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'closetime':
+            case 'opentime': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
+                
+                const timer = parseInt(args[0]);
+                if (isNaN(timer)) return sock.sendMessage(from, { text: `💡 Usage: ${prefix}${command} <minutes>` }, { quoted: msg });
+
+                const actionType = command === 'closetime' ? 'announcement' : 'not_announcement';
+                const actionText = command === 'closetime' ? 'closed (Admins Only)' : 'opened for everyone';
+
+                await sock.sendMessage(from, { text: `⏳ *Group will be ${actionText} in ${timer} minute(s).*` }, { quoted: msg });
+                setTimeout(async () => {
+                    await sock.groupSettingUpdate(from, actionType);
+                    await sock.sendMessage(from, { text: `🔒 *Group is now ${actionText}!*` });
+                }, timer * 60 * 1000);
+                break;
+            }
+
+            case 'warning':
+            case 'setwarning': {
+                if (!isGroup) return sock.sendMessage(from, { text: '❌ This command can only be used in groups!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Admin only command!' }, { quoted: msg });
+                
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant;
+                if (!target) return sock.sendMessage(from, { text: '💡 *Reply to or tag a user to warn.*' }, { quoted: msg });
+
+                await sock.sendMessage(from, { 
+                    text: `⚠️ *@${target.split('@')[0]}*, you have been issued a warning! Please follow group rules.`,
+                    mentions: [target]
+                }, { quoted: msg });
+                break;
+            }
+
+            case 'vippromote':
+            case 'vipassign':
+            case 'vipadd':
+            case 'vipadmin': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                if (!target) return sock.sendMessage(from, { text: `💡 Tag or mention a user to add to VIP.` }, { quoted: msg });
+                
+                vipUsers.add(target);
+                await sock.sendMessage(from, { text: `⭐ Successfully added user to the VIP list.` }, { quoted: msg });
+                break;
+            }
+
+            case 'vipdemote':
+            case 'vipremove': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || args[0]?.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                if (!target) return sock.sendMessage(from, { text: `💡 Tag or mention a user to remove from VIP.` }, { quoted: msg });
+                
+                vipUsers.delete(target);
+                await sock.sendMessage(from, { text: `❌ Successfully removed user from the VIP list.` }, { quoted: msg });
+                break;
+            }
+
+            case 'viptakeover': {
+                if (!isOwner) return sock.sendMessage(from, { text: '❌ Owner only command!' }, { quoted: msg });
+                await sock.sendMessage(from, { text: `👑 *VIP Override Activated:* Full admin control granted.` }, { quoted: msg });
+                break;
+            }
 
             case 'kick':
             case 'remove':
@@ -954,11 +826,8 @@ case 'pair': {
                 break;
             }
 
-            // Fallback for all other auxiliary menu commands so they return clean responses
             default: {
-                if (command) {
-                    await sock.sendMessage(from, { text: `╭━━━〔 *COMMAND* 〕━━━┈\n✦ .${command} executed successfully.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈` }, { quoted: msg });
-                }
+                // Silently ignore unregistered commands or output clean fallback
                 break;
             }
         }
