@@ -1,4 +1,3 @@
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -22,7 +21,7 @@ const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af56
 const startTime = Date.now();
 
 // --- STATE MANAGEMENT ---
-let botMode = "public"; // 'public' or 'private'
+let botMode = "public"; 
 const activeGames = {};
 const groupSettings = {};
 const vipUsers = new Set([OWNER_NUMBER]);
@@ -37,7 +36,6 @@ const autoSettings = {
     autotyping: false
 };
 
-// Helper for HTTP requests
 function fetchJson(url) {
     return new Promise((resolve, reject) => {
         https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
@@ -50,16 +48,14 @@ function fetchJson(url) {
     });
 }
 
-// --- ANTISPAM CONFIGURATION ---
 const spamMap = new Map();
 const SPAM_LIMIT = 3;
-const SPAM_TIME = 5000;       // 5 seconds
-const COOLDOWN_TIME = 10000;  // 10 seconds
+const SPAM_TIME = 5000;
+const COOLDOWN_TIME = 10000;
 
 async function startDemonBot() {
     const sessionPath = './demon_session';
 
-    // Auto restore session if SESSION_ID exists
     if (process.env.SESSION_ID && !fs.existsSync(path.join(sessionPath, 'creds.json'))) {
         if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
         try {
@@ -224,33 +220,9 @@ async function startDemonBot() {
             }
         }
 
-        // --- ANTI-DELETE TRACKER ---
-        if (msg.messageStubType === 68 || msg.type === 'protocolMessage') {
-            const targetKey = msg.message?.protocolMessage?.key;
-            if (targetKey && deletedMessages.has(targetKey.id)) {
-                const deletedMsg = deletedMessages.get(targetKey.id);
-                const chatJid = deletedMsg.key.remoteJid;
-
-                if (groupSettings[chatJid]?.antidelete) {
-                    await sock.sendMessage(chatJid, {
-                        text: `🕵️‍♂️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Imperial Sight (Anti-Delete)*\n\n` +
-                              `👤 *Mortal:* @${deletedMsg.sender.split('@')[0]}\n` +
-                              `💬 *Erased Words:* ${deletedMsg.text || '[Media / Sealed Message]'}`,
-                        mentions: [deletedMsg.sender]
-                    });
-                }
-            }
-        } else if (msg.key?.id) {
-            deletedMessages.set(msg.key.id, {
-                key: msg.key,
-                sender: msg.key.participant || msg.key.remoteJid,
-                text: body
-            });
-        }
-
         switch (command) {
             // =========================================================================
-            // CORE & MENU COMMANDS
+            // 1. EMPEROR'S SUPREME MENU
             // =========================================================================
             case 'menu':
             case 'help': {
@@ -266,7 +238,7 @@ async function startDemonBot() {
                 const hours = Math.floor(uptimeSeconds / 3600);
                 const minutes = Math.floor((uptimeSeconds % 3600) / 60);
                 const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m${seconds}s`;
+                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
 
                 const menuText = 
 `✦ 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝕾𝖞𝖘𝖙𝖊𝖒 ✦
@@ -367,21 +339,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 break;
             }
 
-            case 'ping': {
-                const start = Date.now();
-                await sock.sendMessage(from, { text: `⚡ *At your command, My Lord Demon Emperor!* Response Speed: ${Date.now() - start}ms` }, { quoted: msg });
-                break;
-            }
-
-            // =========================================================================
-            // EMPEROR'S SUPREME MENU COMMANDS
-            // =========================================================================
             case 'addowner': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor can appoint co-owners!*' }, { quoted: msg });
                 const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
                 if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, tag a user or reply to their message.*' }, { quoted: msg });
                 vipUsers.add(target.split('@')[0]);
-                await sock.sendMessage(from, { text: `👑 *Granted throne privileges to @${target.split('@')[0]}, My Lord!*`, mentions: [target] }, { quoted: msg });
+                await sock.sendMessage(from, { text: `👑 *Granted throne privileges to subject, My Lord!*` }, { quoted: msg });
                 break;
             }
 
@@ -397,7 +360,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'antiviewonce': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                if (!quotedMsg) return sock.sendMessage(from, { text: '💡 *My Lord, reply to a view-once media message.*' }, { quoted: msg });
+                if (!quotedMsg) return sock.sendMessage(from, { text: '💡 *My Lord, reply to a view-once message.*' }, { quoted: msg });
                 await sock.sendMessage(from, { text: '🕵️‍♂️ *Piercing the ViewOnce veil for My Lord Demon Emperor...*' }, { quoted: msg });
                 break;
             }
@@ -409,7 +372,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'autotyping': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 autoSettings[command] = !autoSettings[command];
-                await sock.sendMessage(from, { text: `⚙️ *Imperial Presence [${command.toUpperCase()}]:*${autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `⚙️ *Imperial Presence [${command.toUpperCase()}]:* ${autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
                 break;
             }
 
@@ -419,7 +382,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, mention the subject to banish.*' }, { quoted: msg });
                 await sock.updateBlockStatus(target, 'block');
                 blockedUsers.add(target);
-                await sock.sendMessage(from, { text: `🚫 *Subject @${target.split('@')[0]} banished into the Void!*`, mentions: [target] }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🚫 *Subject banished into the Void per your command, My Lord!*` }, { quoted: msg });
                 break;
             }
 
@@ -429,25 +392,25 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, mention the subject to forgive.*' }, { quoted: msg });
                 await sock.updateBlockStatus(target, 'unblock');
                 blockedUsers.delete(target);
-                await sock.sendMessage(from, { text: `✅ *Banishment rescinded for @${target.split('@')[0]}, My Lord!*`, mentions: [target] }, { quoted: msg });
+                await sock.sendMessage(from, { text: `✅ *Banishment rescinded per your command, My Lord!*` }, { quoted: msg });
                 break;
             }
 
             case 'buatgc': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}buatgc <domain_name>\`` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .buatgc <domain_name>` }, { quoted: msg });
                 try {
                     const group = await sock.groupCreate(q, [sender]);
-                    await sock.sendMessage(from, { text: `👑 *Imperial domain "${q}" forged successfully, My Lord! ID:* ${group.id}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `👑 *New domain created for My Lord! ID:* ${group.id}` }, { quoted: msg });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ *Failed to forge new domain, My Lord.*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ *Failed to forge domain, My Lord.*' }, { quoted: msg });
                 }
                 break;
             }
 
             case 'changebio': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}changebio <new_status_text>\`` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .changebio <new_status>` }, { quoted: msg });
                 await sock.updateProfileStatus(q);
                 await sock.sendMessage(from, { text: `👑 *Imperial status updated, My Lord!*` }, { quoted: msg });
                 break;
@@ -460,7 +423,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                           `• *Platform:* ${os.platform()}\n` +
                           `• *Architecture:* ${os.arch()}\n` +
                           `• *Memory:* ${(os.freemem() / 1024 / 1024).toFixed(2)} MB Free / ${(os.totalmem() / 1024 / 1024).toFixed(2)} MB Total\n` +
-                          `• *Imperial Uptime:* ${(os.uptime() / 3600).toFixed(2)} Hours` 
+                          `• *Uptime:* ${(os.uptime() / 3600).toFixed(2)} Hours` 
                 }, { quoted: msg });
                 break;
             }
@@ -469,22 +432,22 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null) || sender;
                 try {
                     const ppUrl = await sock.profilePictureUrl(target, 'image');
-                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: `📸 *Imperial Sight: Visual Captured for My Lord!*` }, { quoted: msg });
+                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: `📸 *Imperial Sight: Visual Captured, My Lord!*` }, { quoted: msg });
                 } catch {
-                    await sock.sendMessage(from, { text: '❌ *Subject\'s portrait is concealed from Imperial sight.*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ *Subject portrait concealed from sight.*' }, { quoted: msg });
                 }
                 break;
             }
 
             case 'joingroup': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}joingroup <invite_link>\`` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .joingroup <invite_link>` }, { quoted: msg });
                 try {
                     const code = q.split('chat.whatsapp.com/')[1] || q;
                     await sock.groupAcceptInvite(code);
-                    await sock.sendMessage(from, { text: '👑 *Subjugated domain entered by Imperial decree, My Lord!*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '👑 *Domain entered by Imperial decree, My Lord!*' }, { quoted: msg });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ *Invalid or expired domain invite portal.*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ *Invalid domain invite link.*' }, { quoted: msg });
                 }
                 break;
             }
@@ -501,10 +464,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'listfont': {
                 await sock.sendMessage(from, { 
                     text: `✒️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Script Typographies*\n\n` +
-                          `1. *Imperial Gothic:* 𝕲```javascript
-                          `1. *Imperial Gothic:* 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓\n` +
-                          `2. *Royal Monospace:* \`Great Demon\`\n` +
-                          `3. *Shadow Italic:* _Great Demon_`
+                          `1. Imperial Gothic: 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓\n` +
+                          `2. Royal Monospace: Great Demon\n` +
+                          `3. Shadow Italic: Great Demon`
                 }, { quoted: msg });
                 break;
             }
@@ -516,19 +478,19 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 let txt = `📋 *Subjugated Domains (${groups.length}):*\n\n`;
                 for (let gId of groups) {
                     const meta = await sock.groupMetadata(gId).catch(() => ({}));
-                    txt += `• ${meta.subject \vert{}\vert{} 'Unknown Domain'} (${gId})\n`;
+                    txt += `• ${meta.subject || 'Unknown Domain'} (${gId})\n`;
                 }
                 await sock.sendMessage(from, { text: txt }, { quoted: msg });
                 break;
             }
 
             case 'bancheck': {
-                await sock.sendMessage(from, { text: `🛡️ *Imperial Security Check:* Zero ban restrictions found. Your throne stands intact, My Lord!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🛡️ *Imperial Check:* Zero ban restrictions active. Your throne stands intact, My Lord!` }, { quoted: msg });
                 break;
             }
 
             case 'botlink': {
-                await sock.sendMessage(from, { text: `🔗 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Throne Engine Portal:* Online & Sovereign` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🔗 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Throne Portal:* Online & Sovereign` }, { quoted: msg });
                 break;
             }
 
@@ -538,7 +500,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!target) return sock.sendMessage(from, { text: '💡 *Mention or reply to target.*' }, { quoted: msg });
                 try {
                     const status = await sock.fetchStatus(target);
-                    await sock.sendMessage(from, { text: `📜 *Status for @${target.split('@')[0]}:* "${status.status}"` , mentions: [target] }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `📜 *Status:* "${status.status}"` }, { quoted: msg });
                 } catch {
                     await sock.sendMessage(from, { text: '❌ *Status concealed.*' }, { quoted: msg });
                 }
@@ -546,23 +508,20 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             }
 
             case 'listchannels': {
-                await sock.sendMessage(from, { text: `📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Channels:* Fully subjugated and active under your rule, My Lord!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Channels:* Fully subjugated under your rule, My Lord!` }, { quoted: msg });
                 break;
             }
 
             case 'mode':
             case 'private':
             case 'public': {
-                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Imperial Denial:* Only My Lord Demon Emperor may alter realm permissions!' }, { quoted: msg });
-                let selectedMode = args[0]?.toLowerCase();
-                if (command === 'private') selectedMode = 'private';
-                if (command === 'public') selectedMode = 'public';
-
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may alter realm permissions!*' }, { quoted: msg });
+                let selectedMode = args[0]?.toLowerCase() || command;
                 if (selectedMode === 'public' || selectedMode === 'private') {
                     botMode = selectedMode;
                     await sock.sendMessage(from, { text: `👑 *Decree Enforced:* Domain mode set to *${botMode.toUpperCase()}*, My Lord!` }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: `⚔️ *Current Realm State:* *${botMode.toUpperCase()}*\n\n💡 *Usage:* \`${prefix}mode public\` or \`${prefix}mode private\`` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `⚔️ *Current State:* *${botMode.toUpperCase()}*` }, { quoted: msg });
                 }
                 break;
             }
@@ -570,12 +529,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'pair': {
                 let targetNum = args[0] ? args[0].replace(/[^0-9]/g, '') : '';
                 if (!targetNum || targetNum.length < 10) {
-                    return sock.sendMessage(from, { text: "⚔️ *My Lord, please provide a valid target phone number with country code!*\n\n*Example:* `.pair 2349046797695`" }, { quoted: msg });
+                    return sock.sendMessage(from, { text: "⚔️ *Provide a valid phone number with country code, My Lord!*" }, { quoted: msg });
                 }
 
                 try {
                     await sock.sendMessage(from, { text: `⏳ *Forging link key for +${targetNum}, My Lord Demon Emperor...*` }, { quoted: msg });
-
                     const tempSessionPath = path.join(__dirname, 'sessions', `session_${targetNum}`);
                     const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
 
@@ -592,23 +550,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                         try {
                             let code = await tempSock.requestPairingCode(targetNum);
                             code = code?.match(/.{1,4}/g)?.join("-") || code;
-
-                            let pairMsg = `🔑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 IMPERIAL LINK CODE*\n\n` +
-                                          `📱 *Target Subject:* +${targetNum}\n` +
-                                          `⚡ *Binding Seal:* \`${code}\`\n\n` +
-                                          `*Imperial Directives:*\n` +
-                                          `1. Open WhatsApp on +${targetNum}\n` +
-                                          `2. Go to **Settings / Linked Devices** > **Link a Device**\n` +
-                                          `3. Select **Link with phone number instead**\n` +
-                                          `4. Enter the seal above immediately!`;
-
-                            await sock.sendMessage(from, { text: pairMsg }, { quoted: msg });
+                            await sock.sendMessage(from, { text: `🔑 *IMPERIAL LINK CODE:* \`${code}\`` }, { quoted: msg });
                         } catch (innerErr) {
-                            await sock.sendMessage(from, { text: "❌ *Forging failed! WhatsApp rejected the pairing seal.*" }, { quoted: msg });
+                            await sock.sendMessage(from, { text: "❌ *Forging failed! Pairing seal rejected.*" }, { quoted: msg });
                         }
                     }, 3000);
                 } catch (err) {
-                    await sock.sendMessage(from, { text: "❌ *My Lord, an error occurred during the ritual.*" }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *An error occurred during the ritual.*" }, { quoted: msg });
                 }
                 break;
             }
@@ -616,27 +564,27 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'broadcast':
             case 'bc': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may speak to all realms!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}broadcast <royal proclamation>\`` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .broadcast <royal proclamation>` }, { quoted: msg });
 
                 const groups = Object.keys(await sock.groupFetchAllParticipating());
-                await sock.sendMessage(from, { text: `📢 *Transmitting your royal decree to ${groups.length} domains, My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `📢 *Transmitting royal decree to ${groups.length} domains, My Lord!*` }, { quoted: msg });
 
                 for (const groupId of groups) {
                     await sock.sendMessage(groupId, {
                         text: `📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 ROYAL PROCLAMATION*\n\n${q}\n\n_~ Directly from My Lord Demon Emperor_`
                     });
                 }
-                await sock.sendMessage(from, { text: `✅ *Royal Proclamation delivered across all domains, My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `✅ *Proclamation delivered, My Lord!*` }, { quoted: msg });
                 break;
             }
 
             // =========================================================================
-            // VIP NOBILITY MENU COMMANDS
+            // 2. VIP NOBILITY MENU
             // =========================================================================
             case 'connectedusers':
             case 'activeusers': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: `🟢 *Imperial Connectivity:* Active and standing by 24/7 for My Lord Demon Emperor!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🟢 *Imperial Session:* Active 24/7 for My Lord Demon Emperor!` }, { quoted: msg });
                 break;
             }
 
@@ -644,9 +592,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'status': {
                 await sock.sendMessage(from, { 
                     text: `⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Core Health*\n\n` +
-                          `• *Socket State:* Bound & Synced ✅\n` +
-                          `• *Latency:* Lightning Fast\n` +
-                          `• *Realm Protection:* Active`
+                          `• *Socket:* Bound & Synced ✅\n` +
+                          `• *Latency:* Optimal\n` +
+                          `• *Protection:* Active`
                 }, { quoted: msg });
                 break;
             }
@@ -657,10 +605,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'vipassign': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-                if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, tag or mention a subject to grant VIP Nobility.*' }, { quoted: msg });
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or mention a subject to grant VIP rank.*' }, { quoted: msg });
                 
                 vipUsers.add(target.split('@')[0]);
-                await sock.sendMessage(from, { text: `⭐ *Granted VIP Nobility status to subject @${target.split('@')[0]}, My Lord!*`, mentions: [target] }, { quoted: msg });
+                await sock.sendMessage(from, { text: `⭐ *Granted VIP Nobility status to subject, My Lord!*` }, { quoted: msg });
                 break;
             }
 
@@ -668,7 +616,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'vipgroups': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 const groups = Object.keys(await sock.groupFetchAllParticipating());
-                await sock.sendMessage(from, { text: `👑 *VIP Controlled Domains:* ${groups.length} domains fully governed, My Lord!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `👑 *VIP Domains:* ${groups.length} domains governed!` }, { quoted: msg });
                 break;
             }
 
@@ -676,17 +624,17 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'vipremove': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-                if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, tag or mention a subject to revoke VIP rank.*' }, { quoted: msg });
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or mention a subject to revoke VIP rank.*' }, { quoted: msg });
                 
                 vipUsers.delete(target.split('@')[0]);
-                await sock.sendMessage(from, { text: `❌ *Stripped @${target.split('@')[0]} of VIP Nobility per your command, My Lord!*`, mentions: [target] }, { quoted: msg });
+                await sock.sendMessage(from, { text: `❌ *Stripped subject of VIP rank, My Lord!*` }, { quoted: msg });
                 break;
             }
 
             case 'vipdetails':
             case 'viplist':
             case 'vipmenu': {
-                let txt = `👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 VIP Nobility Roster*\n\n`;
+                let txt = `👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 VIP Roster*\n\n`;
                 vipUsers.forEach(u => txt += `• @${u}\n`);
                 await sock.sendMessage(from, { text: txt, mentions: Array.from(vipUsers).map(u => u + '@s.whatsapp.net') }, { quoted: msg });
                 break;
@@ -694,36 +642,36 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
             case 'vipreassign': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: '👑 *VIP Ranks Reassigned and synchronized for My Lord Demon Emperor!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *VIP Ranks synchronized, My Lord!*' }, { quoted: msg });
                 break;
             }
 
             case 'viptakeover': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: '👑 *VIP OVERRIDE ACTIVATED:* Absolute sovereignty asserted across this domain, My Lord!' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *VIP OVERRIDE ACTIVATED across domain!*' }, { quoted: msg });
                 break;
             }
 
             case 'vipunclaim': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: '👑 *Domain unclimbed and relinquished per your command, My Lord!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *Domain relinquished, My Lord!*' }, { quoted: msg });
                 break;
             }
 
             // =========================================================================
-            // DOMAIN MANAGEMENT COMMANDS
+            // 3. DOMAIN MANAGEMENT
             // =========================================================================
             case 'addmember': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
                 if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}addmember 234...\`` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .addmember 234...` }, { quoted: msg });
                 const targetJid = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
                 try {
                     await sock.groupParticipantsUpdate(from, [targetJid], 'add');
                     await sock.sendMessage(from, { text: `✅ *Subject added to domain, My Lord!*` }, { quoted: msg });
                 } catch {
-                    await sock.sendMessage(from, { text: `❌ *Failed to add subject to domain.*` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `❌ *Failed to add subject.*` }, { quoted: msg });
                 }
                 break;
             }
@@ -749,13 +697,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
                 if (stateArg === 'on') {
                     groupSettings[from][setting] = true;
-                    await sock.sendMessage(from, { text: `✅ *By decree of the Demon Emperor:* *${setting.toUpperCase()}* is now **ENFORCED**!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `✅ *By decree of the Demon Emperor:* *${setting.toUpperCase()}* is ENFORCED!` }, { quoted: msg });
                 } else if (stateArg === 'off') {
                     groupSettings[from][setting] = false;
-                    await sock.sendMessage(from, { text: `❌ *Imperial Dispensation:* *${setting.toUpperCase()}* has been **DISABLED**!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `❌ *Imperial Dispensation:* *${setting.toUpperCase()}* is DISABLED!` }, { quoted: msg });
                 } else {
                     groupSettings[from][setting] = !groupSettings[from][setting];
-                    await sock.sendMessage(from, { text: `🛡️ *${setting.toUpperCase()} Barrier:*${groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌'}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `🛡️ *${setting.toUpperCase()} Barrier:* ${groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌'}` }, { quoted: msg });
                 }
                 break;
             }
@@ -763,12 +711,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'approveall': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin to approve join requests!*' }, { quoted: msg });
+                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin!*' }, { quoted: msg });
                 
                 try {
                     const requests = await sock.groupRequestParticipantsList(from);
                     if (!requests || requests.length === 0) {
-                        return sock.sendMessage(from, { text: '💡 *No subjects currently awaiting entry in this domain, My Lord.*' }, { quoted: msg });
+                        return sock.sendMessage(from, { text: '💡 *No pending entry requests, My Lord.*' }, { quoted: msg });
                     }
                     
                     let approvedCount = 0;
@@ -777,7 +725,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                         await sock.groupRequestParticipantsUpdate(from, [targetJid], 'approve');
                         approvedCount++;
                     }
-                    
                     await sock.sendMessage(from, { text: `✅ *Granted domain entry to ${approvedCount} subject(s), My Lord!*` }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: `❌ *Failed to approve requests.*` }, { quoted: msg });
@@ -788,7 +735,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'close': {
                 if (!isGroup || (!isAdmin && !isOwner)) return;
                 await sock.groupSettingUpdate(from, 'announcement');
-                await sock.sendMessage(from, { text: '🔒 *Silence in the realm! Gates locked by Imperial decree.*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔒 *Gates locked by Imperial decree!*' }, { quoted: msg });
                 break;
             }
 
@@ -798,12 +745,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
                 
                 const timer = parseInt(args[0]);
-                if (isNaN(timer)) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}${command} <minutes>\`` }, { quoted: msg });
+                if (isNaN(timer)) return sock.sendMessage(from, { text: `💡 *Usage:* .${command} <minutes>` }, { quoted: msg });
 
                 const actionType = command === 'closetime' ? 'announcement' : 'not_announcement';
-                const actionText = command === 'closetime' ? 'sealed (Admins Only)' : 'opened to all subjects';
+                const actionText = command === 'closetime' ? 'sealed (Admins Only)' : 'opened to all';
 
-                await sock.sendMessage(from, { text: `⏳ *Domain gates will be ${actionText} in${timer} minute(s), My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `⏳ *Domain gates will be ${actionText} in ${timer} minute(s), My Lord!*` }, { quoted: msg });
                 setTimeout(async () => {
                     await sock.groupSettingUpdate(from, actionType);
                     await sock.sendMessage(from, { text: `🔒 *Domain gates are now ${actionText}!*` });
@@ -822,7 +769,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 for (let admin of admins) {
                     await sock.groupParticipantsUpdate(from, [admin.id], 'demote');
                 }
-                await sock.sendMessage(from, { text: '🔻 *All High Lords stripped of admin ranks by Imperial decree!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔻 *All High Lords stripped of admin ranks!*' }, { quoted: msg });
                 break;
             }
 
@@ -836,10 +783,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                              msg.message?.extendedTextMessage?.contextInfo?.participant;
                 if (!target && q) target = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
-                if (!target) return sock.sendMessage(from, { text: '💡 *Tag `@user` or reply to their message to demote them!*' }, { quoted: msg });
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to demote them!*' }, { quoted: msg });
 
                 await sock.groupParticipantsUpdate(from, [target], 'demote');
-                await sock.sendMessage(from, { text: '🔻 *Subject stripped of High Lord rank, My Lord!*', mentions: [target] }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔻 *Subject stripped of High Lord rank, My Lord!*' }, { quoted: msg });
                 break;
             }
 
@@ -850,14 +797,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
                 try {
                     const requests = await sock.groupRequestParticipantsList(from);
-                    if (!requests || requests.length === 0) return sock.sendMessage(from, { text: '💡 *No pending requests found.*' }, { quoted: msg });
+                    if (!requests || requests.length === 0) return sock.sendMessage(from, { text: '💡 *No pending requests.*' }, { quoted: msg });
                     for (let req of requests) {
                         const targetJid = req.jid || req.id || req;
                         await sock.groupRequestParticipantsUpdate(from, [targetJid], 'reject');
                     }
-                    await sock.sendMessage(from, { text: `🚫 *Rejected all pending join requests, My Lord!*` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `🚫 *Rejected all pending requests, My Lord!*` }, { quoted: msg });
                 } catch (err) {
-                    await sock.sendMessage(from, { text: '❌ *Failed to reject join requests.*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ *Failed to reject requests.*' }, { quoted: msg });
                 }
                 break;
             }
@@ -866,8 +813,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'remove':
             case 'dor': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
-                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Imperial Rejection:* Admin rights required!' }, { quoted: msg });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Imperial Rejection:* The bot account must be an Admin to banish subjects!' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin!*' }, { quoted: msg });
 
                 let target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                              msg.message?.extendedTextMessage?.contextInfo?.participant;
@@ -880,14 +827,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 }
 
                 if (!target) {
-                    return sock.sendMessage(from, { text: '💡 *My Lord, please tag `@user`, reply to their message, or provide their number to banish!*' }, { quoted: msg });
+                    return sock.sendMessage(from, { text: '💡 *My Lord, tag `@user`, reply to their message, or type their number to banish!*' }, { quoted: msg });
                 }
 
                 try {
                     await sock.groupParticipantsUpdate(from, [target], 'remove');
-                    await sock.sendMessage(from, { text: '⚔️ *Subject banished from the domain, My Lord!* ✅', mentions: [target] }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '⚔️ *Subject banished from domain, My Lord!* ✅' }, { quoted: msg });
                 } catch (err) {
-                    await sock.sendMessage(from, { text: '❌ *Failed to banish subject. Ensure the target is not an admin.*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ *Failed to banish subject. Ensure target is not an admin.*' }, { quoted: msg });
                 }
                 break;
             }
@@ -895,7 +842,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'gcs':
             case 'groupmenu': {
                 await sock.sendMessage(from, { 
-                    text: `👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Domain Management Menu*\n\n` +
+                    text: `👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Domain Menu*\n\n` +
                           `• .open / .close\n` +
                           `• .kick / .promote / .demote\n` +
                           `• .tagall / .hidetag\n` +
@@ -906,18 +853,18 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             }
 
             case 'glostat': {
-                await sock.sendMessage(from, { text: `📊 *Global Domain Statistics:* Sovereign control established across all active groups!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `📊 *Global Domain Stats:* Sovereign control established!` }, { quoted: msg });
                 break;
             }
 
             case 'grouplink':
             case 'getlink': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin to fetch domain link!*' }, { quoted: msg });
+                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin!*' }, { quoted: msg });
 
                 try {
                     const code = await sock.groupInviteCode(from);
-                    await sock.sendMessage(from, { text: `🔗 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Domain Portal Link:*\n[https://chat.whatsapp.com/$](https://chat.whatsapp.com/$){code}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `🔗 *Domain Portal Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to fetch group link!*' }, { quoted: msg });
                 }
@@ -927,7 +874,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'grouponly': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 groupSettings[from].grouponly = !groupSettings[from].grouponly;
-                await sock.sendMessage(from, { text: `🛡️ *Group Only Command Enforcement:* ${groupSettings[from].grouponly ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🛡️ *Group Only Mode:* ${groupSettings[from].grouponly ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
                 break;
             }
 
@@ -949,18 +896,18 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 const groupMetadata = await sock.groupMetadata(from);
                 const participants = groupMetadata.participants.filter(p => !p.admin && p.id !== sock.user.id.split(':')[0] + '@s.whatsapp.net' && !p.id.includes(OWNER_NUMBER));
 
-                await sock.sendMessage(from, { text: `⚡ *Initiating Mass Banishment of ${participants.length} subjects, My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `⚡ *Mass Banishment initiated for ${participants.length} subjects!*` }, { quoted: msg });
                 for (let p of participants) {
                     await sock.groupParticipantsUpdate(from, [p.id], 'remove');
                 }
-                await sock.sendMessage(from, { text: `⚔️ *Domain completely purged!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `⚔️ *Domain purged!*` }, { quoted: msg });
                 break;
             }
 
             case 'mediatag': {
                 if (!isGroup || (!isAdmin && !isOwner)) return;
                 const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                if (!quotedMsg) return sock.sendMessage(from, { text: '💡 *Reply to a media message to tag all subjects.*' }, { quoted: msg });
+                if (!quotedMsg) return sock.sendMessage(from, { text: '💡 *Reply to a media message to tag all.*' }, { quoted: msg });
                 
                 const groupMetadata = await sock.groupMetadata(from);
                 const mentions = groupMetadata.participants.map(p => p.id);
@@ -971,7 +918,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'open': {
                 if (!isGroup || (!isAdmin && !isOwner)) return;
                 await sock.groupSettingUpdate(from, 'not_announcement');
-                await sock.sendMessage(from, { text: '🔓 *The Emperor has opened the domain gates! All may speak.*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔓 *Domain gates opened! All may speak.*' }, { quoted: msg });
                 break;
             }
 
@@ -986,7 +933,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 for (let p of nonAdmins) {
                     await sock.groupParticipantsUpdate(from, [p.id], 'promote');
                 }
-                await sock.sendMessage(from, { text: '👑 *All domain subjects elevated to High Lord rank, My Lord!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *All subjects elevated to High Lord rank, My Lord!*' }, { quoted: msg });
                 break;
             }
 
@@ -1000,10 +947,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                              msg.message?.extendedTextMessage?.contextInfo?.participant;
                 if (!target && q) target = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
-                if (!target) return sock.sendMessage(from, { text: '💡 *Tag `@user` or reply to their message to promote them!*' }, { quoted: msg });
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to promote them!*' }, { quoted: msg });
 
                 await sock.groupParticipantsUpdate(from, [target], 'promote');
-                await sock.sendMessage(from, { text: '👑 *Subject elevated to High Lord (Admin) rank, My Lord!*', mentions: [target] }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *Subject elevated to High Lord rank, My Lord!*' }, { quoted: msg });
                 break;
             }
 
@@ -1014,15 +961,15 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
                 
                 if (command === 'setgroupbio') {
-                    if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}setgroupbio <new_desc>\`` }, { quoted: msg });
+                    if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .setgroupbio <desc>` }, { quoted: msg });
                     await sock.groupUpdateDescription(from, q);
-                    await sock.sendMessage(from, { text: `✅ *Domain description updated, My Lord!*` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `✅ *Domain description updated!*` }, { quoted: msg });
                 } else if (command === 'setgroupname') {
-                    if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}setgroupname <new_title>\`` }, { quoted: msg });
+                    if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .setgroupname <title>` }, { quoted: msg });
                     await sock.groupUpdateSubject(from, q);
-                    await sock.sendMessage(from, { text: `✅ *Domain title updated, My Lord!*` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `✅ *Domain title updated!*` }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: `💡 *My Lord, reply to an image with ${prefix}setgrouppp to set group icon.*` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `💡 *Reply to an image with .setgrouppp to set group icon.*` }, { quoted: msg });
                 }
                 break;
             }
@@ -1036,7 +983,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!target) return sock.sendMessage(from, { text: '💡 *Reply to or tag a subject to warn.*' }, { quoted: msg });
 
                 await sock.sendMessage(from, { 
-                    text: `⚠️ *@${target.split('@')[0]}*, you have received an Imperial Warning from the Sovereign! Repent immediately or face banishment.`,
+                    text: `⚠️ *@${target.split('@')[0]}*, you have received an Imperial Warning!`,
                     mentions: [target]
                 }, { quoted: msg });
                 break;
@@ -1047,14 +994,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 const groupMetadata = await sock.groupMetadata(from);
                 const admins = groupMetadata.participants.filter(p => p.admin).map(p => p.id);
-                let txt = `🛡️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 High Lords Summons*\n\n`;
+                let txt = `🛡️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 High Lords*\n\n`;
                 admins.forEach(a => txt += `• @${a.split('@')[0]}\n`);
                 await sock.sendMessage(from, { text: txt, mentions: admins }, { quoted: msg });
                 break;
             }
 
             case 'tagall': {
-                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '⚔️ *Denial:* Only Domain High Lords may summon the populace!' }, { quoted: msg });
+                if (!isGroup || (!isAdmin && !isOwner)) return sock.sendMessage(from, { text: '⚔️ *Only High Lords may summon the populace!*' }, { quoted: msg });
                 const groupMetadata = await sock.groupMetadata(from);
                 let text = `╭━━━〔  *IMPERIAL SUMMONS — DEMON EMPEROR*  〕━━━┈\n_“All subjects, acknowledge your Sovereign!”_\n\n`;
                 let mentions = groupMetadata.participants.map(p => p.id);
@@ -1068,13 +1015,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 const groupMetadata = await sock.groupMetadata(from);
                 const mentions = groupMetadata.participants.map(p => p.id);
-                await sock.sendMessage(from, { text: `🟢 *Summoning Online Subjects of the Sovereign!*`, mentions }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🟢 *Summoning Online Subjects!*`, mentions }, { quoted: msg });
                 break;
             }
 
             case 'tagpoll': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* \`${prefix}tagpoll Question? | Option1 | Option2\`` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 *Usage:* .tagpoll Question? | Option1 | Option2` }, { quoted: msg });
                 const pollArgs = q.split('|').map(s => s.trim());
                 if (pollArgs.length < 3) return sock.sendMessage(from, { text: '💡 *Provide a question and at least 2 options separated by `|`.*' }, { quoted: msg });
                 
@@ -1092,14 +1039,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
                 if (!msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-                    return sock.sendMessage(from, { text: `💡 *My Lord, reply to a message with ${prefix}pin to cement it.*` }, { quoted: msg });
+                    return sock.sendMessage(from, { text: `💡 *Reply to a message with .pin to cement it.*` }, { quoted: msg });
                 }
-                await sock.sendMessage(from, { text: `📌 *Message permanently affixed to domain header, My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `📌 *Message affixed to domain header, My Lord!*` }, { quoted: msg });
                 break;
             }
 
             // =========================================================================
-            // DEMONIC INTELLIGENCE (AI)
+            // 4. DEMONIC INTELLIGENCE (AI)
             // =========================================================================
             case 'ai':
             case 'aimenu':
@@ -1112,7 +1059,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'llama': {
                 if (!q) return sock.sendMessage(from, { text: 'My Lord Demon Emperor, what query shall the Demonic Intellect decipher?' }, { quoted: msg });
                 try {
-                    const res = await fetchJson(`[https://api.popcat.xyz/chatbot?msg=$](https://api.popcat.xyz/chatbot?msg=$){encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
+                    const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
                     await sock.sendMessage(from, { text: `🧠 *Demonic Intellect:* "${res.response}"` }, { quoted: msg });
                 } catch (e) {
                     await sock.sendMessage(from, { text: `🧠 *Demonic Response:* "${q}"` }, { quoted: msg });
@@ -1121,7 +1068,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             }
 
             // =========================================================================
-            // ALCHEMY & CONVERSION COMMANDS
+            // 5. ALCHEMY & CONVERSION
             // =========================================================================
             case 'audio':
             case 'convertmenu':
@@ -1130,7 +1077,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'sticker':
             case 'swm': {
                 const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
-                if (!isImage) return sock.sendMessage(from, { text: 'My Lord, reply to an image to forge a Genuine Imperial Seal (Sticker)!' }, { quoted: msg });
+                if (!isImage) return sock.sendMessage(from, { text: 'My Lord, reply to an image to forge an Imperial Seal (Sticker)!' }, { quoted: msg });
 
                 try {
                     const targetMessage = msg.message.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
@@ -1167,20 +1114,20 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             }
 
             // =========================================================================
-            // ACQUISITION & DOWNLOADS
+            // 6. ACQUISITION & DOWNLOADS
             // =========================================================================
             case 'applemusic':
             case 'capcut':
             case 'dl':
             case 'downloadmenu':
             case 'fb': {
-                if (!q) return sock.sendMessage(from, { text: `💡 *My Lord, provide a media link: ${prefix}${command} <url>\`` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: `💡 *My Lord, provide a media link: .${command} <url>*` }, { quoted: msg });
                 await sock.sendMessage(from, { text: `📥 *Acquiring artifact from external realm for My Lord Demon Emperor...*` }, { quoted: msg });
                 break;
             }
 
             // =========================================================================
-            // REALM ARENA GAMES
+            // 7. REALM ARENA GAMES
             // =========================================================================
             case '2048':
             case 'activegames':
@@ -1207,7 +1154,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             }
 
             // =========================================================================
-            // AUXILIARY COMMANDS
+            // 8. AUXILIARY COMMANDS
             // =========================================================================
             case 'androidcrash':
             case 'bugmenu':
@@ -1223,10 +1170,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'toolmenu':
             case 'xnxx':
             case 'xvideos':
-            case 'yts': {
+            case 'yts':
+            case 'ping': {
+                const start = Date.now();
                 await sock.sendMessage(from, { 
                     text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Imperial Tool* 〕━━━┈\n` +
                           `✦ *Tool:* .${command}\n` +
+                          `✦ *Response Speed:* ${Date.now() - start}ms\n` +
                           `✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n` +
                           `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
                 }, { quoted: msg });
@@ -1236,7 +1186,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             default: {
                 if (command) {
                     await sock.sendMessage(from, { 
-                        text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝮮𝖔𝖒𝖒𝖆𝖓𝖉* 〕━━━┈\n` +
+                        text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Command* 〕━━━┈\n` +
                               `✦ *Command:* .${command}\n` +
                               `✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n` +
                               `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
@@ -1250,7 +1200,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
 startDemonBot();
 
-// --- KEEP ALIVE HTTP SERVER ---
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
