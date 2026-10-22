@@ -1,3 +1,4 @@
+
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -58,6 +59,7 @@ const COOLDOWN_TIME = 10000;  // 10 seconds
 async function startDemonBot() {
     const sessionPath = './demon_session';
 
+    // Auto restore session if SESSION_ID exists
     if (process.env.SESSION_ID && !fs.existsSync(path.join(sessionPath, 'creds.json'))) {
         if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
         try {
@@ -248,7 +250,131 @@ async function startDemonBot() {
 
         switch (command) {
             // =========================================================================
-            // EMPEROR'S SUPREME MENU COMMANDS[span_1](start_span)[span_1](end_span)
+            // CORE & MENU COMMANDS
+            // =========================================================================
+            case 'menu':
+            case 'help': {
+                const startTimeNum = Date.now();
+                const latency = Date.now() - startTimeNum;
+                const totalMem = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(2);
+                const freeMem = (os.freemem() / (1024 * 1024 * 1024)).toFixed(2);
+                const usedMem = (totalMem - freeMem).toFixed(2);
+                const processMem = (process.memoryUsage().rss / (1024 * 1024)).toFixed(2);
+                const cpuCores = os.cpus().length;
+
+                const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+                const hours = Math.floor(uptimeSeconds / 3600);
+                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+                const seconds = uptimeSeconds % 60;
+                const uptimeFormatted = `${hours}h ${minutes}m${seconds}s`;
+
+                const menuText = 
+`✦ 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝕾𝖞𝖘𝖙𝖊𝖒 ✦
+_“All bowing before My Lord Demon Emperor!”_
+
+• ⚡ *Realm Latency:* ${latency}ms
+• ⏱️ *Imperial Uptime:* ${uptimeFormatted}
+• 💾 *Throne Memory:* ${usedMem} GB / ${totalMem} GB
+• 📊 *Core Consumption:* ${processMem} MB
+• 💻 *Processor Cores:* ${cpuCores} Cores
+• ⚙️ *Engine:* Baileys v12.0
+• 👑 *Status:* Absolute Sovereignty
+
+╭━━━〔  *${BOT_NAME}*  〕━━━┈
+✦ *Sovereign:* ${OWNER_NAME}
+✦ *Prefix:* .
+✦ *Realm Mode:* ${botMode.toUpperCase()}
+✦ *Runtime:* ${uptimeFormatted}
+✦ *Version:* ${BOT_VERSION}
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *EMPEROR'S SUPREME MENU* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .addowner, .antidelete, .antiviewonce
+⬡ .autoonline, .autorecording, .autostatuslike
+⬡ .autostatusview, .autotyping, .block, .unblock
+⬡ .buatgc, .changebio, .devices, .getpp
+⬡ .joingroup, .leavegroup, .listfont, .listgroup
+⬡ .bancheck, .botlink, .fetchstatus, .listchannels
+⬡ .mode <public/private>, .pair <number>, .broadcast
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *VIP NOBILITY MENU* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .connectedusers, .inspectsock, .vipadd
+⬡ .vipadmin, .vipallgroups, .vipdemote
+⬡ .vipdetails, .vipgroups, .viplist, .vipmenu
+⬡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *DOMAIN MANAGEMENT* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .activeusers, .addmember, .antiadd, .antibot
+⬡ .antidemote, .antigroupsmention, .antiimage, .antilink
+⬡ .antipromote, .antiremove, .antispam, .antitag
+⬡ .antitagadmin, .approveall, .close, .closetime
+⬡ .demoteall, .demoteuser, .disapproveall, .dor
+⬡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
+⬡ .grouponly, .hidetag, .inactiveusers, .kickall
+⬡ .left, .listgroups, .mediatag, .open, .opentime
+⬡ .promoteall, .promoteuser, .remove, .setgroupbio
+⬡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
+⬡ .tagall, .tagonline, .tagpoll, .warning, .welcome
+⬡ .pin, .status, .vv
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *DEMONIC INTELLIGENCE* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .ai, .aimenu, .claude, .copilot
+⬡ .describe, .felo, .gpt, .imagine, .llama
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *ALCHEMY & CONVERSION* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .audio, .convertmenu, .stickermeme, .stiker
+⬡ .swm, .telestick, .toaud, .togif, .toimg
+⬡ .tomp4, .toptt, .tourl
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *ACQUISITION & DOWNLOADS* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .applemusic, .capcut, .dl, .downloadmenu, .fb
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *REALM ARENA GAMES* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .2048, .activegames, .connect4, .dino
+⬡ .emojidecode, .endgame, .flappy, .galaxy
+⬡ .gamemenu, .letterblitz, .memory, .mines
+⬡ .pong, .reverseit
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+『 *AUXILIARY COMMANDS* 』
+╭━━━━━━━━━━━━━━━━━━━━━━━┈
+⬡ .androidcrash, .bugmenu, .gccrash, .hd
+⬡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
+⬡ .searchmenu, .spamngl, .toolmenu, .xnxx
+⬡ .xvideos, .yts, .ping
+╰━━━━━━━━━━━━━━━━━━━━━━━┈
+
+_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata Rules the Night_`;
+
+                try {
+                    await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
+                } catch (err) {
+                    await sock.sendMessage(from, { text: menuText }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'ping': {
+                const start = Date.now();
+                await sock.sendMessage(from, { text: `⚡ *At your command, My Lord Demon Emperor!* Response Speed: ${Date.now() - start}ms` }, { quoted: msg });
+                break;
+            }
+
+            // =========================================================================
+            // EMPEROR'S SUPREME MENU COMMANDS
             // =========================================================================
             case 'addowner': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor can appoint co-owners!*' }, { quoted: msg });
@@ -375,6 +501,7 @@ async function startDemonBot() {
             case 'listfont': {
                 await sock.sendMessage(from, { 
                     text: `✒️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Script Typographies*\n\n` +
+                          `1. *Imperial Gothic:* 𝕲```javascript
                           `1. *Imperial Gothic:* 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓\n` +
                           `2. *Royal Monospace:* \`Great Demon\`\n` +
                           `3. *Shadow Italic:* _Great Demon_`
@@ -504,7 +631,7 @@ async function startDemonBot() {
             }
 
             // =========================================================================
-            // VIP NOBILITY MENU COMMANDS[span_2](start_span)[span_2](end_span)
+            // VIP NOBILITY MENU COMMANDS
             // =========================================================================
             case 'connectedusers':
             case 'activeusers': {
@@ -584,7 +711,7 @@ async function startDemonBot() {
             }
 
             // =========================================================================
-            // DOMAIN MANAGEMENT COMMANDS[span_3](start_span)[span_3](end_span)
+            // DOMAIN MANAGEMENT COMMANDS
             // =========================================================================
             case 'addmember': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
@@ -790,7 +917,7 @@ async function startDemonBot() {
 
                 try {
                     const code = await sock.groupInviteCode(from);
-                    await sock.sendMessage(from, { text: `🔗 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Domain Portal Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `🔗 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Domain Portal Link:*\n[https://chat.whatsapp.com/$](https://chat.whatsapp.com/$){code}` }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to fetch group link!*' }, { quoted: msg });
                 }
@@ -972,7 +1099,7 @@ async function startDemonBot() {
             }
 
             // =========================================================================
-            // DEMONIC INTELLIGENCE (AI)[span_4](start_span)[span_4](end_span)
+            // DEMONIC INTELLIGENCE (AI)
             // =========================================================================
             case 'ai':
             case 'aimenu':
@@ -985,7 +1112,7 @@ async function startDemonBot() {
             case 'llama': {
                 if (!q) return sock.sendMessage(from, { text: 'My Lord Demon Emperor, what query shall the Demonic Intellect decipher?' }, { quoted: msg });
                 try {
-                    const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
+                    const res = await fetchJson(`[https://api.popcat.xyz/chatbot?msg=$](https://api.popcat.xyz/chatbot?msg=$){encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
                     await sock.sendMessage(from, { text: `🧠 *Demonic Intellect:* "${res.response}"` }, { quoted: msg });
                 } catch (e) {
                     await sock.sendMessage(from, { text: `🧠 *Demonic Response:* "${q}"` }, { quoted: msg });
@@ -1109,7 +1236,7 @@ async function startDemonBot() {
             default: {
                 if (command) {
                     await sock.sendMessage(from, { 
-                        text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝕮𝖔𝖒𝖒𝖆𝖓𝖉* 〕━━━┈\n` +
+                        text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝮮𝖔𝖒𝖒𝖆𝖓𝖉* 〕━━━┈\n` +
                               `✦ *Command:* .${command}\n` +
                               `✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n` +
                               `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
