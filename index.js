@@ -1,4 +1,3 @@
-
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -276,14 +275,33 @@ if (msg.messageStubType === 68 || msg.type === 'protocolMessage') {
         switch (command) {
             case 'menu':
             case 'help': {
+                const startTimeNum = Date.now();
+                const latency = Date.now() - startTimeNum;
+                const totalMem = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(2);
+                const freeMem = (os.freemem() / (1024 * 1024 * 1024)).toFixed(2);
+                const usedMem = (totalMem - freeMem).toFixed(2);
+                const processMem = (process.memoryUsage().rss / (1024 * 1024)).toFixed(2);
+                const cpuCores = os.cpus().length;
+
                 const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-                const hours = Math.floor(uptimeSeconds / 3600);
-                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-                const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
+                const d = Math.floor(uptimeSeconds / (3600 * 24));
+                const h = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
+                const m = Math.floor((uptimeSeconds % 3600) / 60);
+                const s = uptimeSeconds % 60;
+                const uptimeFormatted = `${d > 0 ? d + 'd ' : ''}${h}h ${m}m ${s}s`;
 
                 const menuText = 
-`╭━━━〔  *${BOT_NAME}*  〕━━━┈
+`✦ 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓 𝕭𝖔𝖙 𝕾𝖞𝖘𝖙𝖊𝖒 ✦
+
+• ⚡ *Response Time:* ${latency}ms
+• ⏱️ *System Uptime:* ${uptimeFormatted}
+• 💾 *Server Memory:* ${usedMem} GB / ${totalMem} GB
+• 📊 *Bot Memory:* ${processMem} MB
+• 💻 *CPU Processor:* ${cpuCores} Cores
+• ⚙️ *Core Engine:* Baileys v12.0
+• 👑 *Status:* Online & Operational
+
+╭━━━〔  *${BOT_NAME}*  〕━━━┈
 ✦ *Owner:* ${OWNER_NAME}
 ✦ *Prefix:* .
 ✦ *Mode:* ${botMode.toUpperCase()}
@@ -914,9 +932,7 @@ case 'pair': {
 
             case 'ping': {
                 const start = Date.now();
-                const sent = await sock.sendMessage(from, { text: 'Testing speed...' }, { quoted: msg });
-                const end = Date.now();
-                await sock.sendMessage(from, { text: `Speed: ${end - start}ms` }, { edit: sent.key });
+                await sock.sendMessage(from, { text: `⚡ *Pong!* Speed: ${Date.now() - start}ms` }, { quoted: msg });
                 break;
             }
 
