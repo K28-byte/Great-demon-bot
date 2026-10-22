@@ -49,7 +49,14 @@ const SPAM_TIME = 5000;       // 5 seconds
 const COOLDOWN_TIME = 10000;  // 10 seconds
 
 async function startDemonBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('./demon_session');
+    const sessionPath = './demon_session';
+    
+    // Auto-clean incomplete or desynced session state prior to pairing
+    if (fs.existsSync(sessionPath) && !fs.existsSync(path.join(sessionPath, 'creds.json'))) {
+        fs.rmSync(sessionPath, { recursive: true, force: true });
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
@@ -57,7 +64,7 @@ async function startDemonBot() {
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"],
+        browser: ["Chrome (Linux)", "Chrome", "110.0.5481.177"],
         syncFullHistory: false,
         markOnlineOnConnect: true
     });
@@ -88,7 +95,7 @@ async function startDemonBot() {
                 console.log('⚡ Reconnecting Great Demon Bot...');
                 startDemonBot();
             } else {
-                console.log('❌ Bot logged out. Delete ./demon_session and restart to re-pair.');
+                console.log('❌ Bot logged out. Session reset required.');
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
