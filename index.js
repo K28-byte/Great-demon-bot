@@ -14,7 +14,7 @@ const https = require('https');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
-const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
+const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝚘𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
 const BOT_VERSION = "v10.0 ULTRA";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
@@ -318,7 +318,7 @@ _“All bowing before My Lord Demon Emperor!”_
 ⬡ .2048, .activegames, .connect4, .dino
 ⬡ .emojidecode, .endgame, .flappy, .galaxy
 ⬡ .gamemenu, .letterblitz, .memory, .mines
-⬡ .pong, .reverseitt
+⬡ .pong, .reverseit
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *AUXILIARY COMMANDS* 』
@@ -786,7 +786,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to demote them!*' }, { quoted: msg });
 
                 await sock.groupParticipantsUpdate(from, [target], 'demote');
-                await sock.sendMessage(from, { text: '🔻 *Subject stripped of High Lord rank, My Lord!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔻 *Subject stripped of High Lord rank, My Lord!*`' }, { quoted: msg });
                 break;
             }
 
@@ -1206,6 +1206,6 @@ const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Great Demon Bot is active 24/7 under the rule of Demon Emperor!\n');
-}).listen(PORT, () => {
-    console.log(`🌐 Keep-alive server running on port ${PORT}`);
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 Keep-alive server running on 0.0.0.0:${PORT}`);
 });
