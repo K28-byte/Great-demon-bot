@@ -1,3 +1,4 @@
+
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -86,7 +87,7 @@ async function startDemonBot() {
         version,
         auth: state,
         printQRInTerminal: false,
-        logger: pino({ level: 'silent' }), // Suppress noisy logs to make pairing code stand out clearly
+        logger: pino({ level: 'silent' }), // Suppress noisy logs
         browser: ["Ubuntu", "Chrome", "20.0.04"],
         syncFullHistory: false,
         markOnlineOnConnect: autoSettings.autoonline,
@@ -101,129 +102,14 @@ async function startDemonBot() {
         console.log('\n==================================================');
         let phoneNumber = process.env.PHONE_NUMBER || OWNER_NUMBER;
         phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-        
-        setTimeout(async () => {
-            try {
-                console.log(`⏳ Requesting Imperial Pairing Code for +${phoneNumber}...`);
-                const code = await sock.requestPairingCode(phoneNumber);
-                const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-                console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${formattedCode}\x1b[0m\n`);
-                console.log('==================================================\n');
-                
-                // Keep the container awake for 10 minutes to allow linking
-                await new Promise((resolve) => setTimeout(resolve, 600000));
-            } catch (err) {
-                console.log('❌ Error requesting pairing code:', err.message);
-            }
-        }, 4000);
-    }
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'close') {
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-            if (statusCode !== DisconnectReason.loggedOut) {
-                console.log('⚡ Reconnecting Great Demon Bot...');
-                startDemonBot();
-            } else {
-                console.log('❌ Session logged out from WhatsApp servers. Please clear SESSION_ID to re-pair.');
-            }
-        } else if (connection === 'open') {
-            console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
-        }
-    });
-
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
-        const msg = messages[0];
-        if (!msg.message) return;
-
-        const from = msg.key.remoteJid;
-        const isGroup = from.endsWith('@g.us');
-        const sender = msg.key.participant || msg.key.remoteJid;
-        const senderNum = sender.split('@')[0];
-
-        const body = msg.message.conversation || 
-                     msg.message.extendedTextMessage?.text || 
-                     msg.message.imageMessage?.caption || '';
-
-        if (!body.startsWith('.')) return;
-
-        const args = body.slice(1).trim().split(/ +/);
-        const command = args.shift().toLowerCase();
-        const q = args.join(' ');
-
-        const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
-        const isVip = isOwner || vipUsers.has(senderNum);
-
-        if (botMode === 'private' && !isVip) return;
-
-        let isAdmin = false;
-        let isBotAdmin = false;
-        if (isGroup) {
-            try {
-                const groupMetadata = await sock.groupMetadata(from);
-                const userObj = groupMetadata.participants.find(p => p.id.split('@')[0] === senderNum);
-                isAdmin = userObj && (userObj.admin === 'admin' || userObj.admin === 'superadmin');
-
-                const botNum = sock.user.id.split(':')[0].split('@')[0];
-                const botObj = groupMetadata.participants.find(p => p.id.split('@')[0] === botNum);
-                isBotAdmin = botObj && (botObj.admin === 'admin' || botObj.admin === 'superadmin');
-
-                if (isOwner && isAdmin) isBotAdmin = true;
-            } catch (e) {}
-        }
-
-        if (!groupSettings[from]) {
-            groupSettings[from] = { 
-                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false
-            };
-        }
-
-        // --- ANTISPAM INTERCEPTOR ---
-        const senderId = msg.key.participant || msg.key.remoteJid;
-        if (body.startsWith(prefix)) {
-            const currentTime = Date.now();
-            if (spamMap.has(senderId)) {
-                const userData = spamMap.get(senderId);
-                if (userData.inCooldown) {
-                    if (currentTime < userData.cooldownUntil) {
-                        await sock.sendMessage(from, { text: "⚔️ *Imperial Warning:* Do not spam the Demon Realm's commands!" }, { quoted: msg });
-                        return;
-                    } else {
-                        spamMap.delete(senderId);
-                    }
-                } else {
-                    if (currentTime - userData.firstMsgTime < SPAM_TIME) {
-                        userData.msgCount += 1;
-                        if (userData.msgCount >= SPAM_LIMIT) {
-                            userData.inCooldown = true;
-                            userData.cooldownUntil = currentTime + COOLDOWN_TIME;
-                            await sock.sendMessage(from, { text: "🚫 *Demon Realm Seal:* You have triggered anti-spam! Muted for 10 seconds." }, { quoted: msg });
-                            return;
-                        }
-                    } else {
-                        spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
-                    }
-                }
-            } else {
-                spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
-            }
-        }
-
-        // --- GROUP PROTECTION INTERCEPTORS ---
-        if (isGroup && groupSettings[from]) {
-            const isSenderAdmin = isAdmin || isOwner;
-
-            if (groupSettings[from].antilink && !isSenderAdmin) {
-                const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
-                if (linkRegex.test(body)) {
-                    await sock.sendMessage(from, { delete: msg.key });
-                    await sock.sendMessage(from, { 
-                        text: `🗡️ *@${sender.split('@')[0]}*, foreign domain links are forbidden by decree of the Demon Emperor!`,
+        try {
+            // Wait 5 seconds for socket connection to initialize
+            await new Promise(res => setTimeout(res, 5000));
+            console.log(`⏳ Requesting Imperial Pairing Code for +${phoneNumber}...`);
+            const code = await sock.requestPairingCode(phoneNumber);
+            const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
+            console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${formattedCode}\x1b[0m\n`); console.log('==================================================\n');  // FREEZES PROCESS AT THIS POINT UNTIL WHATSAPP RESPONDS await new Promise(() => {}); } catch (err) { console.log('❌ Error requesting pairing code:', err.message); } }  sock.ev.on('connection.update', (update) => { const { connection, lastDisconnect } = update; if (connection === 'close') { const statusCode = lastDisconnect?.error?.output?.statusCode; if (statusCode !== DisconnectReason.loggedOut) { console.log('⚡ Reconnecting Great Demon Bot...'); startDemonBot(); } else { console.log('❌ Session logged out from WhatsApp servers. Please clear SESSION_ID to re-pair.'); } } else if (connection === 'open') { console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n'); } });  sock.ev.on('messages.upsert', async ({ messages, type }) => { if (type !== 'notify') return; const msg = messages[0]; if (!msg.message) return;  const from = msg.key.remoteJid; const isGroup = from.endsWith('@g.us'); const sender = msg.key.participant \vert{}\vert{} msg.key.remoteJid; const senderNum = sender.split('@')[0];  const body = msg.message.conversation \vert{}\vert{} msg.message.extendedTextMessage?.text \vert{}\vert{} msg.message.imageMessage?.caption \vert{}\vert{} '';  if (!body.startsWith('.')) return;  const args = body.slice(1).trim().split(/ +/); const command = args.shift().toLowerCase(); const q = args.join(' ');  const isOwner = msg.key.fromMe \vert{}\vert{} sender.includes(OWNER_NUMBER) \vert{}\vert{} senderNum === OWNER_NUMBER; const isVip = isOwner \vert{}\vert{} vipUsers.has(senderNum);  if (botMode === 'private' && !isVip) return;  let isAdmin = false; let isBotAdmin = false; if (isGroup) { try { const groupMetadata = await sock.groupMetadata(from); const userObj = groupMetadata.participants.find(p => p.id.split('@')[0] === senderNum); isAdmin = userObj && (userObj.admin === 'admin' \vert{}\vert{} userObj.admin === 'superadmin');  const botNum = sock.user.id.split(':')[0].split('@')[0]; const botObj = groupMetadata.participants.find(p => p.id.split('@')[0] === botNum); isBotAdmin = botObj && (botObj.admin === 'admin' \vert{}\vert{} botObj.admin === 'superadmin');  if (isOwner && isAdmin) isBotAdmin = true; } catch (e) {} }  if (!groupSettings[from]) { groupSettings[from] = { antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, antiimage: false, antilink: false, antipromote: false, antiremove: false, antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false, antitagadmin: false, grouponly: false }; }  // --- ANTISPAM INTERCEPTOR --- const senderId = msg.key.participant \vert{}\vert{} msg.key.remoteJid; if (body.startsWith(prefix)) { const currentTime = Date.now(); if (spamMap.has(senderId)) { const userData = spamMap.get(senderId); if (userData.inCooldown) { if (currentTime < userData.cooldownUntil) { await sock.sendMessage(from, { text: "⚔️ *Imperial Warning:* Do not spam the Demon Realm's commands!" }, { quoted: msg }); return; } else { spamMap.delete(senderId); } } else { if (currentTime - userData.firstMsgTime < SPAM_TIME) { userData.msgCount += 1; if (userData.msgCount >= SPAM_LIMIT) { userData.inCooldown = true; userData.cooldownUntil = currentTime + COOLDOWN_TIME; await sock.sendMessage(from, { text: "🚫 *Demon Realm Seal:* You have triggered anti-spam! Muted for 10 seconds." }, { quoted: msg }); return; } } else { spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false }); } } } else { spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false }); } }  // --- GROUP PROTECTION INTERCEPTORS --- if (isGroup && groupSettings[from]) { const isSenderAdmin = isAdmin \vert{}\vert{} isOwner;  if (groupSettings[from].antilink && !isSenderAdmin) { const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}\vert{}https?:\/\/[^\s]+)/gi; if (linkRegex.test(body)) { await sock.sendMessage(from, { delete: msg.key }); await sock.sendMessage(from, { text: `🗡️ *@${sender.split('@')[0]}*, foreign domain links are forbidden by decree of the Demon Emperor!`,
                         mentions: [sender]
                     });
                     return;
@@ -258,7 +144,7 @@ async function startDemonBot() {
                 const hours = Math.floor(uptimeSeconds / 3600);
                 const minutes = Math.floor((uptimeSeconds % 3600) / 60);
                 const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
+                const uptimeFormatted = `${hours}h ${minutes}m${seconds}s`;
 
                 const menuText = 
 `✦ 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝕾𝖞𝖘𝖙𝖊𝖒 ✦
@@ -392,7 +278,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'autotyping': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 autoSettings[command] = !autoSettings[command];
-                await sock.sendMessage(from, { text: `⚙️ *Imperial Presence [${command.toUpperCase()}]:* ${autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `⚙️ *Imperial Presence [${command.toUpperCase()}]:*${autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
                 break;
             }
 
@@ -441,8 +327,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 await sock.sendMessage(from, { 
                     text: `💻 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Throne Engine Info*\n\n` +
                           `• *Platform:* ${os.platform()}\n` +
-                          `• *Architecture:* ${os.arch()}\n` +
-                          `• *Memory:* ${(os.freemem() / 1024 / 1024).toFixed(2)} MB Free / ${(os.totalmem() / 1024 / 1024).toFixed(2)} MB Total\n` +
+                          `• *Architecture:* ${os.arch()}\n` + `• *Memory:* ${(os.freemem() / 1024 / 1024).toFixed(2)} MB Free / ${(os.totalmem() / 1024 / 1024).toFixed(2)} MB Total\n` +
                           `• *Uptime:* ${(os.uptime() / 3600).toFixed(2)} Hours` 
                 }, { quoted: msg });
                 break;
@@ -481,6 +366,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 break;
             }
 
+            case 'listfont': {
+                await sock.sendMessage(from, { 
+                    text: `✒️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Script Typographies*\n\n` +
+                          `1. Imperial Gothic: 𝕲Here is the rest of your `index.js` file script starting right from `listfont`:
+
+```javascript
             case 'listfont': {
                 await sock.sendMessage(from, { 
                     text: `✒️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Script Typographies*\n\n` +
@@ -884,7 +775,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
                 try {
                     const code = await sock.groupInviteCode(from);
-                    await sock.sendMessage(from, { text: `🔗 *Domain Portal Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `🔗 *Domain Portal Link:*\n[https://chat.whatsapp.com/$](https://chat.whatsapp.com/$){code}` }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to fetch group link!*' }, { quoted: msg });
                 }
@@ -1079,7 +970,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'llama': {
                 if (!q) return sock.sendMessage(from, { text: 'My Lord Demon Emperor, what query shall the Demonic Intellect decipher?' }, { quoted: msg });
                 try {
-                    const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
+                    const res = await fetchJson(`[https://api.popcat.xyz/chatbot?msg=$](https://api.popcat.xyz/chatbot?msg=$){encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
                     await sock.sendMessage(from, { text: `🧠 *Demonic Intellect:* "${res.response}"` }, { quoted: msg });
                 } catch (e) {
                     await sock.sendMessage(from, { text: `🧠 *Demonic Response:* "${q}"` }, { quoted: msg });
