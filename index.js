@@ -1,3 +1,4 @@
+
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -108,7 +109,6 @@ async function startDemonBot() {
             console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${formattedCode}\x1b[0m\n`);
             console.log('==================================================\n');
             
-            // Keeps process alive while waiting for pairing
             await new Promise(() => {});
         } catch (err) {
             console.log('❌ Error requesting pairing code:', err.message);
@@ -279,71 +279,71 @@ _“All bowing before My Lord Demon Emperor!”_
 
 『 *EMPEROR'S SUPREME MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .addowner, .antidelete, .antiviewonce
-⬡ .autoonline, .autorecording, .autostatuslike
-⬡ .autostatusview, .autotyping, .block, .unblock
-⬡ .buatgc, .changebio, .devices, .getpp
-⬡ .joingroup, .leavegroup, .listfont, .listgroup
-⬡ .bancheck, .botlink, .fetchstatus, .listchannels
-⬡ .mode <public/private>, .pair <number>, .broadcast
+⡡ .addowner, .antidelete, .antiviewonce
+⡡ .autoonline, .autorecording, .autostatuslike
+⡡ .autostatusview, .autotyping, .block, .unblock
+⡡ .buatgc, .changebio, .devices, .getpp
+⡡ .joingroup, .leavegroup, .listfont, .listgroup
+⡡ .bancheck, .botlink, .fetchstatus, .listchannels
+⡡ .mode <public/private>, .pair <number>, .broadcast
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *VIP NOBILITY MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .connectedusers, .inspectsock, .vipadd
-⬡ .vipadmin, .vipallgroups, .vipdemote
-⬡ .vipdetails, .vipgroups, .viplist, .vipmenu
-⬡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
+⡡ .connectedusers, .inspectsock, .vipadd
+⡡ .vipadmin, .vipallgroups, .vipdemote
+⡡ .vipdetails, .vipgroups, .viplist, .vipmenu
+⡡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *DOMAIN MANAGEMENT* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .activeusers, .addmember, .antiadd, .antibot
-⬡ .antidemote, .antigroupsmention, .antiimage, .antilink
-⬡ .antipromote, .antiremove, .antispam, .antitag
-⬡ .antitagadmin, .approveall, .close, .closetime
-⬡ .demoteall, .demoteuser, .disapproveall, .dor
-⬡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
-⬡ .grouponly, .hidetag, .inactiveusers, .kickall
-⬡ .left, .listgroups, .mediatag, .open, .opentime
-⬡ .promoteall, .promoteuser, .remove, .setgroupbio
-⬡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⬡ .tagall, .tagonline, .tagpoll, .warning, .welcome
-⬡ .pin, .status, .vv
+⡡ .activeusers, .addmember, .antiadd, .antibot
+⡡ .antidemote, .antigroupsmention, .antiimage, .antilink
+⡡ .antipromote, .antiremove, .antispam, .antitag
+⡡ .antitagadmin, .approveall, .close, .closetime
+⡡ .demoteall, .demoteuser, .disapproveall, .dor
+⡡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
+⡡ .grouponly, .hidetag, .inactiveusers, .kickall
+⡡ .left, .listgroups, .mediatag, .open, .opentime
+⡡ .promoteall, .promoteuser, .remove, .setgroupbio
+⡡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
+⡡ .tagall, .tagonline, .tagpoll, .warning, .welcome
+⡡ .pin, .status, .vv
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *DEMONIC INTELLIGENCE* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .ai, .aimenu, .claude, .copilot
-⬡ .describe, .felo, .gpt, .imagine, .llama
+⡡ .ai, .aimenu, .claude, .copilot
+⡡ .describe, .felo, .gpt, .imagine, .llama
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *ALCHEMY & CONVERSION* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .audio, .convertmenu, .stickermeme, .stiker
-⬡ .swm, .telestick, .toaud, .togif, .toimg
-⬡ .tomp4, .toptt, .tourl
+⡡ .audio, .convertmenu, .stickermeme, .stiker
+⡡ .swm, .telestick, .toaud, .togif, .toimg
+⡡ .tomp4, .toptt, .tourl
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *ACQUISITION & DOWNLOADS* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .applemusic, .capcut, .dl, .downloadmenu, .fb
+⡡ .applemusic, .capcut, .dl, .downloadmenu, .fb
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *REALM ARENA GAMES* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .2048, .activegames, .connect4, .dino
-⬡ .emojidecode, .endgame, .flappy, .galaxy
-⬡ .gamemenu, .letterblitz, .memory, .mines
-⬡ .pong, .reverseit
+⡡ .2048, .activegames, .connect4, .dino
+⡡ .emojidecode, .endgame, .flappy, .galaxy
+⡡ .gamemenu, .letterblitz, .memory, .mines
+⡡ .pong, .reverseit
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *AUXILIARY COMMANDS* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .androidcrash, .bugmenu, .gccrash, .hd
-⬡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
-⬡ .searchmenu, .spamngl, .toolmenu, .xnxx
-⬡ .xvideos, .yts, .ping
+⡡ .androidcrash, .bugmenu, .gccrash, .hd
+⡡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
+⡡ .searchmenu, .spamngl, .toolmenu, .xnxx
+⡡ .xvideos, .yts, .ping
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata Rules the Night_`;
@@ -1022,7 +1022,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 const groupMetadata = await sock.groupMetadata(from);
                 let text = `╭━━━〔  *IMPERIAL SUMMONS — DEMON EMPEROR*  〕━━━┈\n_“All subjects, acknowledge your Sovereign!”_\n\n`;
                 let mentions = groupMetadata.participants.map(p => p.id);
-                mentions.forEach(p => text += `⬡ @${p.split('@')[0]}\n`);
+                mentions.forEach(p => text += `⡡ @${p.split('@')[0]}\n`);
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
                 await sock.sendMessage(from, { text, mentions }, { quoted: msg });
                 break;
