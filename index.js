@@ -109,6 +109,9 @@ async function startDemonBot() {
                 const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
                 console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${formattedCode}\x1b[0m\n`);
                 console.log('==================================================\n');
+                
+                // Keep the container awake for 10 minutes to allow linking
+                await new Promise((resolve) => setTimeout(resolve, 600000));
             } catch (err) {
                 console.log('❌ Error requesting pairing code:', err.message);
             }
@@ -950,7 +953,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 for (let p of nonAdmins) {
                     await sock.groupParticipantsUpdate(from, [p.id], 'promote');
                 }
-                await sock.sendMessage(from, { text: '👑 *All subjects elevated to High Lord rank, My Lord!*`' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *All subjects elevated to High Lord rank, My Lord!*' }, { quoted: msg });
                 break;
             }
 
@@ -1216,4 +1219,3 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 }
 
 startDemonBot();
-
