@@ -56,10 +56,10 @@ const COOLDOWN_TIME = 10000;
 async function startDemonBot() {
     const sessionPath = './demon_session';
 
-    if (process.env.SESSION_ID && !fs.existsSync(path.join(sessionPath, 'creds.json'))) {
+    // Check if session ID is provided and write creds.json
+    if (process.env.SESSION_ID && process.env.SESSION_ID.trim().length > 20) {
         if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
         try {
-            // Bulletproof cleanup: trims whitespace, removes prefix whether present or not
             const rawId = process.env.SESSION_ID.trim().replace(/^GREAT_DEMON_/, '');
             const decodedCreds = Buffer.from(rawId, 'base64').toString('utf-8');
             fs.writeFileSync(path.join(sessionPath, 'creds.json'), decodedCreds);
@@ -76,6 +76,7 @@ async function startDemonBot() {
         version,
         auth: state,
         printQRInTerminal: false,
+        logger: pino({ level: 'silent' }), // Suppress noisy logs to make pairing code stand out clearly
         browser: ["Ubuntu", "Chrome", "20.0.04"],
         syncFullHistory: false,
         markOnlineOnConnect: autoSettings.autoonline,
@@ -85,20 +86,23 @@ async function startDemonBot() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    if (!sock.authState.creds.registered && !process.env.SESSION_ID) {
+    // FORCE PAIRING CODE GENERATION IF NOT REGISTERED
+    if (!sock.authState.creds.registered) {
         console.log('\n==================================================');
         let phoneNumber = process.env.PHONE_NUMBER || OWNER_NUMBER;
         phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
         
         setTimeout(async () => {
             try {
+                console.log(`⏳ Requesting Imperial Pairing Code for +${phoneNumber}...`);
                 const code = await sock.requestPairingCode(phoneNumber);
                 const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
                 console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${formattedCode}\x1b[0m\n`);
+                console.log('==================================================\n');
             } catch (err) {
                 console.log('❌ Error requesting pairing code:', err.message);
             }
-        }, 3000);
+        }, 4000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -108,6 +112,8 @@ async function startDemonBot() {
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('⚡ Reconnecting Great Demon Bot...');
                 startDemonBot();
+            } else {
+                console.log('❌ Session logged out from WhatsApp servers. Please clear SESSION_ID to re-pair.');
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
@@ -643,7 +649,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
             case 'vipreassign': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: '👑 *VIP Ranks synchronized, My Lord!*`' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *VIP Ranks synchronized, My Lord!*' }, { quoted: msg });
                 break;
             }
 
@@ -934,7 +940,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 for (let p of nonAdmins) {
                     await sock.groupParticipantsUpdate(from, [p.id], 'promote');
                 }
-                await sock.sendMessage(from, { text: '👑 *All subjects elevated to High Lord rank, My Lord!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *All subjects elevated to High Lord rank, My Lord!*`' }, { quoted: msg });
                 break;
             }
 
