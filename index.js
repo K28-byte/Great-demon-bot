@@ -14,7 +14,7 @@ const https = require('https');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
-const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝚘𝒏";
+const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
 const BOT_VERSION = "v10.0 ULTRA";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
@@ -59,7 +59,8 @@ async function startDemonBot() {
     if (process.env.SESSION_ID && !fs.existsSync(path.join(sessionPath, 'creds.json'))) {
         if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
         try {
-            const rawId = process.env.SESSION_ID.replace(/^GREAT_DEMON_/, '');
+            // Bulletproof cleanup: trims whitespace, removes prefix whether present or not
+            const rawId = process.env.SESSION_ID.trim().replace(/^GREAT_DEMON_/, '');
             const decodedCreds = Buffer.from(rawId, 'base64').toString('utf-8');
             fs.writeFileSync(path.join(sessionPath, 'creds.json'), decodedCreds);
             console.log('✅ Imperial Session successfully restored from SESSION_ID Environment Variable!');
@@ -642,7 +643,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
             case 'vipreassign': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: '👑 *VIP Ranks synchronized, My Lord!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *VIP Ranks synchronized, My Lord!*`' }, { quoted: msg });
                 break;
             }
 
@@ -786,7 +787,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to demote them!*' }, { quoted: msg });
 
                 await sock.groupParticipantsUpdate(from, [target], 'demote');
-                await sock.sendMessage(from, { text: '🔻 *Subject stripped of High Lord rank, My Lord!*`' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔻 *Subject stripped of High Lord rank, My Lord!*' }, { quoted: msg });
                 break;
             }
 
