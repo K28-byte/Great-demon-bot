@@ -318,7 +318,7 @@ _“All bowing before My Lord Demon Emperor!”_
 ⬡ .2048, .activegames, .connect4, .dino
 ⬡ .emojidecode, .endgame, .flappy, .galaxy
 ⬡ .gamemenu, .letterblitz, .memory, .mines
-⬡ .pong, .reverseit
+⬡ .pong, .reverseitt
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *AUXILIARY COMMANDS* 』
