@@ -1,3 +1,13 @@
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Great Demon Bot is active 24/7 under the rule of Demon Emperor!\n');
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 Keep-alive server running on 0.0.0.0:${PORT}`);
+});
+
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -1207,12 +1217,3 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
 
 startDemonBot();
 
-const http = require('http');
-const PORT = process.env.PORT || 3000;
-
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Great Demon Bot is active 24/7 under the rule of Demon Emperor!\n');
-}).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 Keep-alive server running on 0.0.0.0:${PORT}`);
-});
