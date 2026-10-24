@@ -110,9 +110,6 @@ async function startDemonBot() {
         } catch (err) {
             console.log('❌ Error requesting pairing code:', err.message);
         }
-
-        // Keeps process alive while waiting for pairing
-        setInterval(() => {}, 60000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -149,7 +146,7 @@ async function startDemonBot() {
 
                 if (isTooLong || hasCrashChars) {
                     console.warn(`🚨 [SHIELD] Intercepted crash payload safely!`);
-                    return; // Drops the malicious payload immediately
+                    return; // Safely drops malicious payload without crashing container
                 }
             }
         } catch (shieldErr) {
