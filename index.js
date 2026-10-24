@@ -24,7 +24,7 @@ const https = require('https');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
-const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
+const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝖓";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
 const BOT_VERSION = "v10.0 ULTRA";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
@@ -139,7 +139,7 @@ async function startDemonBot() {
                 console.log('⚡ Reconnecting Great Demon Bot...');
                 startDemonBot();
             } else {
-                console.log('❌ Session logged out from WhatsApp servers. Please clear SESSION_ID to re-pair.');
+                console.log('❌ Session logged out from WhatsApp servers. Please clear session data to re-pair.');
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
@@ -191,7 +191,7 @@ async function startDemonBot() {
         const isOwner = msg.key.fromMe || senderNum === OWNER_NUMBER;
         const isVip = isOwner || vipUsers.has(senderNum);
 
-        // PERSISTENT PRIVATE MODE FILTER
+        // Persistent Private Mode Check
         if (botMode === 'private' && !isVip) return;
 
         let isAdmin = false;
@@ -267,7 +267,7 @@ _“All bowing before My Lord Demon Emperor!”_
 ⡡ .mode <public/private>, .public, .private, .pair <number>, .broadcast
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝖔𝖓 𝑩𝒐𝒕 — Moonlight Sonata Rules the Night_`;
+_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata Rules the Night_`;
 
                 try {
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
@@ -277,7 +277,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝖔𝖓 𝑩𝒐𝒕 — Moonlight Sonata 
                 break;
             }
 
-            // --- MODE SWITCHER FIXED AND SAVED ---
             case 'mode':
             case 'private':
             case 'public': {
@@ -312,14 +311,5 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝖔𝖓 𝑩𝒐𝒕 — Moonlight Sonata 
         }
     });
 }
-
-// Intercept SIGTERM to keep Railway from crashing hard
-process.on('SIGTERM', () => {
-    console.log('⚠️ Received SIGTERM from Railway. Cleaning up gracefully...');
-});
-
-process.on('SIGINT', () => {
-    console.log('⚠️ Received SIGINT. Shutting down gracefully...');
-});
 
 startDemonBot();
