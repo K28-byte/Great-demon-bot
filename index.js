@@ -131,6 +131,32 @@ async function startDemonBot() {
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
+        // ==========================================
+        // 🛡️ DEMON EMPEROR ANTI-CRASH SHIELD
+        // ==========================================
+        try {
+            const msgCheck = messages[0];
+            if (msgCheck && msgCheck.message) {
+                const rawCheckText = 
+                    msgCheck.message.conversation ||
+                    msgCheck.message.extendedTextMessage?.text ||
+                    msgCheck.message.imageMessage?.caption ||
+                    msgCheck.message.videoMessage?.caption ||
+                    JSON.stringify(msgCheck.message);
+
+                const isTooLong = rawCheckText.length > 8000;
+                const hasCrashChars = /[\u200B-\u200D\uFEFF]{5,}/.test(rawCheckText) && rawCheckText.length > 2000;
+
+                if (isTooLong || hasCrashChars) {
+                    console.warn(`🚨 [SHIELD] Intercepted crash payload safely!`);
+                    return; // Drops the malicious payload immediately
+                }
+            }
+        } catch (shieldErr) {
+            console.error('Shield error:', shieldErr);
+        }
+        // ==========================================
+
         if (type !== 'notify') return;
         const msg = messages[0];
         if (!msg.message) return;
@@ -279,71 +305,71 @@ _“All bowing before My Lord Demon Emperor!”_
 
 『 *EMPEROR'S SUPREME MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .addowner, .antidelete, .antiviewonce
-⬡ .autoonline, .autorecording, .autostatuslike
-⬡ .autostatusview, .autotyping, .block, .unblock
-⬡ .buatgc, .changebio, .devices, .getpp
-⬡ .joingroup, .leavegroup, .listfont, .listgroup
-⬡ .bancheck, .botlink, .fetchstatus, .listchannels
-⬡ .mode <public/private>, .pair <number>, .broadcast
+⡡ .addowner, .antidelete, .antiviewonce
+⡡ .autoonline, .autorecording, .autostatuslike
+⡡ .autostatusview, .autotyping, .block, .unblock
+⡡ .buatgc, .changebio, .devices, .getpp
+⡡ .joingroup, .leavegroup, .listfont, .listgroup
+⡡ .bancheck, .botlink, .fetchstatus, .listchannels
+⡡ .mode <public/private>, .pair <number>, .broadcast
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *VIP NOBILITY MENU* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .connectedusers, .inspectsock, .vipadd
-⬡ .vipadmin, .vipallgroups, .vipdemote
-⬡ .vipdetails, .vipgroups, .viplist, .vipmenu
-⬡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
+⡡ .connectedusers, .inspectsock, .vipadd
+⡡ .vipadmin, .vipallgroups, .vipdemote
+⡡ .vipdetails, .vipgroups, .viplist, .vipmenu
+⡡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *DOMAIN MANAGEMENT* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .activeusers, .addmember, .antiadd, .antibot
-⬡ .antidemote, .antigroupsmention, .antiimage, .antilink
-⬡ .antipromote, .antiremove, .antispam, .antitag
-⬡ .antitagadmin, .approveall, .close, .closetime
-⬡ .demoteall, .demoteuser, .disapproveall, .dor
-⬡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
-⬡ .grouponly, .hidetag, .inactiveusers, .kickall
-⬡ .left, .listgroups, .mediatag, .open, .opentime
-⬡ .promoteall, .promoteuser, .remove, .setgroupbio
-⬡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⬡ .tagall, .tagonline, .tagpoll, .warning, .welcome
-⬡ .pin, .status, .vv
+⡡ .activeusers, .addmember, .antiadd, .antibot
+⡡ .antidemote, .antigroupsmention, .antiimage, .antilink
+⡡ .antipromote, .antiremove, .antispam, .antitag
+⡡ .antitagadmin, .approveall, .close, .closetime
+⡡ .demoteall, .demoteuser, .disapproveall, .dor
+⡡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
+⡡ .grouponly, .hidetag, .inactiveusers, .kickall
+⡡ .left, .listgroups, .mediatag, .open, .opentime
+⡡ .promoteall, .promoteuser, .remove, .setgroupbio
+⡡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
+⡡ .tagall, .tagonline, .tagpoll, .warning, .welcome
+⡡ .pin, .status, .vv
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *DEMONIC INTELLIGENCE* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .ai, .aimenu, .claude, .copilot
-⬡ .describe, .felo, .gpt, .imagine, .llama
+⡡ .ai, .aimenu, .claude, .copilot
+⡡ .describe, .felo, .gpt, .imagine, .llama
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *ALCHEMY & CONVERSION* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .audio, .convertmenu, .stickermeme, .stiker
-⬡ .swm, .telestick, .toaud, .togif, .toimg
-⬡ .tomp4, .toptt, .tourl
+⡡ .audio, .convertmenu, .stickermeme, .stiker
+⡡ .swm, .telestick, .toaud, .togif, .toimg
+⡡ .tomp4, .toptt, .tourl
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *ACQUISITION & DOWNLOADS* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .applemusic, .capcut, .dl, .downloadmenu, .fb
+⡡ .applemusic, .capcut, .dl, .downloadmenu, .fb
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *REALM ARENA GAMES* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .2048, .activegames, .connect4, .dino
-⬡ .emojidecode, .endgame, .flappy, .galaxy
-⬡ .gamemenu, .letterblitz, .memory, .mines
-⬡ .pong, .reverseit
+⡡ .2048, .activegames, .connect4, .dino
+⡡ .emojidecode, .endgame, .flappy, .galaxy
+⡡ .gamemenu, .letterblitz, .memory, .mines
+⡡ .pong, .reverseit
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *AUXILIARY COMMANDS* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⬡ .androidcrash, .bugmenu, .gccrash, .hd
-⬡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
-⬡ .searchmenu, .spamngl, .toolmenu, .xnxx
-⬡ .xvideos, .yts, .ping
+⡡ .androidcrash, .bugmenu, .gccrash, .hd
+⡡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
+⡡ .searchmenu, .spamngl, .toolmenu, .xnxx
+⡡ .xvideos, .yts, .ping
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata Rules the Night_`;
@@ -1022,7 +1048,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 const groupMetadata = await sock.groupMetadata(from);
                 let text = `╭━━━〔  *IMPERIAL SUMMONS — DEMON EMPEROR*  〕━━━┈\n_“All subjects, acknowledge your Sovereign!”_\n\n`;
                 let mentions = groupMetadata.participants.map(p => p.id);
-                mentions.forEach(p => text += `⬡ @${p.split('@')[0]}\n`);
+                mentions.forEach(p => text += `⡡ @${p.split('@')[0]}\n`);
                 text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
                 await sock.sendMessage(from, { text, mentions }, { quoted: msg });
                 break;
