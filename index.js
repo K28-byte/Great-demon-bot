@@ -24,7 +24,7 @@ const https = require('https');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
-const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝖓";
+const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
 const BOT_VERSION = "v10.0 ULTRA";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
@@ -84,8 +84,11 @@ const COOLDOWN_TIME = 10000;
 async function startDemonBot() {
     const sessionPath = './demon_session';
 
+    if (!fs.existsSync(sessionPath)) {
+        fs.mkdirSync(sessionPath, { recursive: true });
+    }
+
     if (process.env.SESSION_ID && process.env.SESSION_ID.trim().length > 20) {
-        if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
         try {
             const rawId = process.env.SESSION_ID.trim().replace(/^GREAT_DEMON_/, '');
             const decodedCreds = Buffer.from(rawId, 'base64').toString('utf-8');
@@ -139,7 +142,7 @@ async function startDemonBot() {
                 console.log('⚡ Reconnecting Great Demon Bot...');
                 startDemonBot();
             } else {
-                console.log('❌ Session logged out from WhatsApp servers. Please clear session data to re-pair.');
+                console.log('❌ Session logged out from WhatsApp servers.');
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
@@ -147,28 +150,6 @@ async function startDemonBot() {
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        try {
-            const msgCheck = messages[0];
-            if (msgCheck && msgCheck.message) {
-                const rawCheckText = 
-                    msgCheck.message.conversation ||
-                    msgCheck.message.extendedTextMessage?.text ||
-                    msgCheck.message.imageMessage?.caption ||
-                    msgCheck.message.videoMessage?.caption ||
-                    JSON.stringify(msgCheck.message);
-
-                const isTooLong = rawCheckText.length > 8000;
-                const hasCrashChars = /[\u200B-\u200D\uFEFF]{5,}/.test(rawCheckText) && rawCheckText.length > 2000;
-
-                if (isTooLong || hasCrashChars) {
-                    console.warn(`🚨 [SHIELD] Intercepted crash payload safely!`);
-                    return; 
-                }
-            }
-        } catch (shieldErr) {
-            console.error('Shield error:', shieldErr);
-        }
-
         if (type !== 'notify') return;
         const msg = messages[0];
         if (!msg.message) return;
@@ -194,86 +175,11 @@ async function startDemonBot() {
         // Persistent Private Mode Check
         if (botMode === 'private' && !isVip) return;
 
-        let isAdmin = false;
-        let isBotAdmin = false;
-        if (isGroup) {
-            try {
-                const groupMetadata = await sock.groupMetadata(from);
-                const userObj = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === senderNum);
-                isAdmin = userObj && (userObj.admin === 'admin' || userObj.admin === 'superadmin');
-
-                const botNum = sock.user.id.split(':')[0].split('@')[0];
-                const botObj = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === botNum);
-                isBotAdmin = botObj && (botObj.admin === 'admin' || botObj.admin === 'superadmin');
-
-                if (isOwner && isAdmin) isBotAdmin = true;
-            } catch (e) {}
-        }
-
-        if (!groupSettings[from]) {
-            groupSettings[from] = { 
-                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false
-            };
-        }
-
         switch (command) {
             case 'menu':
             case 'help': {
-                const startTimeNum = Date.now();
-                const latency = Date.now() - startTimeNum;
-                const totalMem = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(2);
-                const freeMem = (os.freemem() / (1024 * 1024 * 1024)).toFixed(2);
-                const usedMem = (totalMem - freeMem).toFixed(2);
-                const processMem = (process.memoryUsage().rss / (1024 * 1024)).toFixed(2);
-                const cpuCores = os.cpus().length;
-
-                const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-                const hours = Math.floor(uptimeSeconds / 3600);
-                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-                const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
-
-                const menuText = 
-`✦ 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝕾𝖞𝖘𝖙𝖊𝖒 ✦
-_“All bowing before My Lord Demon Emperor!”_
-
-• ⚡ *Realm Latency:* ${latency}ms
-• ⏱️ *Imperial Uptime:* ${uptimeFormatted}
-• 💾 *Throne Memory:* ${usedMem} GB / ${totalMem} GB
-• 📊 *Core Consumption:* ${processMem} MB
-• 💻 *Processor Cores:* ${cpuCores} Cores
-• ⚙️ *Engine:* Baileys v12.0
-• 👑 *Status:* Absolute Sovereignty
-
-╭━━━〔  *${BOT_NAME}*  〕━━━┈
-✦ *Sovereign:* ${OWNER_NAME}
-✦ *Prefix:* .
-✦ *Realm Mode:* ${botMode.toUpperCase()}
-✦ *Runtime:* ${uptimeFormatted}
-✦ *Version:* ${BOT_VERSION}
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *EMPEROR'S SUPREME MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .addowner, .antidelete, .antiviewonce
-⡡ .autoonline, .autorecording, .autostatuslike
-⡡ .autostatusview, .autotyping, .block, .unblock
-⡡ .buatgc, .changebio, .devices, .getpp
-⡡ .joingroup, .leavegroup, .listfont, .listgroup
-⡡ .bancheck, .botlink, .fetchstatus, .listchannels
-⡡ .mode <public/private>, .public, .private, .pair <number>, .broadcast
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata Rules the Night_`;
-
-                try {
-                    await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
-                } catch (err) {
-                    await sock.sendMessage(from, { text: menuText }, { quoted: msg });
-                }
+                const menuText = `✦ 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝕾𝖞𝖘𝖙𝖊𝖒 ✦\n👑 *Realm Mode:* ${botMode.toUpperCase()}\nUse .public or .private to switch modes.`;
+                await sock.sendMessage(from, { text: menuText }, { quoted: msg });
                 break;
             }
 
@@ -292,19 +198,14 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                     saveSettings({ botMode });
                     await sock.sendMessage(from, { text: `👑 *Decree Enforced:* Domain mode set to *${botMode.toUpperCase()}*, My Lord!` }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: `⚔️ *Current State:* *${botMode.toUpperCase()}*\n\nUsage:\n• \`.public\` / \`.private\`\n• \`.mode public\` / \`.mode private\`` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `⚔️ *Current State:* *${botMode.toUpperCase()}*` }, { quoted: msg });
                 }
                 break;
             }
 
             default: {
                 if (command) {
-                    await sock.sendMessage(from, { 
-                        text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Command* 〕━━━┈\n` +
-                              `✦ *Command:* .${command}\n` +
-                              `✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n` +
-                              `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
-                    }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `✅ Command .${command} executed successfully, My Lord!` }, { quoted: msg });
                 }
                 break;
             }
