@@ -1113,48 +1113,94 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             // =========================================================================
             // 5. ALCHEMY & CONVERSION
             // =========================================================================
-            case 'audio':
-            case 'convertmenu':
-            case 'stickermeme':
-            case 'stiker':
-            case 'sticker':
-            case 'swm': {
-                const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
-                if (!isImage) return sock.sendMessage(from, { text: 'My Lord, reply to an image to forge an Imperial Seal (Sticker)!' }, { quoted: msg });
+                    // =======================================================
+        // STICKER CREATION
+        // =======================================================
+        case 'stiker':
+        case 'sticker':
+        case 'swm': {
+            const isImage = msg.message?.imageMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+            
+            if (!isImage) {
+                return sock.sendMessage(from, { text: 'My Lord, reply to an image to forge an Imperial Seal (Sticker)!' }, { quoted: msg });
+            }
 
-                try {
-                    const targetMessage = msg.message.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
-                    const stream = await downloadContentFromMessage(targetMessage, 'image');
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-                    const tempImg = `./temp_${Date.now()}.jpg`;
-                    const tempWebp = `./temp_${Date.now()}.webp`;
-                    fs.writeFileSync(tempImg, buffer);
-
-                    exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
-                        if (err) return sock.sendMessage(from, { text: '❌ Imperial sticker alchemy failed, My Lord.' }, { quoted: msg });
-                        const stickerBuffer = fs.readFileSync(tempWebp);
-                        await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
-                        if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
-                        if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
-                    });
-                } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ Error forging sticker, My Lord.' }, { quoted: msg });
+            try {
+                const targetMessage = msg.message?.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
+                const stream = await downloadContentFromMessage(targetMessage, 'image');
+                
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
                 }
-                break;
+
+                const tempImg = `./temp_${Date.now()}.jpg`;
+                const tempWebp = `./temp_${Date.now()}.webp`;
+
+                fs.writeFileSync(tempImg, buffer);
+
+                exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
+                    if (err) {
+                        if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
+                        return sock.sendMessage(from, { text: '❌ Imperial sticker alchemy failed, My Lord.' }, { quoted: msg });
+                    }
+
+                    const stickerBuffer = fs.readFileSync(tempWebp);
+                    await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+
+                    // Clean up temp files
+                    if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
+                    if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                });
+            } catch (error) {
+                console.error(error);
+                await sock.sendMessage(from, { text: '❌ Error processing sticker.' }, { quoted: msg });
+            }
+            break;
+        }
+
+        // =======================================================
+        // CONVERT STICKER TO IMAGE (toimg)
+        // =======================================================
+        case 'toimg': {
+            const isSticker = msg.message?.stickerMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
+            
+            if (!isSticker) {
+                return sock.sendMessage(from, { text: 'My Lord, reply to a sticker to convert it to an image!' }, { quoted: msg });
             }
 
-            case 'telestick':
-            case 'toaud':
-            case 'togif':
-            case 'toimg':
-            case 'tomp4':
-            case 'toptt':
-            case 'tourl': {
-                await sock.sendMessage(from, { text: '🔮 *Imperial Alchemy:* Transmutation ritual initiated for My Lord Demon Emperor!' }, { quoted: msg });
-                break;
+            try {
+                const targetMessage = msg.message?.stickerMessage ? msg.message.stickerMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.stickerMessage;
+                const stream = await downloadContentFromMessage(targetMessage, 'sticker');
+                
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                    buffer = Buffer.concat([buffer, chunk]);
+                }
+
+                const tempWebp = `./temp_${Date.now()}.webp`;
+                const tempPng = `./temp_${Date.now()}.png`;
+
+                fs.writeFileSync(tempWebp, buffer);
+
+                exec(`ffmpeg -i ${tempWebp} ${tempPng}`, async (err) => {
+                    if (err) {
+                        if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                        return sock.sendMessage(from, { text: '❌ Transmutation failed, My Lord!' }, { quoted: msg });
+                    }
+
+                    const imgBuffer = fs.readFileSync(tempPng);
+                    await sock.sendMessage(from, { image: imgBuffer, caption: '✨ Transmutation complete!' }, { quoted: msg });
+
+                    if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                    if (fs.existsSync(tempPng)) fs.unlinkSync(tempPng);
+                });
+            } catch (e) {
+                console.error(e);
+                await sock.sendMessage(from, { text: '❌ Error converting sticker to image.' }, { quoted: msg });
             }
+            break;
+        }
 
             // =========================================================================
             // 6. ACQUISITION & DOWNLOADS
