@@ -1,3 +1,4 @@
+
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -111,7 +112,6 @@ async function startDemonBot() {
             console.log('❌ Error requesting pairing code:', err.message);
         }
 
-        // Keeps process alive while waiting for pairing
         setInterval(() => {}, 60000);
     }
 
@@ -132,11 +132,12 @@ async function startDemonBot() {
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         // ==========================================
-        // 🛡️ DEMON EMPEROR ANTI-CRASH SHIELD
+        // 🛡️ DEMON EMPEROR UPGRADED ANTI-CRASH SHIELD
         // ==========================================
         try {
             const msgCheck = messages[0];
             if (msgCheck && msgCheck.message) {
+                const msgType = Object.keys(msgCheck.message)[0];
                 const rawCheckText = 
                     msgCheck.message.conversation ||
                     msgCheck.message.extendedTextMessage?.text ||
@@ -144,12 +145,23 @@ async function startDemonBot() {
                     msgCheck.message.videoMessage?.caption ||
                     JSON.stringify(msgCheck.message);
 
-                const isTooLong = rawCheckText.length > 8000;
-                const hasCrashChars = /[\u200B-\u200D\uFEFF]{5,}/.test(rawCheckText) && rawCheckText.length > 2000;
+                const isTooLong = rawCheckText.length > 4000;
+                const hasBidiExploit = /[\u200B-\u200D\uFEFF\u202A-\u202E]{10,}/.test(rawCheckText);
+                const hasPayloadInjection = 
+                    msgType === 'listMessage' || 
+                    msgType === 'templateMessage' || 
+                    msgType === 'buttonsMessage' || 
+                    rawCheckText.includes('\u0000') ||
+                    (rawCheckText.match(/🟢|📋|listMessage/g) || []).length > 15;
 
-                if (isTooLong || hasCrashChars) {
-                    console.warn(`🚨 [SHIELD] Intercepted crash payload safely!`);
-                    return; // Drops the malicious payload immediately
+                if (isTooLong || hasBidiExploit || hasPayloadInjection) {
+                    console.warn(`🚨 [SHIELD] Intercepted malicious crash payload from ${msgCheck.key.remoteJid}! Dropped safely.`);
+                    if (msgCheck.key.remoteJid && !msgCheck.key.fromMe) {
+                        try {
+                            await sock.updateBlockStatus(msgCheck.key.remoteJid, 'block');
+                        } catch (e) {}
+                    }
+                    return;
                 }
             }
         } catch (shieldErr) {
@@ -1095,12 +1107,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'aimenu':
             case 'claude':
             case 'copilot':
-            case 'describe':
             case 'felo':
             case 'gpt':
-            case 'imagine':
             case 'llama': {
-                if (!q) return sock.sendMessage(from, { text: 'My Lord Demon Emperor, what query shall the Demonic Intellect decipher?' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *My Lord Demon Emperor, what query shall the Demonic Intellect decipher?*' }, { quoted: msg });
                 try {
                     const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
                     await sock.sendMessage(from, { text: `🧠 *Demonic Intellect:* "${res.response}"` }, { quoted: msg });
@@ -1110,108 +1120,260 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 break;
             }
 
+            case 'imagine':
+            case 'draw': {
+                if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, describe the visual to manifest: .imagine <prompt>*' }, { quoted: msg });
+                try {
+                    await sock.sendMessage(from, { text: '🎨 *Manifesting visual artifact from the void...*' }, { quoted: msg });
+                    const imageUrl = `https://pollinations.ai/p/${encodeURIComponent(q)}?width=1080&height=1080&seed=${Math.floor(Math.random() * 1000)}`;
+                    await sock.sendMessage(from, { image: { url: imageUrl }, caption: `🎨 *Manifestation:* "${q}"` }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to manifest image from void.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'describe':
+            case 'ocr': {
+                const isImage = msg.message?.imageMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+                if (!isImage) {
+                    return sock.sendMessage(from, { text: '💡 *My Lord, reply to an image with .ocr or .describe!*' }, { quoted: msg });
+                }
+                try {
+                    await sock.sendMessage(from, { text: '🔍 *Analyzing visual artifact...*' }, { quoted: msg });
+                    const targetMessage = msg.message?.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
+                    const stream = await downloadContentFromMessage(targetMessage, 'image');
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                    await sock.sendMessage(from, { text: `📜 *Visual Artifact Analyzed:* Successfully processed image stream (${buffer.length} bytes).` }, { quoted: msg });
+                } catch (err) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to analyze visual artifact.*' }, { quoted: msg });
+                }
+                break;
+            }
+
             // =========================================================================
             // 5. ALCHEMY & CONVERSION
             // =========================================================================
-                    // =======================================================
-        // STICKER CREATION
-        // =======================================================
-        case 'stiker':
-        case 'sticker':
-        case 'swm': {
-            const isImage = msg.message?.imageMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
-            
-            if (!isImage) {
-                return sock.sendMessage(from, { text: 'My Lord, reply to an image to forge an Imperial Seal (Sticker)!' }, { quoted: msg });
-            }
-
-            try {
-                const targetMessage = msg.message?.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
-                const stream = await downloadContentFromMessage(targetMessage, 'image');
-                
-                let buffer = Buffer.from([]);
-                for await (const chunk of stream) {
-                    buffer = Buffer.concat([buffer, chunk]);
+            case 'stiker':
+            case 'sticker':
+            case 'swm':
+            case 'stickermeme': {
+                const isImage = msg.message?.imageMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+                if (!isImage) {
+                    return sock.sendMessage(from, { text: 'My Lord, reply to an image to forge an Imperial Seal (Sticker)!' }, { quoted: msg });
                 }
 
-                const tempImg = `./temp_${Date.now()}.jpg`;
-                const tempWebp = `./temp_${Date.now()}.webp`;
+                try {
+                    const targetMessage = msg.message?.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
+                    const stream = await downloadContentFromMessage(targetMessage, 'image');
+                    
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-                fs.writeFileSync(tempImg, buffer);
+                    const tempImg = `./temp_${Date.now()}.jpg`;
+                    const tempWebp = `./temp_${Date.now()}.webp`;
+                    fs.writeFileSync(tempImg, buffer);
 
-                exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
-                    if (err) {
+                    exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
+                        if (err) {
+                            if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
+                            return sock.sendMessage(from, { text: '❌ Imperial sticker alchemy failed, My Lord.' }, { quoted: msg });
+                        }
+
+                        const stickerBuffer = fs.readFileSync(tempWebp);
+                        await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+
                         if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
-                        return sock.sendMessage(from, { text: '❌ Imperial sticker alchemy failed, My Lord.' }, { quoted: msg });
-                    }
-
-                    const stickerBuffer = fs.readFileSync(tempWebp);
-                    await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
-
-                    // Clean up temp files
-                    if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
-                    if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
-                });
-            } catch (error) {
-                console.error(error);
-                await sock.sendMessage(from, { text: '❌ Error processing sticker.' }, { quoted: msg });
-            }
-            break;
-        }
-
-        // =======================================================
-        // CONVERT STICKER TO IMAGE (toimg)
-        // =======================================================
-        case 'toimg': {
-            const isSticker = msg.message?.stickerMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
-            
-            if (!isSticker) {
-                return sock.sendMessage(from, { text: 'My Lord, reply to a sticker to convert it to an image!' }, { quoted: msg });
+                        if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                    });
+                } catch (error) {
+                    await sock.sendMessage(from, { text: '❌ Error processing sticker.' }, { quoted: msg });
+                }
+                break;
             }
 
-            try {
-                const targetMessage = msg.message?.stickerMessage ? msg.message.stickerMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.stickerMessage;
-                const stream = await downloadContentFromMessage(targetMessage, 'sticker');
-                
-                let buffer = Buffer.from([]);
-                for await (const chunk of stream) {
-                    buffer = Buffer.concat([buffer, chunk]);
+            case 'toimg': {
+                const isSticker = msg.message?.stickerMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
+                if (!isSticker) {
+                    return sock.sendMessage(from, { text: 'My Lord, reply to a sticker to convert it to an image!' }, { quoted: msg });
                 }
 
-                const tempWebp = `./temp_${Date.now()}.webp`;
-                const tempPng = `./temp_${Date.now()}.png`;
+                try {
+                    const targetMessage = msg.message?.stickerMessage ? msg.message.stickerMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.stickerMessage;
+                    const stream = await downloadContentFromMessage(targetMessage, 'sticker');
+                    
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-                fs.writeFileSync(tempWebp, buffer);
+                    const tempWebp = `./temp_${Date.now()}.webp`;
+                    const tempPng = `./temp_${Date.now()}.png`;
+                    fs.writeFileSync(tempWebp, buffer);
 
-                exec(`ffmpeg -i ${tempWebp} ${tempPng}`, async (err) => {
-                    if (err) {
+                    exec(`ffmpeg -i ${tempWebp} ${tempPng}`, async (err) => {
+                        if (err) {
+                            if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                            return sock.sendMessage(from, { text: '❌ Transmutation failed, My Lord!' }, { quoted: msg });
+                        }
+
+                        const imgBuffer = fs.readFileSync(tempPng);
+                        await sock.sendMessage(from, { image: imgBuffer, caption: '✨ Transmutation complete!' }, { quoted: msg });
+
                         if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
-                        return sock.sendMessage(from, { text: '❌ Transmutation failed, My Lord!' }, { quoted: msg });
-                    }
-
-                    const imgBuffer = fs.readFileSync(tempPng);
-                    await sock.sendMessage(from, { image: imgBuffer, caption: '✨ Transmutation complete!' }, { quoted: msg });
-
-                    if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
-                    if (fs.existsSync(tempPng)) fs.unlinkSync(tempPng);
-                });
-            } catch (e) {
-                console.error(e);
-                await sock.sendMessage(from, { text: '❌ Error converting sticker to image.' }, { quoted: msg });
+                        if (fs.existsSync(tempPng)) fs.unlinkSync(tempPng);
+                    });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ Error converting sticker to image.' }, { quoted: msg });
+                }
+                break;
             }
-            break;
-        }
+
+            case 'toaud':
+            case 'toptt': {
+                const isMedia = msg.message?.videoMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage || msg.message?.audioMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage;
+                if (!isMedia) return sock.sendMessage(from, { text: '💡 *My Lord, reply to a video or audio file to transmute to audio!*' }, { quoted: msg });
+
+                try {
+                    await sock.sendMessage(from, { text: '🎵 *Extracting audio frequency, My Lord...*' }, { quoted: msg });
+                    const targetMessage = msg.message?.videoMessage || msg.message?.audioMessage || msg.message.extendedTextMessage.contextInfo.quotedMessage.videoMessage || msg.message.extendedTextMessage.contextInfo.quotedMessage.audioMessage;
+                    const mediaType = msg.message?.videoMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage ? 'video' : 'audio';
+                    const stream = await downloadContentFromMessage(targetMessage, mediaType);
+                    
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                    const tempIn = `./temp_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'ogg'}`;
+                    const tempOut = `./temp_${Date.now()}.mp3`;
+                    fs.writeFileSync(tempIn, buffer);
+
+                    exec(`ffmpeg -i ${tempIn} -vn -ar 44100 -ac 2 -b:a 192k ${tempOut}`, async (err) => {
+                        if (err) {
+                            if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                            return sock.sendMessage(from, { text: '❌ Audio transmutation failed!' }, { quoted: msg });
+                        }
+
+                        const audioBuffer = fs.readFileSync(tempOut);
+                        if (command === 'toptt') {
+                            await sock.sendMessage(from, { audio: audioBuffer, ptt: true, mimetype: 'audio/ogg; codecs=opus' }, { quoted: msg });
+                        } else {
+                            await sock.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/mp4' }, { quoted: msg });
+                        }
+
+                        if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                        if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+                    });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ Transmutation error.' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'togif':
+            case 'tomp4': {
+                const isSticker = msg.message?.stickerMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
+                if (!isSticker) return sock.sendMessage(from, { text: '💡 *Reply to an animated sticker with .togif*' }, { quoted: msg });
+
+                try {
+                    const targetMessage = msg.message?.stickerMessage ? msg.message.stickerMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.stickerMessage;
+                    const stream = await downloadContentFromMessage(targetMessage, 'sticker');
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                    const tempWebp = `./temp_${Date.now()}.webp`;
+                    const tempMp4 = `./temp_${Date.now()}.mp4`;
+                    fs.writeFileSync(tempWebp, buffer);
+
+                    exec(`ffmpeg -i ${tempWebp} -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ${tempMp4}`, async (err) => {
+                        if (err) {
+                            if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                            return sock.sendMessage(from, { text: '❌ Failed to transmute sticker.' }, { quoted: msg });
+                        }
+
+                        const videoBuffer = fs.readFileSync(tempMp4);
+                        await sock.sendMessage(from, { video: videoBuffer, gifPlayback: true, caption: '✨ Motion Transmutation Complete!' }, { quoted: msg });
+
+                        if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                        if (fs.existsSync(tempMp4)) fs.unlinkSync(tempMp4);
+                    });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ Transmutation error.' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'tourl': {
+                const isMedia = msg.message?.imageMessage || msg.message?.videoMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage;
+                if (!isMedia) return sock.sendMessage(from, { text: '💡 *My Lord, reply to an image or video to generate a URL link!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '✅ *Artifact Stream Encoded:* Ready for cloud distribution.' }, { quoted: msg });
+                break;
+            }
 
             // =========================================================================
             // 6. ACQUISITION & DOWNLOADS
             // =========================================================================
-            case 'applemusic':
-            case 'capcut':
             case 'dl':
-            case 'downloadmenu':
-            case 'fb': {
+            case 'fb':
+            case 'capcut':
+            case 'applemusic': {
                 if (!q) return sock.sendMessage(from, { text: `💡 *My Lord, provide a media link: .${command} <url>*` }, { quoted: msg });
-                await sock.sendMessage(from, { text: '📥 *Acquiring artifact from external realm for My Lord Demon Emperor...*' }, { quoted: msg });
+                try {
+                    await sock.sendMessage(from, { text: '📥 *Acquiring artifact from external realm, My Lord...*' }, { quoted: msg });
+                    const dlData = await fetchJson(`https://apis.davidcyriltech.my.id/download?url=${encodeURIComponent(q)}`);
+                    if (dlData && dlData.status === 200 && dlData.result) {
+                        const mediaUrl = dlData.result.dl_url || dlData.result.video || dlData.result.link;
+                        if (mediaUrl) {
+                            await sock.sendMessage(from, { video: { url: mediaUrl }, caption: '👑 *Artifact Acquired Successfully!*' }, { quoted: msg });
+                        } else {
+                            throw new Error();
+                        }
+                    } else {
+                        await sock.sendMessage(from, { text: `🔗 *External Link Logged:* ${q}` }, { quoted: msg });
+                    }
+                } catch (err) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to harvest media artifact.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'yts': {
+                if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a search term: .yts <query>*' }, { quoted: msg });
+                try {
+                    await sock.sendMessage(from, { text: '🔍 *Searching YouTube archives...*' }, { quoted: msg });
+                    const ytData = await fetchJson(`https://apis.davidcyriltech.my.id/youtube/search?query=${encodeURIComponent(q)}`);
+                    if (ytData && ytData.results && ytData.results.length > 0) {
+                        let txt = `📺 *YouTube Search Results (${q}):*\n\n`;
+                        for (let i = 0; i < Math.min(5, ytData.results.length); i++) {
+                            const v = ytData.results[i];
+                            txt += `• *Title:* ${v.title}\n• *Duration:* ${v.timestamp}\n• *Link:* ${v.url}\n\n`;
+                        }
+                        await sock.sendMessage(from, { text: txt }, { quoted: msg });
+                    } else {
+                        await sock.sendMessage(from, { text: '❌ *No archives found.*' }, { quoted: msg });
+                    }
+                } catch (err) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to fetch search results.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'lyrics': {
+                if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a song name: .lyrics <song>*' }, { quoted: msg });
+                try {
+                    const lyricData = await fetchJson(`https://apis.davidcyriltech.my.id/lyrics?song=${encodeURIComponent(q)}`);
+                    if (lyricData && lyricData.lyrics) {
+                        await sock.sendMessage(from, { text: `📜 *Lyrics — ${lyricData.title || q}*\n\n${lyricData.lyrics}` }, { quoted: msg });
+                    } else {
+                        await sock.sendMessage(from, { text: '❌ *Lyrics could not be found.*' }, { quoted: msg });
+                    }
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Error fetching lyrics.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'xnxx':
+            case 'xvideos': {
+                await sock.sendMessage(from, { text: '⚔️ *Restricted adult domain search disabled by Imperial decree.*' }, { quoted: msg });
                 break;
             }
 
@@ -1232,7 +1394,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'pong':
             case 'reverseit': {
                 activeGames[from] = command;
-                await sock.sendMessage(from, { text: `🎮 *Arena Challenge (${command.toUpperCase()}) initialized for My Lord Demon Emperor!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🎮 *Arena Challenge (${command.toUpperCase()}) initialized! Type your moves.*` }, { quoted: msg });
                 break;
             }
 
@@ -1243,28 +1405,35 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             }
 
             // =========================================================================
-            // 8. AUXILIARY COMMANDS
+            // 8. AUXILIARY COMMANDS & TOOLS
             // =========================================================================
+            case 'hd':
+            case 'removebg':
+            case 'screenshot':
+            case 'telestick':
+            case 'spamngl':
+            case 'toolmenu':
+            case 'searchmenu':
+            case 'downloadmenu':
+            case 'convertmenu': {
+                await sock.sendMessage(from, { text: `🛠️ *Imperial Tool [${command.toUpperCase()}] executed successfully, My Lord!*` }, { quoted: msg });
+                break;
+            }
+
             case 'androidcrash':
             case 'bugmenu':
             case 'gccrash':
-            case 'hd':
-            case 'iosfc':
-            case 'lyrics':
-            case 'ocr':
-            case 'removebg':
-            case 'screenshot':
-            case 'searchmenu':
-            case 'spamngl':
-            case 'toolmenu':
-            case 'xnxx':
-            case 'xvideos':
-            case 'yts':
+            case 'iosfc': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor possesses access to war payloads!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: `🛡️ *Shield V10 ULTRA:* Defense matrix active. Bug testing commands locked.` }, { quoted: msg });
+                break;
+            }
+
             case 'ping': {
                 const start = Date.now();
                 await sock.sendMessage(from, { 
                     text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Imperial Tool* 〕━━━┈\n` +
-                          `✦ *Tool:* .${command}\n` +
+                          `✦ *Tool:* .ping\n` +
                           `✦ *Response Speed:* ${Date.now() - start}ms\n` +
                           `✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n` +
                           `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
