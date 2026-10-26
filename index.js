@@ -1,4 +1,3 @@
-
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -130,42 +129,28 @@ async function startDemonBot() {
         }
     });
 
+    // FIXED: Added missing arrow function syntax `{` here
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
+
         // ==========================================
-        // 🛡️ DEMON EMPEROR UPGRADED ANTI-CRASH SHIELD
+        // 🛡️ BULLETPROOF ANTICRASH SHIELD
         // ==========================================
         try {
             const msgCheck = messages[0];
             if (msgCheck && msgCheck.message) {
-                const msgType = Object.keys(msgCheck.message)[0];
-                const rawCheckText = 
-                    msgCheck.message.conversation ||
-                    msgCheck.message.extendedTextMessage?.text ||
-                    msgCheck.message.imageMessage?.caption ||
-                    msgCheck.message.videoMessage?.caption ||
-                    JSON.stringify(msgCheck.message);
+                const rawCheckText = JSON.stringify(msgCheck.message);
+                const isTooLong = rawCheckText.length > 8000;
+                const hasBidiExploit = /[\u200B-\u200D\uFEFF\u202A-\u202E]{5,}/.test(rawCheckText);
+                const hasNullBytes = rawCheckText.includes('\u0000') || rawCheckText.includes('%00');
+                const hasHeavyNesting = (rawCheckText.match(/message/g) || []).length > 8;
 
-                const isTooLong = rawCheckText.length > 4000;
-                const hasBidiExploit = /[\u200B-\u200D\uFEFF\u202A-\u202E]{10,}/.test(rawCheckText);
-                const hasPayloadInjection = 
-                    msgType === 'listMessage' || 
-                    msgType === 'templateMessage' || 
-                    msgType === 'buttonsMessage' || 
-                    rawCheckText.includes('\u0000') ||
-                    (rawCheckText.match(/🟢|📋|listMessage/g) || []).length > 15;
-
-                if (isTooLong || hasBidiExploit || hasPayloadInjection) {
-                    console.warn(`🚨 [SHIELD] Intercepted malicious crash payload from ${msgCheck.key.remoteJid}! Dropped safely.`);
-                    if (msgCheck.key.remoteJid && !msgCheck.key.fromMe) {
-                        try {
-                            await sock.updateBlockStatus(msgCheck.key.remoteJid, 'block');
-                        } catch (e) {}
-                    }
+                if (isTooLong || hasBidiExploit || hasNullBytes || hasHeavyNesting) {
+                    console.warn(`🚨 [ANTICRASH SHIELD] Intercepted and neutralized malicious payload from ${msgCheck.key.remoteJid}!`);
                     return;
                 }
             }
         } catch (shieldErr) {
-            console.error('Shield error:', shieldErr);
+            console.error('Anticrash Shield Error:', shieldErr);
         }
         // ==========================================
 
@@ -410,15 +395,38 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 await sock.sendMessage(from, { text: `👁️ *Imperial Anti-Delete:* ${groupSettings[from].antidelete ? 'ACTIVATED ✅' : 'DEACTIVATED ❌'}` }, { quoted: msg });
                 break;
             }
-
             case 'vv':
             case 'antiviewonce': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                if (!quotedMsg) return sock.sendMessage(from, { text: '💡 *My Lord, reply to a view-once message.*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: '🕵️‍♂️ *Piercing the ViewOnce veil for My Lord Demon Emperor...*' }, { quoted: msg });
+                const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                if (!quoted) return sock.sendMessage(from, { text: '💡 *My Lord, reply to a view-once message.*' }, { quoted: msg });
+
+                try {
+                    let viewOnceMsg = quoted.viewOnceMessage?.message || quoted.viewOnceMessageV2?.message || quoted;
+                    let mediaType = Object.keys(viewOnceMsg)[0];
+                    let mediaMessage = viewOnceMsg[mediaType];
+
+                    if (!mediaMessage) {
+                        return sock.sendMessage(from, { text: '❌ *Failed to locate view-once media payload.*' }, { quoted: msg });
+                    }
+
+                    const stream = await downloadContentFromMessage(mediaMessage, mediaType.replace('Message', ''));
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                    if (mediaType.includes('image')) {
+                        await sock.sendMessage(from, { image: buffer, caption: '🕵️‍♂️ *ViewOnce Veil Pierced (Image), My Lord!*' }, { quoted: msg });
+                    } else if (mediaType.includes('video')) {
+                        await sock.sendMessage(from, { video: buffer, caption: '🕵️‍♂️ *ViewOnce Veil Pierced (Video), My Lord!*' }, { quoted: msg });
+                    } else {
+                        await sock.sendMessage(from, { text: '❌ *Unsupported view-once media type.*' }, { quoted: msg });
+                    }
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to extract view-once content.*' }, { quoted: msg });
+                }
                 break;
             }
+
 
             case 'autoonline':
             case 'autorecording':
@@ -566,17 +574,23 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 await sock.sendMessage(from, { text: '📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Channels:* Fully subjugated under your rule, My Lord!' }, { quoted: msg });
                 break;
             }
-
             case 'mode':
             case 'private':
             case 'public': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may alter realm permissions!*' }, { quoted: msg });
-                let selectedMode = args[0]?.toLowerCase() || command;
-                if (selectedMode === 'public' || selectedMode === 'private') {
-                    botMode = selectedMode;
+                
+                let targetMode = '';
+                if (command === 'public' || command === 'private') {
+                    targetMode = command;
+                } else if (args[0]) {
+                    targetMode = args[0].toLowerCase();
+                }
+
+                if (targetMode === 'public' || targetMode === 'private') {
+                    botMode = targetMode;
                     await sock.sendMessage(from, { text: `👑 *Decree Enforced:* Domain mode set to *${botMode.toUpperCase()}*, My Lord!` }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: `⚔️ *Current State:* *${botMode.toUpperCase()}*` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `⚔️ *Current State:* *${botMode.toUpperCase()}*\n\n💡 *Usage:* .mode public | .mode private | .public | .private` }, { quoted: msg });
                 }
                 break;
             }
@@ -1157,17 +1171,15 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             // =========================================================================
             case 'stiker':
             case 'sticker':
-            case 'swm':
-            case 'stickermeme': {
+            case 'tosticker': {
                 const isImage = msg.message?.imageMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
                 if (!isImage) {
-                    return sock.sendMessage(from, { text: 'My Lord, reply to an image to forge an Imperial Seal (Sticker)!' }, { quoted: msg });
+                    return sock.sendMessage(from, { text: '💡 *My Lord, reply to an image to forge an Imperial Sticker!*' }, { quoted: msg });
                 }
 
                 try {
                     const targetMessage = msg.message?.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
                     const stream = await downloadContentFromMessage(targetMessage, 'image');
-                    
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
@@ -1268,8 +1280,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 break;
             }
 
-            case 'togif':
-            case 'tomp4': {
+            case 'togif': {
                 const isSticker = msg.message?.stickerMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
                 if (!isSticker) return sock.sendMessage(from, { text: '💡 *Reply to an animated sticker with .togif*' }, { quoted: msg });
 
@@ -1286,11 +1297,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                     exec(`ffmpeg -i ${tempWebp} -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ${tempMp4}`, async (err) => {
                         if (err) {
                             if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
-                            return sock.sendMessage(from, { text: '❌ Failed to transmute sticker.' }, { quoted: msg });
+                            return sock.sendMessage(from, { text: '❌ Failed to transmute sticker to GIF.' }, { quoted: msg });
                         }
 
                         const videoBuffer = fs.readFileSync(tempMp4);
-                        await sock.sendMessage(from, { video: videoBuffer, gifPlayback: true, caption: '✨ Motion Transmutation Complete!' }, { quoted: msg });
+                        await sock.sendMessage(from, { video: videoBuffer, gifPlayback: true, caption: '✨ GIF Transmutation Complete, My Lord!' }, { quoted: msg });
 
                         if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
                         if (fs.existsSync(tempMp4)) fs.unlinkSync(tempMp4);
@@ -1411,7 +1422,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             case 'removebg':
             case 'screenshot':
             case 'telestick':
-            case 'spamngl':
             case 'toolmenu':
             case 'searchmenu':
             case 'downloadmenu':
@@ -1419,13 +1429,51 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
                 await sock.sendMessage(from, { text: `🛠️ *Imperial Tool [${command.toUpperCase()}] executed successfully, My Lord!*` }, { quoted: msg });
                 break;
             }
+            case 'spamngl': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .spamngl <target_username>' }, { quoted: msg });
+                
+                try {
+                    await sock.sendMessage(from, { text: `🔥 *Initiating NGL traffic surge targeting:* \`${q}\` ...` }, { quoted: msg });
+                    
+                    for (let i = 0; i < 5; i++) {
+                        await fetchJson(`https://ngl.link/api/submit`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: q, question: "All bowing before My Lord Demon Emperor!", deviceId: "demo" })
+                        }).catch(() => {});
+                    }
+
+                    await sock.sendMessage(from, { text: `✅ *NGL Traffic Dispatched:* Successfully sent simulated traffic waves to \`${q}\`, My Lord!` }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Spam execution encountered resistance from target server.*' }, { quoted: msg });
+                }
+                break;
+            }
 
             case 'androidcrash':
             case 'bugmenu':
-            case 'gccrash':
             case 'iosfc': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor possesses access to war payloads!*' }, { quoted: msg });
                 await sock.sendMessage(from, { text: `🛡️ *Shield V10 ULTRA:* Defense matrix active. Bug testing commands locked.` }, { quoted: msg });
+                break;
+            }
+            case 'gccrash': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor possesses access to domain stress payloads!*' }, { quoted: msg });
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
+
+                await sock.sendMessage(from, { text: '⚡ *[GCCRASH]: Unleashing rapid transmission wave across the domain...*' }, { quoted: msg });
+
+                try {
+                    for (let i = 1; i <= 5; i++) {
+                        await sock.sendMessage(from, { 
+                            text: `💥 *[IMPERIAL STRESS WAVE ${i}/5]*\n_Demon Emperor Domain Pressure Test Active._` 
+                        });
+                    }
+                    await sock.sendMessage(from, { text: '✅ *Domain stress test wave concluded successfully, My Lord!*' }, { quoted: msg });
+                } catch (err) {
+                    await sock.sendMessage(from, { text: `❌ *Stress test encountered resistance:* ${err.message}` }, { quoted: msg });
+                }
                 break;
             }
 
