@@ -347,92 +347,181 @@ async function startDemonBot() {
                 const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
 
                 const menuText = 
-`✦ 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 𝕾𝖞𝖘𝖙𝖊𝖒 ✦
-_“All bowing before My Lord Demon Emperor!”_
+`╔══✪  👑 **${BOT_NAME}** 👑  ✪══╗
+║ *Sovereign:* ${OWNER_NAME}
+║ *Realm Mode:* ${botMode.toUpperCase()}
+║ *Uptime:* ${uptimeFormatted}
+║ *Engine:* Baileys v12.0
+╚═════════════════════════╝
 
-• ⚡ *Realm Latency:* ${latency}ms
-• ⏱️ *Imperial Uptime:* ${uptimeFormatted}
-• 💾 *Throne Memory:* ${usedMem} GB / ${totalMem} GB
-• ⚙️ *Engine:* Baileys v12.0
-• 👑 *Status:* Absolute Sovereignty
+╔══✪  👑 **EMPEROR'S SUPREME**  ✪══╗
+✿ .addowner
+✿ .antidelete
+✿ .antiviewonce
+✿ .autoonline
+✿ .autorecording
+✿ .autostatuslike
+✿ .autostatusview
+✿ .autotyping
+✿ .block
+✿ .unblock
+✿ .buatgc
+✿ .changebio
+✿ .devices
+✿ .getpp
+✿ .gcstatus
+✿ .joingroup
+✿ .leavegroup
+✿ .listfont
+✿ .listgroup
+✿ .bancheck
+✿ .botlink
+✿ .fetchstatus
+✿ .listchannels
+✿ .mode
+✿ .pair
+✿ .broadcast
+✿ .spamngl
+╚═════════════════════════╝
 
-╭━━━〔  *${BOT_NAME}*  〕━━━┈
-✦ *Sovereign:* ${OWNER_NAME}
-✦ *Prefix:* .
-✦ *Realm Mode:* ${botMode.toUpperCase()}
-✦ *Runtime:* ${uptimeFormatted}
-✦ *Version:* ${BOT_VERSION}
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
+╔══✪  ⭐ **VIP NOBILITY**  ✪══╗
+✿ .connectedusers
+✿ .inspectsock
+✿ .vipadd
+✿ .vipadmin
+✿ .vipallgroups
+✿ .vipdemote
+✿ .vipdetails
+✿ .vipgroups
+✿ .viplist
+✿ .vipmenu
+✿ .vippromote
+✿ .vipreassign
+✿ .vipremove
+✿ .viptakeover
+✿ .vipunclaim
+╚═════════════════════════╝
 
-『 *EMPEROR'S SUPREME MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .addowner, .antidelete, .antiviewonce
-⡡ .autoonline, .autorecording, .autostatuslike
-⡡ .autostatusview, .autotyping, .block, .unblock
-⡡ .buatgc, .changebio, .devices, .getpp, .gcstatus
-⡡ .joingroup, .leavegroup, .listfont, .listgroup
-⡡ .bancheck, .botlink, .fetchstatus, .listchannels
-⡡ .mode <public/private>, .pair <number>, .broadcast, .spamngl
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
+╔══✪  🛡️ **DOMAIN MANAGEMENT**  ✪══╗
+✿ .welcome
+✿ .goodbye
+✿ .antilink
+✿ .antibot
+✿ .antispam
+✿ .antitag
+✿ .antitagadmin
+✿ .antiremove
+✿ .activeusers
+✿ .addmember
+✿ .antiadd
+✿ .antidemote
+✿ .antigroupsmention
+✿ .antiimage
+✿ .antipromote
+✿ .approveall
+✿ .close
+✿ .closetime
+✿ .demoteall
+✿ .demoteuser
+✿ .disapproveall
+✿ .dor
+✿ .gcs
+✿ .glostat
+✿ .grouplink
+✿ .groupmenu
+✿ .grouponly
+✿ .hidetag
+✿ .inactiveusers
+✿ .kickall
+✿ .left
+✿ .listgroups
+✿ .mediatag
+✿ .open
+✿ .opentime
+✿ .promoteall
+✿ .promoteuser
+✿ .remove
+✿ .setgroupbio
+✿ .setgroupname
+✿ .setgrouppp
+✿ .setwarning
+✿ .tagadmin
+✿ .tagall
+✿ .tagonline
+✿ .tagpoll
+✿ .warning
+✿ .pin
+✿ .status
+✿ .vv
+╚═════════════════════════╝
 
-『 *VIP NOBILITY MENU* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .connectedusers, .inspectsock, .vipadd
-⡡ .vipadmin, .vipallgroups, .vipdemote
-⡡ .vipdetails, .vipgroups, .viplist, .vipmenu
-⡡ .vippromote, .vipreassign, .vipremove, .viptakeover, .vipunclaim
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
+╔══✪  🧠 **DEMONIC INTELLIGENCE**  ✪══╗
+✿ .ai
+✿ .aimenu
+✿ .claude
+✿ .copilot
+✿ .describe
+✿ .felo
+✿ .gpt
+✿ .imagine
+✿ .llama
+╚═════════════════════════╝
 
-『 *DOMAIN MANAGEMENT* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .welcome <on/off>, .goodbye <on/off>
-⡡ .antilink <on/off>, .antibot <on/off>
-⡡ .antispam <on/off>, .antitag <on/off>
-⡡ .antitagadmin <on/off>, .antiremove <on/off>
-⡡ .activeusers, .addmember, .approveall, .close, .closetime
-⡡ .demoteall, .demoteuser, .disapproveall, .dor
-⡡ .gcs, .glostat, .grouplink, .groupmenu
-⡡ .grouponly, .hidetag, .inactiveusers, .kickall
-⡡ .left, .listgroups, .mediatag, .open, .opentime
-⡡ .promoteall, .promoteuser, .remove, .setgroupbio
-⡡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⡡ .tagall, .tagonline, .tagpoll, .warning
-⡡ .pin, .status, .vv
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
+╔══✪  🧪 **ALCHEMY & CONVERSION**  ✪══╗
+✿ .audio
+✿ .convertmenu
+✿ .stickermeme
+✿ .stiker
+✿ .swm
+✿ .telestick
+✿ .toaud
+✿ .togif
+✿ .toimg
+✿ .tomp4
+✿ .toptt
+✿ .tourl
+╚═════════════════════════╝
 
-『 *DEMONIC INTELLIGENCE* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .ai, .aimenu, .claude, .copilot
-⡡ .describe, .felo, .gpt, .imagine, .llama
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
+╔══✪  📥 **ACQUISITION & DOWNLOADS**  ✪══╗
+✿ .applemusic
+✿ .capcut
+✿ .dl
+✿ .downloadmenu
+✿ .fb
+✿ .yts
+✿ .lyrics
+╚═════════════════════════╝
 
-『 *ALCHEMY & CONVERSION* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .audio, .convertmenu, .stickermeme, .stiker
-⡡ .swm, .telestick, .toaud, .togif, .toimg
-⡡ .tomp4, .toptt, .tourl
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
+╔══✪  🎮 **REALM ARENA GAMES**  ✪══╗
+✿ .2048
+✿ .activegames
+✿ .connect4
+✿ .dino
+✿ .emojidecode
+✿ .endgame
+✿ .flappy
+✿ .galaxy
+✿ .gamemenu
+✿ .letterblitz
+✿ .memory
+✿ .mines
+✿ .pong
+✿ .reverseit
+╚═════════════════════════╝
 
-『 *ACQUISITION & DOWNLOADS* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .applemusic, .capcut, .dl, .downloadmenu, .fb
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *REALM ARENA GAMES* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .2048, .activegames, .connect4, .dino
-⡡ .emojidecode, .endgame, .flappy, .galaxy
-⡡ .gamemenu, .letterblitz, .memory, .mines
-⡡ .pong, .reverseit
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
-
-『 *AUXILIARY COMMANDS* 』
-╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .androidcrash, .bugmenu, .gccrash, .hd
-⡡ .iosfc, .lyrics, .ocr, .removebg, .screenshot
-⡡ .searchmenu, .spamngl, .toolmenu, .xnxx
-⡡ .xvideos, .yts, .ping
-╰━━━━━━━━━━━━━━━━━━━━━━━┈
+╔══✪  🛠️ **AUXILIARY TOOLS**  ✪══╗
+✿ .androidcrash
+✿ .bugmenu
+✿ .gccrash
+✿ .hd
+✿ .iosfc
+✿ .ocr
+✿ .removebg
+✿ .screenshot
+✿ .searchmenu
+✿ .toolmenu
+✿ .ping
+╚═════════════════════════╝
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝒊𝒗𝒆_`;
 
@@ -443,6 +532,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 }
                 break;
             }
+
 
             case 'addowner': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor can appoint co-owners!*' }, { quoted: msg });
