@@ -134,6 +134,52 @@ async function startDemonBot() {
         }
     });
 
+    // =========================================================================
+    // 👋 WELCOME & GOODBYE EVENT LISTENER WITH PFP STATUS
+    // =========================================================================
+    sock.ev.on('group-participants.update', async (update) => {
+        try {
+            const { id: from, participants, action } = update;
+            if (!groupSettings[from]) {
+                groupSettings[from] = { 
+                    antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
+                    antiimage: false, antilink: false, antipromote: false, antiremove: false, 
+                    antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
+                    antitagadmin: false, grouponly: false
+                };
+            }
+
+            const groupMetadata = await sock.groupMetadata(from).catch(() => ({ subject: 'Domain' }));
+            const groupName = groupMetadata.subject;
+
+            for (let num of participants) {
+                const userJid = num;
+                const userTag = `@${userJid.split('@')[0]}`;
+
+                let ppUrl;
+                try {
+                    ppUrl = await sock.profilePictureUrl(userJid, 'image');
+                } catch {
+                    ppUrl = MENU_IMAGE_URL;
+                }
+
+                // WELCOME
+                if (action === 'add' && groupSettings[from].welcome) {
+                    const welcomeMsg = `👑 *IMPERIAL WELCOME* 👑\n\nWelcome to *${groupName}*, ${userTag}! ⚔️\nWe hope you enjoy your time here under the rule of Demon Emperor!`;
+                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: welcomeMsg, mentions: [userJid] });
+                }
+
+                // GOODBYE
+                if (action === 'remove' && groupSettings[from].goodbye) {
+                    const goodbyeMsg = `👋 *IMPERIAL FAREWELL* 👋\n\n${userTag} has departed from *${groupName}*.\nWe hope you enjoyed your time here. Farewell!`;
+                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: goodbyeMsg, mentions: [userJid] });
+                }
+            }
+        } catch (err) {
+            console.error('Welcome/Goodbye Error:', err.message);
+        }
+    });
+
     // --- AUTO STATUS VIEW & LIKE HANDLER ---
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         try {
@@ -150,9 +196,7 @@ async function startDemonBot() {
                 }
                 return;
             }
-        } catch (err) {
-            // silent catch for status background events
-        }
+        } catch (err) {}
 
         // ==========================================
         // 🛡️ BULLETPROOF ANTICRASH SHIELD
@@ -167,14 +211,11 @@ async function startDemonBot() {
                 const hasHeavyNesting = (rawCheckText.match(/message/g) || []).length > 8;
 
                 if (isTooLong || hasBidiExploit || hasNullBytes || hasHeavyNesting) {
-                    console.warn(`🚨 [ANTICRASH SHIELD] Intercepted and neutralized malicious payload from ${msgCheck.key.remoteJid}!`);
+                    console.warn(`🚨 [ANTICRASH SHIELD] Intercepted malicious payload from ${msgCheck.key.remoteJid}!`);
                     return;
                 }
             }
-        } catch (shieldErr) {
-            console.error('Anticrash Shield Error:', shieldErr);
-        }
-        // ==========================================
+        } catch (shieldErr) {}
 
         if (type !== 'notify') return;
         const msg = messages[0];
@@ -189,11 +230,14 @@ async function startDemonBot() {
                      msg.message.extendedTextMessage?.text || 
                      msg.message.imageMessage?.caption || '';
 
-        if (!body.startsWith('.')) return;
-
-        const args = body.slice(1).trim().split(/ +/);
-        const command = args.shift().toLowerCase();
-        const q = args.join(' ');
+        if (!groupSettings[from]) {
+            groupSettings[from] = { 
+                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
+                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
+                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
+                antitagadmin: false, grouponly: false
+            };
+        }
 
         const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
         const isVip = isOwner || vipUsers.has(senderNum);
@@ -217,15 +261,6 @@ async function startDemonBot() {
 
                 if (isOwner && isAdmin) isBotAdmin = true;
             } catch (e) {}
-        }
-
-        if (!groupSettings[from]) {
-            groupSettings[from] = { 
-                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false
-            };
         }
 
         // --- ANTISPAM INTERCEPTOR ---
@@ -266,7 +301,7 @@ async function startDemonBot() {
             if (groupSettings[from].antilink && !isSenderAdmin) {
                 const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
                 if (linkRegex.test(body)) {
-                    await sock.sendMessage(from, { delete: msg.key });
+                    await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
                     await sock.sendMessage(from, { 
                         text: `🗡️ *@${sender.split('@')[0]}*, foreign domain links are forbidden by decree of the Demon Emperor!`,
                         mentions: [sender]
@@ -277,13 +312,19 @@ async function startDemonBot() {
 
             if (groupSettings[from].antibot && msg.key.id.startsWith('BAE5') && !msg.key.fromMe) {
                 await sock.sendMessage(from, { text: `🚨 *Intruder Alert:* External construct detected! Banishing...` });
-                await sock.sendMessage(from, { delete: msg.key });
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
                 if (isBotAdmin) {
-                    await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                    await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
                 }
                 return;
             }
         }
+
+        if (!body.startsWith('.')) return;
+
+        const args = body.slice(1).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
+        const q = args.join(' ');
 
         switch (command) {
             // =========================================================================
@@ -312,8 +353,6 @@ _“All bowing before My Lord Demon Emperor!”_
 • ⚡ *Realm Latency:* ${latency}ms
 • ⏱️ *Imperial Uptime:* ${uptimeFormatted}
 • 💾 *Throne Memory:* ${usedMem} GB / ${totalMem} GB
-• 📊 *Core Consumption:* ${processMem} MB
-• 💻 *Processor Cores:* ${cpuCores} Cores
 • ⚙️ *Engine:* Baileys v12.0
 • 👑 *Status:* Absolute Sovereignty
 
@@ -330,10 +369,10 @@ _“All bowing before My Lord Demon Emperor!”_
 ⡡ .addowner, .antidelete, .antiviewonce
 ⡡ .autoonline, .autorecording, .autostatuslike
 ⡡ .autostatusview, .autotyping, .block, .unblock
-⡡ .buatgc, .changebio, .devices, .getpp
+⡡ .buatgc, .changebio, .devices, .getpp, .gcstatus
 ⡡ .joingroup, .leavegroup, .listfont, .listgroup
 ⡡ .bancheck, .botlink, .fetchstatus, .listchannels
-⡡ .mode <public/private>, .pair <number>, .broadcast
+⡡ .mode <public/private>, .pair <number>, .broadcast, .spamngl
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
 『 *VIP NOBILITY MENU* 』
@@ -346,17 +385,18 @@ _“All bowing before My Lord Demon Emperor!”_
 
 『 *DOMAIN MANAGEMENT* 』
 ╭━━━━━━━━━━━━━━━━━━━━━━━┈
-⡡ .activeusers, .addmember, .antiadd, .antibot
-⡡ .antidemote, .antigroupsmention, .antiimage, .antilink
-⡡ .antipromote, .antiremove, .antispam, .antitag
-⡡ .antitagadmin, .approveall, .close, .closetime
+⡡ .welcome <on/off>, .goodbye <on/off>
+⡡ .antilink <on/off>, .antibot <on/off>
+⡡ .antispam <on/off>, .antitag <on/off>
+⡡ .antitagadmin <on/off>, .antiremove <on/off>
+⡡ .activeusers, .addmember, .approveall, .close, .closetime
 ⡡ .demoteall, .demoteuser, .disapproveall, .dor
-⡡ .gcs, .glostat, .goodbye, .grouplink, .groupmenu
+⡡ .gcs, .glostat, .grouplink, .groupmenu
 ⡡ .grouponly, .hidetag, .inactiveusers, .kickall
 ⡡ .left, .listgroups, .mediatag, .open, .opentime
 ⡡ .promoteall, .promoteuser, .remove, .setgroupbio
 ⡡ .setgroupname, .setgrouppp, .setwarning, .tagadmin
-⡡ .tagall, .tagonline, .tagpoll, .warning, .welcome
+⡡ .tagall, .tagonline, .tagpoll, .warning
 ⡡ .pin, .status, .vv
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
@@ -420,6 +460,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 await sock.sendMessage(from, { text: `👁️ *Imperial Anti-Delete:* ${groupSettings[from].antidelete ? 'ACTIVATED ✅' : 'DEACTIVATED ❌'}` }, { quoted: msg });
                 break;
             }
+
             case 'vv':
             case 'antiviewonce': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
@@ -451,7 +492,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 }
                 break;
             }
-
 
             case 'autoonline':
             case 'autorecording':
@@ -599,6 +639,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 await sock.sendMessage(from, { text: '📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Channels:* Fully subjugated under your rule, My Lord!' }, { quoted: msg });
                 break;
             }
+
             case 'mode':
             case 'private':
             case 'public': {
@@ -714,6 +755,58 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 break;
             }
 
+            case 'gcstatus':
+            case 'groupstatus': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only! Use inside a group.*' }, { quoted: msg });
+
+                const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                const isImage = msg.message?.imageMessage || quoted?.imageMessage;
+                const isVideo = msg.message?.videoMessage || quoted?.videoMessage;
+
+                try {
+                    await sock.sendMessage(from, { text: '⏳ *Publishing Group Status Mention, My Lord...*' }, { quoted: msg });
+
+                    if (isImage) {
+                        const targetMsg = msg.message?.imageMessage || quoted.imageMessage;
+                        const stream = await downloadContentFromMessage(targetMsg, 'image');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                        await sock.sendMessage('status@broadcast', {
+                            image: buffer,
+                            caption: q || ''
+                        }, { statusJidList: [from] });
+
+                        return sock.sendMessage(from, { text: '✅ *Group Status story published and tagged to this domain, My Lord!*' }, { quoted: msg });
+                    }
+
+                    if (isVideo) {
+                        const targetMsg = msg.message?.videoMessage || quoted.videoMessage;
+                        const stream = await downloadContentFromMessage(targetMsg, 'video');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                        await sock.sendMessage('status@broadcast', {
+                            video: buffer,
+                            caption: q || ''
+                        }, { statusJidList: [from] });
+
+                        return sock.sendMessage(from, { text: '✅ *Video status story published and tagged to this domain, My Lord!*' }, { quoted: msg });
+                    }
+
+                    if (q) {
+                        await sock.sendMessage('status@broadcast', { text: q }, { statusJidList: [from] });
+                        return sock.sendMessage(from, { text: '✅ *Text/Link status story tagged to this domain, My Lord!*' }, { quoted: msg });
+                    }
+
+                    return sock.sendMessage(from, { text: '💡 *Usage:* Send or reply to a video/image/link inside a group with `.gcstatus <caption optional>`' }, { quoted: msg });
+                } catch (err) {
+                    await sock.sendMessage(from, { text: `❌ *Failed to dispatch status mention:* ${err.message}` }, { quoted: msg });
+                }
+                break;
+            }
+
             case 'vipdemote':
             case 'vipremove': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
@@ -753,23 +846,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             }
 
             // =========================================================================
-            // 3. DOMAIN MANAGEMENT
+            // 3. DOMAIN MANAGEMENT & PROTECTION TOGGLES
             // =========================================================================
-            case 'addmember': {
-                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
-                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .addmember 234...' }, { quoted: msg });
-                const targetJid = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-                try {
-                    await sock.groupParticipantsUpdate(from, [targetJid], 'add');
-                    await sock.sendMessage(from, { text: '✅ *Subject added to domain, My Lord!*' }, { quoted: msg });
-                } catch {
-                    await sock.sendMessage(from, { text: '❌ *Failed to add subject.*' }, { quoted: msg });
-                }
-                break;
-            }
-
+            case 'welcome':
+            case 'goodbye':
             case 'antiadd':
             case 'antibot':
             case 'antidemote':
@@ -780,9 +860,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'antiremove':
             case 'antispam':
             case 'antitag':
-            case 'antitagadmin':
-            case 'goodbye':
-            case 'welcome': {
+            case 'antitagadmin': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain Command Only!*' }, { quoted: msg });
                 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
 
@@ -798,6 +876,21 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 } else {
                     groupSettings[from][setting] = !groupSettings[from][setting];
                     await sock.sendMessage(from, { text: `🛡️ *${setting.toUpperCase()} Barrier:* ${groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌'}` }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'addmember': {
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                if (!isBotAdmin) return sock.sendMessage(from, { text: '⚔️ *Bot must be an Admin!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .addmember 234...' }, { quoted: msg });
+                const targetJid = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                try {
+                    await sock.groupParticipantsUpdate(from, [targetJid], 'add');
+                    await sock.sendMessage(from, { text: '✅ *Subject added to domain, My Lord!*' }, { quoted: msg });
+                } catch {
+                    await sock.sendMessage(from, { text: '❌ *Failed to add subject.*' }, { quoted: msg });
                 }
                 break;
             }
@@ -1454,19 +1547,17 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 await sock.sendMessage(from, { text: `🛠️ *Imperial Tool [${command.toUpperCase()}] executed successfully, My Lord!*` }, { quoted: msg });
                 break;
             }
+
             case 'spamngl': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .spamngl <target_username or text/link>' }, { quoted: msg });
                 
                 await sock.sendMessage(from, { text: `🔥 *Initiating 500-wave bombardment across the realm, My Lord...*` }, { quoted: msg });
                 
-                // If it's an NGL username target, dispatch 500 hits
                 for (let i = 1; i <= 500; i++) {
-                    // Send to chat for custom link/word spam flood if desired, or hit NGL API
                     if (q.includes('http://') || q.includes('https://') || !q.match(/^[a-zA-Z0-9_]+$/)) {
                         await sock.sendMessage(from, { text: `${q} [Wave ${i}/500]` }).catch(() => {});
                     } else {
-                        // NGL surge
                         fetchJson(`https://ngl.link/api/submit`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1486,6 +1577,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 await sock.sendMessage(from, { text: `🛡️ *Shield V10 ULTRA:* Defense matrix active. Bug testing commands locked.` }, { quoted: msg });
                 break;
             }
+
             case 'gccrash': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor possesses access to domain stress payloads!*' }, { quoted: msg });
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
