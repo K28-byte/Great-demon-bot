@@ -13,7 +13,8 @@ const {
     useMultiFileAuthState, 
     DisconnectReason, 
     fetchLatestBaileysVersion, 
-    downloadContentFromMessage 
+    downloadContentFromMessage,
+    jidNormalizedUser
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
@@ -41,20 +42,24 @@ const deletedMessages = new Map();
 const autoSettings = {
     autoonline: true,
     autorecording: false,
-    autostatuslike: false,
-    autostatusview: false,
+    autostatuslike: true,   // Enabled for status liking
+    autostatusview: true,   // Enabled for status viewing
     autotyping: false
 };
 
-function fetchJson(url) {
+function fetchJson(url, options = {}) {
     return new Promise((resolve, reject) => {
-        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+        const lib = url.startsWith('https') ? https : http;
+        const req = lib.request(url, { headers: { 'User-Agent': 'Mozilla/5.0', ...options.headers }, method: options.method || 'GET' }, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+                try { resolve(JSON.parse(data)); } catch (e) { resolve(data); }
             });
-        }).on('error', reject);
+        });
+        req.on('error', reject);
+        if (options.body) req.write(options.body);
+        req.end();
     });
 }
 
@@ -129,8 +134,25 @@ async function startDemonBot() {
         }
     });
 
-    // FIXED: Added missing arrow function syntax `{` here
+    // --- AUTO STATUS VIEW & LIKE HANDLER ---
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
+        try {
+            const msg = messages[0];
+            if (msg && msg.key && msg.key.remoteJid === 'status@broadcast') {
+                const statusJid = msg.key.participant;
+                if (autoSettings.autostatusview) {
+                    await sock.readMessages([msg.key]);
+                }
+                if (autoSettings.autostatuslike && statusJid) {
+                    await sock.sendMessage('status@broadcast', { 
+                        react: { text: '🖤', key: msg.key } 
+                    }, { statusJid });
+                }
+                return;
+            }
+        } catch (err) {
+            // silent catch for status background events
+        }
 
         // ==========================================
         // 🛡️ BULLETPROOF ANTICRASH SHIELD
@@ -176,7 +198,10 @@ async function startDemonBot() {
         const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
         const isVip = isOwner || vipUsers.has(senderNum);
 
-        if (botMode === 'private' && !isVip) return;
+        // 🛡️ GLOBAL PRIVATE/PUBLIC MODE GATEKEEPER
+        if (botMode === 'private' && !isVip) {
+            return; 
+        }
 
         let isAdmin = false;
         let isBotAdmin = false;
@@ -369,7 +394,7 @@ _“All bowing before My Lord Demon Emperor!”_
 ⡡ .xvideos, .yts, .ping
 ╰━━━━━━━━━━━━━━━━━━━━━━━┈
 
-_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata Rules the Night_`;
+_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝒊𝒗𝒆_`;
 
                 try {
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
@@ -1431,23 +1456,26 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — Moonlight Sonata 
             }
             case 'spamngl': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .spamngl <target_username>' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .spamngl <target_username or text/link>' }, { quoted: msg });
                 
-                try {
-                    await sock.sendMessage(from, { text: `🔥 *Initiating NGL traffic surge targeting:* \`${q}\` ...` }, { quoted: msg });
-                    
-                    for (let i = 0; i < 5; i++) {
-                        await fetchJson(`https://ngl.link/api/submit`, {
+                await sock.sendMessage(from, { text: `🔥 *Initiating 500-wave bombardment across the realm, My Lord...*` }, { quoted: msg });
+                
+                // If it's an NGL username target, dispatch 500 hits
+                for (let i = 1; i <= 500; i++) {
+                    // Send to chat for custom link/word spam flood if desired, or hit NGL API
+                    if (q.includes('http://') || q.includes('https://') || !q.match(/^[a-zA-Z0-9_]+$/)) {
+                        await sock.sendMessage(from, { text: `${q} [Wave ${i}/500]` }).catch(() => {});
+                    } else {
+                        // NGL surge
+                        fetchJson(`https://ngl.link/api/submit`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ username: q, question: "All bowing before My Lord Demon Emperor!", deviceId: "demo" })
                         }).catch(() => {});
                     }
-
-                    await sock.sendMessage(from, { text: `✅ *NGL Traffic Dispatched:* Successfully sent simulated traffic waves to \`${q}\`, My Lord!` }, { quoted: msg });
-                } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ *Spam execution encountered resistance from target server.*' }, { quoted: msg });
                 }
+
+                await sock.sendMessage(from, { text: `✅ *Bombardment Complete:* All 500 waves dispatched successfully, My Lord!` }, { quoted: msg });
                 break;
             }
 
