@@ -140,6 +140,7 @@ async function startDemonBot() {
     sock.ev.on('group-participants.update', async (update) => {
         try {
             const { id: from, participants, action } = update;
+
             if (!groupSettings[from]) {
                 groupSettings[from] = { 
                     antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
@@ -163,16 +164,34 @@ async function startDemonBot() {
                     ppUrl = MENU_IMAGE_URL;
                 }
 
-                // WELCOME
+                // --- AUTOMATIC WELCOME CARD ---
                 if (action === 'add' && groupSettings[from].welcome) {
-                    const welcomeMsg = `👑 *IMPERIAL WELCOME* 👑\n\nWelcome to *${groupName}*, ${userTag}! ⚔️\nWe hope you enjoy your time here under the rule of Demon Emperor!`;
-                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: welcomeMsg, mentions: [userJid] });
+                    const welcomeMsg = 
+`👑 *IMPERIAL WELCOME* 👑
+
+Welcome to *${groupName}*, ${userTag}! ⚔️
+We hope you enjoy your time here under the rule of Demon Emperor!`;
+
+                    await sock.sendMessage(from, { 
+                        image: { url: ppUrl }, 
+                        caption: welcomeMsg, 
+                        mentions: [userJid] 
+                    });
                 }
 
-                // GOODBYE
+                // --- AUTOMATIC GOODBYE CARD ---
                 if (action === 'remove' && groupSettings[from].goodbye) {
-                    const goodbyeMsg = `👋 *IMPERIAL FAREWELL* 👋\n\n${userTag} has departed from *${groupName}*.\nWe hope you enjoyed your time here. Farewell!`;
-                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: goodbyeMsg, mentions: [userJid] });
+                    const goodbyeMsg = 
+`👋 *IMPERIAL FAREWELL* 👋
+
+${userTag} has departed from *${groupName}*.
+We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! ⚔️`;
+
+                    await sock.sendMessage(from, { 
+                        image: { url: ppUrl }, 
+                        caption: goodbyeMsg, 
+                        mentions: [userJid] 
+                    });
                 }
             }
         } catch (err) {
@@ -294,7 +313,7 @@ async function startDemonBot() {
             }
         }
 
-        // --- GROUP PROTECTION INTERCEPTORS ---
+        // --- GROUP PROTECTION INTERCEPTORS (ANTILINK & ANTIBOT) ---
         if (isGroup && groupSettings[from]) {
             const isSenderAdmin = isAdmin || isOwner;
 
@@ -306,17 +325,26 @@ async function startDemonBot() {
                         text: `🗡️ *@${sender.split('@')[0]}*, foreign domain links are forbidden by decree of the Demon Emperor!`,
                         mentions: [sender]
                     });
+                    if (isBotAdmin) {
+                        await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    }
                     return;
                 }
             }
 
-            if (groupSettings[from].antibot && msg.key.id.startsWith('BAE5') && !msg.key.fromMe) {
-                await sock.sendMessage(from, { text: `🚨 *Intruder Alert:* External construct detected! Banishing...` });
-                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                if (isBotAdmin) {
-                    await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+            if (groupSettings[from].antibot && !msg.key.fromMe) {
+                const isExternalBot = msg.key.id.startsWith('BAE5') || msg.key.id.length === 16;
+                if (isExternalBot && !isSenderAdmin) {
+                    await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                    await sock.sendMessage(from, { 
+                        text: `🚨 *@${sender.split('@')[0]}*, external construct detected! Banishing...`,
+                        mentions: [sender]
+                    });
+                    if (isBotAdmin) {
+                        await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    }
+                    return;
                 }
-                return;
             }
         }
 
@@ -332,14 +360,6 @@ async function startDemonBot() {
             // =========================================================================
             case 'menu':
             case 'help': {
-                const startTimeNum = Date.now();
-                const latency = Date.now() - startTimeNum;
-                const totalMem = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(2);
-                const freeMem = (os.freemem() / (1024 * 1024 * 1024)).toFixed(2);
-                const usedMem = (totalMem - freeMem).toFixed(2);
-                const processMem = (process.memoryUsage().rss / (1024 * 1024)).toFixed(2);
-                const cpuCores = os.cpus().length;
-
                 const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
                 const hours = Math.floor(uptimeSeconds / 3600);
                 const minutes = Math.floor((uptimeSeconds % 3600) / 60);
@@ -533,7 +553,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 break;
             }
 
-
             case 'addowner': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor can appoint co-owners!*' }, { quoted: msg });
                 const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
@@ -552,33 +571,50 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             }
 
             case 'vv':
-            case 'antiviewonce': {
+            case 'antiviewonce':
+            case 'viewonce': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                if (!quoted) return sock.sendMessage(from, { text: '💡 *My Lord, reply to a view-once message.*' }, { quoted: msg });
+                
+                const quotedContext = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                if (!quotedContext) {
+                    return sock.sendMessage(from, { text: '💡 *My Lord, reply directly to a View-Once message!*' }, { quoted: msg });
+                }
 
                 try {
-                    let viewOnceMsg = quoted.viewOnceMessage?.message || quoted.viewOnceMessageV2?.message || quoted;
-                    let mediaType = Object.keys(viewOnceMsg)[0];
-                    let mediaMessage = viewOnceMsg[mediaType];
+                    await sock.sendMessage(from, { text: '🕵️‍♂️ *Piercing View-Once Veil...*' }, { quoted: msg });
 
-                    if (!mediaMessage) {
-                        return sock.sendMessage(from, { text: '❌ *Failed to locate view-once media payload.*' }, { quoted: msg });
+                    let targetMessage = quotedContext.viewOnceMessage?.message || 
+                                        quotedContext.viewOnceMessageV2?.message || 
+                                        quotedContext.viewOnceMessageV2Extension?.message || 
+                                        quotedContext;
+
+                    const mediaType = Object.keys(targetMessage)[0];
+                    const mediaContent = targetMessage[mediaType];
+
+                    if (!mediaContent || (!mediaType.includes('image') && !mediaType.includes('video') && !mediaType.includes('audio'))) {
+                        return sock.sendMessage(from, { text: '❌ *No valid View-Once media payload found in quoted message.*' }, { quoted: msg });
                     }
 
-                    const stream = await downloadContentFromMessage(mediaMessage, mediaType.replace('Message', ''));
+                    const streamType = mediaType.replace('Message', '');
+                    const stream = await downloadContentFromMessage(mediaContent, streamType);
                     let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                    for await (const chunk of stream) {
+                        buffer = Buffer.concat([buffer, chunk]);
+                    }
+
+                    const captionText = mediaContent.caption ? `📜 *Caption:* ${mediaContent.caption}` : '🕵️‍♂️ *ViewOnce Veil Pierced successfully, My Lord!*';
 
                     if (mediaType.includes('image')) {
-                        await sock.sendMessage(from, { image: buffer, caption: '🕵️‍♂️ *ViewOnce Veil Pierced (Image), My Lord!*' }, { quoted: msg });
+                        await sock.sendMessage(from, { image: buffer, caption: captionText }, { quoted: msg });
                     } else if (mediaType.includes('video')) {
-                        await sock.sendMessage(from, { video: buffer, caption: '🕵️‍♂️ *ViewOnce Veil Pierced (Video), My Lord!*' }, { quoted: msg });
-                    } else {
-                        await sock.sendMessage(from, { text: '❌ *Unsupported view-once media type.*' }, { quoted: msg });
+                        await sock.sendMessage(from, { video: buffer, caption: captionText }, { quoted: msg });
+                    } else if (mediaType.includes('audio')) {
+                        await sock.sendMessage(from, { audio: buffer, mimetype: 'audio/mp4', ptt: true }, { quoted: msg });
                     }
-                } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ *Failed to extract view-once content.*' }, { quoted: msg });
+
+                } catch (err) {
+                    console.error('ViewOnce Extraction Error:', err);
+                    await sock.sendMessage(from, { text: `❌ *Failed to pierce View-Once payload:* ${err.message}` }, { quoted: msg });
                 }
                 break;
             }
@@ -596,21 +632,119 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
             case 'block': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may cast banishment!*' }, { quoted: msg });
-                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-                if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, mention the subject to banish.*' }, { quoted: msg });
-                await sock.updateBlockStatus(target, 'block');
-                blockedUsers.add(target);
-                await sock.sendMessage(from, { text: '🚫 *Subject banished into the Void per your command, My Lord!*' }, { quoted: msg });
+                
+                let target = null;
+                const quoted = msg.message?.extendedTextMessage?.contextInfo;
+                
+                if (quoted?.participant) {
+                    target = quoted.participant;
+                } else if (quoted?.mentionedJid && quoted.mentionedJid.length > 0) {
+                    target = quoted.mentionedJid[0];
+                } else if (q) {
+                    const cleanNum = q.replace(/[^0-9]/g, '');
+                    if (cleanNum.length >= 7) {
+                        target = cleanNum + '@s.whatsapp.net';
+                    }
+                }
+
+                if (!target) {
+                    return sock.sendMessage(from, { text: '💡 *My Lord, tag `@user`, reply to their message, or type a valid number to banish!*' }, { quoted: msg });
+                }
+
+                const cleanPhone = target.split('@')[0].split(':')[0];
+                const normalizedJid = cleanPhone + '@s.whatsapp.net';
+
+                try {
+                    await sock.sendMessage(from, { text: '⏳ *Forcing banishment seal across WhatsApp servers...*' }, { quoted: msg });
+
+                    await sock.query({
+                        tag: 'iq',
+                        attrs: {
+                            xmlns: 'w:b',
+                            type: 'set',
+                            to: '@s.whatsapp.net'
+                        },
+                        content: [
+                            {
+                                tag: 'item',
+                                attrs: {
+                                    action: 'block',
+                                    jid: normalizedJid
+                                }
+                            }
+                        ]
+                    }).catch(async () => {
+                        await sock.updateBlockStatus(normalizedJid, 'block');
+                    });
+
+                    blockedUsers.add(normalizedJid);
+                    await sock.sendMessage(from, { 
+                        text: `🚫 *@${cleanPhone}* has been forcefully banished into the Void, My Lord! ✅`, 
+                        mentions: [normalizedJid] 
+                    }, { quoted: msg });
+
+                } catch (err) {
+                    console.error('Forced Block Error:', err);
+                    await sock.sendMessage(from, { text: `❌ *Banishment Seal Rejected:* ${err.message || 'Server connection error.'}` }, { quoted: msg });
+                }
                 break;
             }
 
             case 'unblock': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may lift banishment!*' }, { quoted: msg });
-                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-                if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, mention the subject to forgive.*' }, { quoted: msg });
-                await sock.updateBlockStatus(target, 'unblock');
-                blockedUsers.delete(target);
-                await sock.sendMessage(from, { text: '✅ *Banishment rescinded per your command, My Lord!*' }, { quoted: msg });
+                
+                let target = null;
+                const quoted = msg.message?.extendedTextMessage?.contextInfo;
+                
+                if (quoted?.participant) {
+                    target = quoted.participant;
+                } else if (quoted?.mentionedJid && quoted.mentionedJid.length > 0) {
+                    target = quoted.mentionedJid[0];
+                } else if (q) {
+                    const cleanNum = q.replace(/[^0-9]/g, '');
+                    if (cleanNum.length >= 7) {
+                        target = cleanNum + '@s.whatsapp.net';
+                    }
+                }
+
+                if (!target) {
+                    return sock.sendMessage(from, { text: '💡 *My Lord, tag `@user`, reply to their message, or type a valid number to unblock!*' }, { quoted: msg });
+                }
+
+                const cleanPhone = target.split('@')[0].split(':')[0];
+                const normalizedJid = cleanPhone + '@s.whatsapp.net';
+
+                try {
+                    await sock.query({
+                        tag: 'iq',
+                        attrs: {
+                            xmlns: 'w:b',
+                            type: 'set',
+                            to: '@s.whatsapp.net'
+                        },
+                        content: [
+                            {
+                                tag: 'item',
+                                attrs: {
+                                    action: 'unblock',
+                                    jid: normalizedJid
+                                }
+                            }
+                        ]
+                    }).catch(async () => {
+                        await sock.updateBlockStatus(normalizedJid, 'unblock');
+                    });
+
+                    blockedUsers.delete(normalizedJid);
+                    await sock.sendMessage(from, { 
+                        text: `✅ *Banishment rescinded for *@${cleanPhone}*, My Lord!`, 
+                        mentions: [normalizedJid] 
+                    }, { quoted: msg });
+
+                } catch (err) {
+                    console.error('Forced Unblock Error:', err);
+                    await sock.sendMessage(from, { text: `❌ *Failed to unblock user:* ${err.message}` }, { quoted: msg });
+                }
                 break;
             }
 
@@ -938,8 +1072,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             // =========================================================================
             // 3. DOMAIN MANAGEMENT & PROTECTION TOGGLES
             // =========================================================================
-            case 'welcome':
-            case 'goodbye':
             case 'antiadd':
             case 'antibot':
             case 'antidemote':
@@ -966,6 +1098,27 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 } else {
                     groupSettings[from][setting] = !groupSettings[from][setting];
                     await sock.sendMessage(from, { text: `🛡️ *${setting.toUpperCase()} Barrier:* ${groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌'}` }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'welcome':
+            case 'goodbye': {
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain Command Only!*' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+
+                const setting = command;
+                const stateArg = args[0]?.toLowerCase();
+
+                if (stateArg === 'on') {
+                    groupSettings[from][setting] = true;
+                    await sock.sendMessage(from, { text: `✅ *By decree of the Demon Emperor:* *${setting.toUpperCase()}* card system is ENFORCED!` }, { quoted: msg });
+                } else if (stateArg === 'off') {
+                    groupSettings[from][setting] = false;
+                    await sock.sendMessage(from, { text: `❌ *Imperial Dispensation:* *${setting.toUpperCase()}* card system is DISABLED!` }, { quoted: msg });
+                } else {
+                    groupSettings[from][setting] = !groupSettings[from][setting];
+                    await sock.sendMessage(from, { text: `🛡️ *${setting.toUpperCase()} Card System:* ${groupSettings[from][setting] ? 'ENFORCED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
                 }
                 break;
             }
@@ -1375,40 +1528,67 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             }
 
             // =========================================================================
-            // 5. ALCHEMY & CONVERSION
+            // 5. ALCHEMY & CONVERSION (.stiker / .toimg / etc.)
             // =========================================================================
             case 'stiker':
             case 'sticker':
-            case 'tosticker': {
-                const isImage = msg.message?.imageMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
-                if (!isImage) {
-                    return sock.sendMessage(from, { text: '💡 *My Lord, reply to an image to forge an Imperial Sticker!*' }, { quoted: msg });
+            case 's': {
+                const quotedContext = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                const isImage = msg.message?.imageMessage || quotedContext?.imageMessage;
+                const isVideo = msg.message?.videoMessage || quotedContext?.videoMessage;
+
+                if (!isImage && !isVideo) {
+                    return sock.sendMessage(from, { text: '💡 *My Lord, reply to an image or short video to forge an Imperial Sticker!*' }, { quoted: msg });
                 }
 
                 try {
-                    const targetMessage = msg.message?.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
-                    const stream = await downloadContentFromMessage(targetMessage, 'image');
+                    await sock.sendMessage(from, { text: '🎨 *Forging Imperial Sticker...*' }, { quoted: msg });
+
+                    const targetMsg = msg.message?.imageMessage || msg.message?.videoMessage || quotedContext.imageMessage || quotedContext.videoMessage;
+                    const mediaType = (msg.message?.imageMessage || quotedContext?.imageMessage) ? 'image' : 'video';
+
+                    const stream = await downloadContentFromMessage(targetMsg, mediaType);
                     let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                    for await (const chunk of stream) {
+                        buffer = Buffer.concat([buffer, chunk]);
+                    }
 
-                    const tempImg = `./temp_${Date.now()}.jpg`;
-                    const tempWebp = `./temp_${Date.now()}.webp`;
-                    fs.writeFileSync(tempImg, buffer);
+                    const tempIn = `./temp_sticker_${Date.now()}.${mediaType === 'image' ? 'jpg' : 'mp4'}`;
+                    const tempOut = `./temp_sticker_${Date.now()}.webp`;
+                    fs.writeFileSync(tempIn, buffer);
 
-                    exec(`ffmpeg -i ${tempImg} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempWebp}`, async (err) => {
-                        if (err) {
-                            if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
-                            return sock.sendMessage(from, { text: '❌ Imperial sticker alchemy failed, My Lord.' }, { quoted: msg });
+                    exec(`ffmpeg -i ${tempIn} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempOut}`, async (err) => {
+                        if (!err && fs.existsSync(tempOut)) {
+                            const stickerBuffer = fs.readFileSync(tempOut);
+                            await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+                            if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                            if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+                        } else {
+                            try {
+                                const base64Image = buffer.toString('base64');
+                                const apiRes = await fetchJson(`https://api.lolhuman.xyz/api/convert/towebp?apikey=GataDios`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ img: base64Image })
+                                });
+
+                                if (apiRes && apiRes.result) {
+                                    await sock.sendMessage(from, { sticker: { url: apiRes.result } }, { quoted: msg });
+                                } else {
+                                    await sock.sendMessage(from, { text: '❌ *Sticker alchemy failed:* Ensure ffmpeg is installed on your server environment.' }, { quoted: msg });
+                                }
+                            } catch (fallbackErr) {
+                                await sock.sendMessage(from, { text: '❌ *Sticker conversion failed on all protocols.*' }, { quoted: msg });
+                            } finally {
+                                if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                                if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+                            }
                         }
-
-                        const stickerBuffer = fs.readFileSync(tempWebp);
-                        await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
-
-                        if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
-                        if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
                     });
-                } catch (error) {
-                    await sock.sendMessage(from, { text: '❌ Error processing sticker.' }, { quoted: msg });
+
+                } catch (err) {
+                    console.error('Sticker Error:', err);
+                    await sock.sendMessage(from, { text: `❌ *Sticker creation failed:* ${err.message}` }, { quoted: msg });
                 }
                 break;
             }
