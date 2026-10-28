@@ -1007,14 +1007,22 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 try {
                     await sock.sendMessage(from, { text: '⏳ *Initiating Imperial Status Broadcast across subjugated domains, My Lord...*' }, { quoted: msg });
 
-                    const allGroups = await sock.groupFetchAllParticipating();
-                    const groupIds = Object.keys(allGroups);
+                    // 1. Extract link and custom message from argument
+                    const argsList = body.slice(prefix.length + command.length).trim().split(/ +/);
+                    let targetUrl = argsList.find(arg => arg.includes('chat.whatsapp.com'));
+                    let customText = argsList.filter(arg => !arg.includes('chat.whatsapp.com')).join(' ');
 
-                    if (groupIds.length === 0) {
-                        return sock.sendMessage(from, { text: '❌ *No active domains found to broadcast status, My Lord.*' }, { quoted: msg });
+                    // If no link provided in command, fallback to auto-generating current group's link
+                    if (!targetUrl && isGroup) {
+                        const inviteCode = await sock.groupInviteCode(from).catch(() => null);
+                        if (inviteCode) targetUrl = `https://chat.whatsapp.com/${inviteCode}`;
                     }
 
-                    // Extract quoted or current media securely
+                    if (!targetUrl) {
+                        return sock.sendMessage(from, { text: '💡 *My Lord, provide a group invite link: .gcstatus <invite_link> <optional text>*' }, { quoted: msg });
+                    }
+
+                    // 2. Extract quoted or attached media (Image/Video)
                     const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
                     const isImage = msg.message?.imageMessage || quoted?.imageMessage;
                     const isVideo = msg.message?.videoMessage || quoted?.videoMessage;
@@ -1042,53 +1050,56 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         });
                     }
 
+                    // 3. Construct caption with invite link
+                    const captionText = `${customText ? customText + '\n\n' : ''}✦⁺፝֟፝֟ *Imperial Domain Invite* ⁺፝֟፝֟✦\nGroup chat invite\n${targetUrl}`;
+
+                    // 4. Fetch all participating groups & broadcast
+                    const allGroups = await sock.groupFetchAllParticipating();
+                    const groupIds = Object.keys(allGroups);
                     let broadcastCount = 0;
 
                     for (const gId of groupIds) {
                         try {
-                            const groupMetadata = allGroups[gId];
-                            const groupName = groupMetadata?.subject || 'Imperial Domain';
-                            
-                            // Safely attempt to fetch invite code without breaking if unprivileged
-                            let inviteCode = await sock.groupInviteCode(gId).catch(() => null);
-                            if (!inviteCode) continue;
-
-                            const inviteUrl = `https://chat.whatsapp.com/${inviteCode}`;
-                            const captionText = `${q ? q + '\n\n' : ''}✦⁺፝֟፝֟ *${groupName}* ⁺፝֟፝֟✦\nGroup chat invite\n${inviteUrl}`;
-
                             if (mediaType === 'image' && mediaBuffer) {
-                                await sock.sendMessage('status@broadcast', {
+                                await sock.sendMessage(gId, {
                                     image: mediaBuffer,
-                                    caption: captionText
-                                }, { statusJidList: [gId] }).catch(() => {});
+                                    caption: captionText,
+                                    contextInfo: {
+                                        groupStatusMentionMessage: {
+                                            groupJid: gId
+                                        }
+                                    }
+                                }).catch(() => {});
                             } else if (mediaBuffer) {
-                                await sock.sendMessage('status@broadcast', {
+                                await sock.sendMessage(gId, {
                                     video: mediaBuffer,
-                                    caption: captionText
-                                }, { statusJidList: [gId] }).catch(() => {});
+                                    caption: captionText,
+                                    contextInfo: {
+                                        groupStatusMentionMessage: {
+                                            groupJid: gId
+                                        }
+                                    }
+                                }).catch(() => {});
                             }
 
                             broadcastCount++;
-                            // Safe delay between requests to prevent socket disconnection
+                            // Delay to prevent disconnection/rate limits
                             await new Promise(resolve => setTimeout(resolve, 2000));
                         } catch (singleErr) {
-                            // Suppress individual group errors so the bot never disconnects
-                            console.warn(`Skipped status for group ${gId}:`, singleErr.message);
+                            console.warn(`Skipped broadcast for group ${gId}:`, singleErr.message);
                         }
                     }
 
                     await sock.sendMessage(from, { 
-                        text: `✅ *Multi-GC Status Broadcast Complete! Published interactive invite cards for ${broadcastCount} domain(s), My Lord!* 👑` 
+                        text: `✅ *Broadcast Complete! Delivered status card to ${broadcastCount} domain(s), My Lord!* 👑` 
                     }, { quoted: msg });
 
                 } catch (err) {
                     console.error('Group Status Broadcast Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Broadcast error handled safely:* ${err.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `❌ *Broadcast error:* ${err.message}` }, { quoted: msg });
                 }
                 break;
             }
-
-
 
             case 'vipdemote':
             case 'vipremove': {
