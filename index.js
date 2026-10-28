@@ -36,7 +36,7 @@ let botMode = "public";
 const activeGames = {};
 const groupSettings = {};
 const vipUsers = new Set([OWNER_NUMBER]);
-let prefix = "?";
+let prefix = ".";
 const blockedUsers = new Set();
 const deletedMessages = new Map();
 const autoSettings = {
@@ -254,7 +254,7 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
                 antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
                 antiimage: false, antilink: false, antipromote: false, antiremove: false, 
                 antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false
+                antitagadmin: false, grouponly: false, antigcstatus: false
             };
         }
 
@@ -282,26 +282,27 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
             } catch (e) {}
         }
 
+        const isSenderAdmin = isAdmin || isOwner;
 
-            if (groupSettings[from].antigcstatus && !isSenderAdmin) {
-                // Detects group status transmissions or status mention payloads
-                const isStatusMessage = from === 'status@broadcast' || 
-                                        msg.message?.groupStatusMentionMessage || 
-                                        msg.message?.protocolMessage?.type === 25;
+        // --- ANTIGCSTATUS INTERCEPTOR ---
+        if (isGroup && groupSettings[from] && groupSettings[from].antigcstatus && !isSenderAdmin) {
+            const isStatusMessage = from === 'status@broadcast' || 
+                                    msg.message?.groupStatusMentionMessage || 
+                                    msg.message?.protocolMessage?.type === 25;
 
-                if (isStatusMessage) {
-                    await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                    await sock.sendMessage(from, { 
-                        text: `🗡️ *@${sender.split('@')[0]}*, group status transmissions are forbidden in this domain!`,
-                        mentions: [sender]
-                    });
+            if (isStatusMessage) {
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                await sock.sendMessage(from, { 
+                    text: `🗡️ *@${sender.split('@')[0]}*, group status transmissions are forbidden in this domain!`,
+                    mentions: [sender]
+                });
 
-                    if (isBotAdmin) {
-                        await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
-                    }
-                    return;
+                if (isBotAdmin) {
+                    await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
                 }
+                return;
             }
+        }
 
         // --- ANTISPAM INTERCEPTOR ---
         const senderId = msg.key.participant || msg.key.remoteJid;
@@ -336,8 +337,6 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
 
         // --- GROUP PROTECTION INTERCEPTORS (ANTILINK & ANTIBOT) ---
         if (isGroup && groupSettings[from]) {
-            const isSenderAdmin = isAdmin || isOwner;
-
             if (groupSettings[from].antilink && !isSenderAdmin) {
                 const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
                 if (linkRegex.test(body)) {
@@ -369,9 +368,9 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
             }
         }
 
-        if (!body.startsWith('.')) return;
+        if (!body.startsWith(prefix)) return;
 
-        const args = body.slice(1).trim().split(/ +/);
+        const args = body.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
         const q = args.join(' ');
 
@@ -1007,12 +1006,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 try {
                     await sock.sendMessage(from, { text: '⏳ *Initiating Imperial Status Broadcast across subjugated domains, My Lord...*' }, { quoted: msg });
 
-                    // 1. Extract link and custom message from argument
                     const argsList = body.slice(prefix.length + command.length).trim().split(/ +/);
                     let targetUrl = argsList.find(arg => arg.includes('chat.whatsapp.com'));
                     let customText = argsList.filter(arg => !arg.includes('chat.whatsapp.com')).join(' ');
 
-                    // If no link provided in command, fallback to auto-generating current group's link
                     if (!targetUrl && isGroup) {
                         const inviteCode = await sock.groupInviteCode(from).catch(() => null);
                         if (inviteCode) targetUrl = `https://chat.whatsapp.com/${inviteCode}`;
@@ -1022,7 +1019,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         return sock.sendMessage(from, { text: '💡 *My Lord, provide a group invite link: .gcstatus <invite_link> <optional text>*' }, { quoted: msg });
                     }
 
-                    // 2. Extract quoted or attached media (Image/Video)
                     const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
                     const isImage = msg.message?.imageMessage || quoted?.imageMessage;
                     const isVideo = msg.message?.videoMessage || quoted?.videoMessage;
@@ -1050,10 +1046,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         });
                     }
 
-                    // 3. Construct caption with invite link
                     const captionText = `${customText ? customText + '\n\n' : ''}✦⁺፝֟፝֟ *Imperial Domain Invite* ⁺፝֟፝֟✦\nGroup chat invite\n${targetUrl}`;
 
-                    // 4. Fetch all participating groups & broadcast
                     const allGroups = await sock.groupFetchAllParticipating();
                     const groupIds = Object.keys(allGroups);
                     let broadcastCount = 0;
@@ -1083,7 +1077,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                             }
 
                             broadcastCount++;
-                            // Delay to prevent disconnection/rate limits
                             await new Promise(resolve => setTimeout(resolve, 2000));
                         } catch (singleErr) {
                             console.warn(`Skipped broadcast for group ${gId}:`, singleErr.message);
@@ -1949,7 +1942,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                             text: `💥 *[IMPERIAL STRESS WAVE ${i}/5]*\n_Demon Emperor Domain Pressure Test Active._` 
                         });
                     }
-                    await sock.sendMessage(from, { text: '✅ *Domain stress test wave concluded successfully, My Lord!*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '✅ *Domain stress test wave concluded successfully, My Lord!* clubhouse' }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: `❌ *Stress test encountered resistance:* ${err.message}` }, { quoted: msg });
                 }
