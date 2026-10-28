@@ -27,7 +27,7 @@ const https = require('https');
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
 const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v10.0 ULTRA";
+const BOT_VERSION = "v19.0 ULTRA";
 const MENU_IMAGE_URL = "https://i.postimg.cc/7Ln9xbQD/60124106817e0737d31a27af564d65a8.jpg";
 const startTime = Date.now();
 
@@ -36,7 +36,7 @@ let botMode = "public";
 const activeGames = {};
 const groupSettings = {};
 const vipUsers = new Set([OWNER_NUMBER]);
-let prefix = ".";
+let prefix = "?";
 const blockedUsers = new Set();
 const deletedMessages = new Map();
 const autoSettings = {
@@ -140,15 +140,15 @@ async function startDemonBot() {
     sock.ev.on('group-participants.update', async (update) => {
         try {
             const { id: from, participants, action } = update;
-
-            if (!groupSettings[from]) {
-                groupSettings[from] = { 
-                    antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                    antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                    antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                    antitagadmin: false, grouponly: false
-                };
-            }
+ 
+        if (!groupSettings[from]) {
+            groupSettings[from] = { 
+                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
+                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
+                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
+                antitagadmin: false, grouponly: false, antigcstatus: false
+            };
+        }
 
             const groupMetadata = await sock.groupMetadata(from).catch(() => ({ subject: 'Domain' }));
             const groupName = groupMetadata.subject;
@@ -282,6 +282,27 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
             } catch (e) {}
         }
 
+
+            if (groupSettings[from].antigcstatus && !isSenderAdmin) {
+                // Detects group status transmissions or status mention payloads
+                const isStatusMessage = from === 'status@broadcast' || 
+                                        msg.message?.groupStatusMentionMessage || 
+                                        msg.message?.protocolMessage?.type === 25;
+
+                if (isStatusMessage) {
+                    await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                    await sock.sendMessage(from, { 
+                        text: `🗡️ *@${sender.split('@')[0]}*, group status transmissions are forbidden in this domain!`,
+                        mentions: [sender]
+                    });
+
+                    if (isBotAdmin) {
+                        await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    }
+                    return;
+                }
+            }
+
         // --- ANTISPAM INTERCEPTOR ---
         const senderId = msg.key.participant || msg.key.remoteJid;
         if (body.startsWith(prefix)) {
@@ -375,172 +396,172 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
 ╚═════════════════════════╝
 
 ╔══✪  👑 **EMPEROR'S SUPREME**  ✪══╗
-✿ .addowner
-✿ .antidelete
-✿ .antiviewonce
-✿ .autoonline
-✿ .autorecording
-✿ .autostatuslike
-✿ .autostatusview
-✿ .autotyping
-✿ .block
-✿ .unblock
-✿ .buatgc
-✿ .changebio
-✿ .devices
-✿ .getpp
-✿ .gcstatus
-✿ .joingroup
-✿ .leavegroup
-✿ .listfont
-✿ .listgroup
-✿ .bancheck
-✿ .botlink
-✿ .fetchstatus
-✿ .listchannels
-✿ .mode
-✿ .pair
-✿ .broadcast
-✿ .spamngl
+✿ addowner
+✿ antidelete
+✿ antiviewonce
+✿ autoonline
+✿ autorecording
+✿ autostatuslike
+✿ autostatusview
+✿ autotyping
+✿ block
+✿ unblock
+✿ buatgc
+✿ changebio
+✿ devices
+✿ getpp
+✿ gcstatus
+✿ joingroup
+✿ leavegroup
+✿ listfont
+✿ listgroup
+✿ bancheck
+✿ botlink
+✿ fetchstatus
+✿ listchannels
+✿ mode
+✿ pair
+✿ broadcast
+✿ spamngl
 ╚═════════════════════════╝
 
 ╔══✪  ⭐ **VIP NOBILITY**  ✪══╗
-✿ .connectedusers
-✿ .inspectsock
-✿ .vipadd
-✿ .vipadmin
-✿ .vipallgroups
-✿ .vipdemote
-✿ .vipdetails
-✿ .vipgroups
-✿ .viplist
-✿ .vipmenu
-✿ .vippromote
-✿ .vipreassign
-✿ .vipremove
-✿ .viptakeover
-✿ .vipunclaim
+✿ connectedusers
+✿ inspectsock
+✿ vipadd
+✿ vipadmin
+✿ vipallgroups
+✿ vipdemote
+✿ vipdetails
+✿ vipgroups
+✿ viplist
+✿ vipmenu
+✿ vippromote
+✿ vipreassign
+✿ vipremove
+✿ viptakeover
+✿ vipunclaim
 ╚═════════════════════════╝
 
 ╔══✪  🛡️ **DOMAIN MANAGEMENT**  ✪══╗
-✿ .welcome
-✿ .goodbye
-✿ .antilink
-✿ .antibot
-✿ .antispam
-✿ .antitag
-✿ .antitagadmin
-✿ .antiremove
-✿ .activeusers
-✿ .addmember
-✿ .antiadd
-✿ .antidemote
-✿ .antigroupsmention
-✿ .antiimage
-✿ .antipromote
-✿ .approveall
-✿ .close
-✿ .closetime
-✿ .demoteall
-✿ .demoteuser
-✿ .disapproveall
-✿ .dor
-✿ .gcs
-✿ .glostat
-✿ .grouplink
-✿ .groupmenu
-✿ .grouponly
-✿ .hidetag
-✿ .inactiveusers
-✿ .kickall
-✿ .left
-✿ .listgroups
-✿ .mediatag
-✿ .open
-✿ .opentime
-✿ .promoteall
-✿ .promoteuser
-✿ .remove
-✿ .setgroupbio
-✿ .setgroupname
-✿ .setgrouppp
-✿ .setwarning
-✿ .tagadmin
-✿ .tagall
-✿ .tagonline
-✿ .tagpoll
-✿ .warning
-✿ .pin
-✿ .status
-✿ .vv
+✿ welcome
+✿ goodbye
+✿ antilink
+✿ antibot
+✿ antispam
+✿ antitag
+✿ antitagadmin
+✿ antiremove
+✿ activeusers
+✿ addmember
+✿ antiadd
+✿ antidemote
+✿ antigroupsmention
+✿ antiimage
+✿ antipromote
+✿ approveall
+✿ close
+✿ closetime
+✿ demoteall
+✿ demoteuser
+✿ disapproveall
+✿ dor
+✿ gcs
+✿ glostat
+✿ grouplink
+✿ groupmenu
+✿ grouponly
+✿ hidetag
+✿ inactiveusers
+✿ kickall
+✿ left
+✿ listgroups
+✿ mediatag
+✿ open
+✿ opentime
+✿ promoteall
+✿ promoteuser
+✿ remove
+✿ setgroupbio
+✿ setgroupname
+✿ setgrouppp
+✿ setwarning
+✿ tagadmin
+✿ tagall
+✿ tagonline
+✿ tagpoll
+✿ warning
+✿ pin
+✿ status
+✿ vv
 ╚═════════════════════════╝
 
 ╔══✪  🧠 **DEMONIC INTELLIGENCE**  ✪══╗
-✿ .ai
-✿ .aimenu
-✿ .claude
-✿ .copilot
-✿ .describe
-✿ .felo
-✿ .gpt
-✿ .imagine
-✿ .llama
+✿ ai
+✿ aimenu
+✿ claude
+✿ copilot
+✿ describe
+✿ felo
+✿ gpt
+✿ imagine
+✿ llama
 ╚═════════════════════════╝
 
 ╔══✪  🧪 **ALCHEMY & CONVERSION**  ✪══╗
-✿ .audio
-✿ .convertmenu
-✿ .stickermeme
-✿ .stiker
-✿ .swm
-✿ .telestick
-✿ .toaud
-✿ .togif
-✿ .toimg
-✿ .tomp4
-✿ .toptt
-✿ .tourl
+✿ audio
+✿ convertmenu
+✿ stickermeme
+✿ stiker
+✿ swm
+✿ telestick
+✿ toaud
+✿ togif
+✿ toimg
+✿ tomp4
+✿ toptt
+✿ tourl
 ╚═════════════════════════╝
 
 ╔══✪  📥 **ACQUISITION & DOWNLOADS**  ✪══╗
-✿ .applemusic
-✿ .capcut
-✿ .dl
-✿ .downloadmenu
-✿ .fb
-✿ .yts
-✿ .lyrics
+✿ applemusic
+✿ capcut
+✿ dl
+✿ downloadmenu
+✿ fb
+✿ yts
+✿ lyrics
 ╚═════════════════════════╝
 
 ╔══✪  🎮 **REALM ARENA GAMES**  ✪══╗
-✿ .2048
-✿ .activegames
-✿ .connect4
-✿ .dino
-✿ .emojidecode
-✿ .endgame
-✿ .flappy
-✿ .galaxy
-✿ .gamemenu
-✿ .letterblitz
-✿ .memory
-✿ .mines
-✿ .pong
-✿ .reverseit
+✿ 2048
+✿ activegames
+✿ connect4
+✿ dino
+✿ emojidecode
+✿ endgame
+✿ flappy
+✿ galaxy
+✿ gamemenu
+✿ letterblitz
+✿ memory
+✿ mines
+✿ pong
+✿ reverseit
 ╚═════════════════════════╝
 
 ╔══✪  🛠️ **AUXILIARY TOOLS**  ✪══╗
-✿ .androidcrash
-✿ .bugmenu
-✿ .gccrash
-✿ .hd
-✿ .iosfc
-✿ .ocr
-✿ .removebg
-✿ .screenshot
-✿ .searchmenu
-✿ .toolmenu
-✿ .ping
+✿ androidcrash
+✿ bugmenu
+✿ gccrash
+✿ hd
+✿ iosfc
+✿ ocr
+✿ removebg
+✿ screenshot
+✿ searchmenu
+✿ toolmenu
+✿ ping
 ╚═════════════════════════╝
 
 _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝒊𝒗𝒆_`;
@@ -982,54 +1003,98 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'gcstatus':
             case 'groupstatus': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only! Use inside a group.*' }, { quoted: msg });
-
-                const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                const isImage = msg.message?.imageMessage || quoted?.imageMessage;
-                const isVideo = msg.message?.videoMessage || quoted?.videoMessage;
 
                 try {
-                    await sock.sendMessage(from, { text: '⏳ *Publishing Group Status Mention, My Lord...*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '⏳ *Initiating Imperial Status Broadcast across all subjugated domains, My Lord...*' }, { quoted: msg });
+
+                    // 1. Fetch all participating groups
+                    const allGroups = await sock.groupFetchAllParticipating();
+                    const groupIds = Object.keys(allGroups);
+
+                    if (groupIds.length === 0) {
+                        return sock.sendMessage(from, { text: '❌ *No active domains found to broadcast status, My Lord.*' }, { quoted: msg });
+                    }
+
+                    // 2. Extract media (Quoted or current message image/video)
+                    const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const isImage = msg.message?.imageMessage || quoted?.imageMessage;
+                    const isVideo = msg.message?.videoMessage || quoted?.videoMessage;
+
+                    let mediaBuffer = null;
+                    let mediaType = 'image';
 
                     if (isImage) {
                         const targetMsg = msg.message?.imageMessage || quoted.imageMessage;
                         const stream = await downloadContentFromMessage(targetMsg, 'image');
-                        let buffer = Buffer.from([]);
-                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-                        await sock.sendMessage('status@broadcast', {
-                            image: buffer,
-                            caption: q || ''
-                        }, { statusJidList: [from] });
-
-                        return sock.sendMessage(from, { text: '✅ *Group Status story published and tagged to this domain, My Lord!*' }, { quoted: msg });
-                    }
-
-                    if (isVideo) {
+                        for await (const chunk of stream) mediaBuffer = Buffer.concat([mediaBuffer || Buffer.from([]), chunk]);
+                    } else if (isVideo) {
+                        mediaType = 'video';
                         const targetMsg = msg.message?.videoMessage || quoted.videoMessage;
                         const stream = await downloadContentFromMessage(targetMsg, 'video');
-                        let buffer = Buffer.from([]);
-                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-                        await sock.sendMessage('status@broadcast', {
-                            video: buffer,
-                            caption: q || ''
-                        }, { statusJidList: [from] });
-
-                        return sock.sendMessage(from, { text: '✅ *Video status story published and tagged to this domain, My Lord!*' }, { quoted: msg });
+                        for await (const chunk of stream) mediaBuffer = Buffer.concat([mediaBuffer || Buffer.from([]), chunk]);
+                    } else {
+                        // Fallback to default menu image if no media was provided
+                        const https = require('https');
+                        mediaBuffer = await new Promise((resolve) => {
+                            https.get(MENU_IMAGE_URL, (res) => {
+                                let data = [];
+                                res.on('data', chunk => data.push(chunk));
+                                res.on('end', () => resolve(Buffer.concat(data)));
+                            }).on('error', () => resolve(null));
+                        });
                     }
 
-                    if (q) {
-                        await sock.sendMessage('status@broadcast', { text: q }, { statusJidList: [from] });
-                        return sock.sendMessage(from, { text: '✅ *Text/Link status story tagged to this domain, My Lord!*' }, { quoted: msg });
+                    let broadcastCount = 0;
+
+                    // 3. Loop through every group and post interactive invite status
+                    for (const gId of groupIds) {
+                        try {
+                            const groupMetadata = allGroups[gId];
+                            const groupName = groupMetadata.subject || 'Imperial Domain';
+                            
+                            // Get group invite code
+                            let inviteCode = '';
+                            try {
+                                inviteCode = await sock.groupInviteCode(gId);
+                            } catch (e) {
+                                // Skip if bot is not admin in that specific group
+                                continue; 
+                            }
+
+                            const inviteUrl = `https://chat.whatsapp.com/${inviteCode}`;
+                            const captionText = `${q ? q + '\n\n' : ''}✦⁺፝֟፝֟ *${groupName}* ⁺፝֟፝֟✦\nGroup chat invite\n${inviteUrl}`;
+
+                            if (mediaType === 'image') {
+                                await sock.sendMessage('status@broadcast', {
+                                    image: mediaBuffer,
+                                    caption: captionText
+                                }, { statusJidList: [gId] });
+                            } else {
+                                await sock.sendMessage('status@broadcast', {
+                                    video: mediaBuffer,
+                                    caption: captionText
+                                }, { statusJidList: [gId] });
+                            }
+
+                            broadcastCount++;
+                            // Short delay to prevent WhatsApp rate-limiting
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+                        } catch (singleErr) {
+                            console.error(`Failed status post for ${gId}:`, singleErr.message);
+                        }
                     }
 
-                    return sock.sendMessage(from, { text: '💡 *Usage:* Send or reply to a video/image/link inside a group with `.gcstatus <caption optional>`' }, { quoted: msg });
+                    await sock.sendMessage(from, { 
+                        text: `✅ *Multi-GC Status Broadcast Complete! Published interactive invite cards for ${broadcastCount} domain(s), My Lord!* 👑` 
+                    }, { quoted: msg });
+
                 } catch (err) {
-                    await sock.sendMessage(from, { text: `❌ *Failed to dispatch status mention:* ${err.message}` }, { quoted: msg });
+                    console.error('Group Status Broadcast Error:', err);
+                    await sock.sendMessage(from, { text: `❌ *Failed to broadcast group status:* ${err.message}` }, { quoted: msg });
                 }
                 break;
             }
+
 
             case 'vipdemote':
             case 'vipremove': {
@@ -1751,6 +1816,25 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     }
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to fetch search results.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'antigcstatus': {
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain Command Only!*' }, { quoted: msg });
+                if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+
+                const stateArg = args[0]?.toLowerCase();
+
+                if (stateArg === 'on') {
+                    groupSettings[from].antigcstatus = true;
+                    await sock.sendMessage(from, { text: `✅ *By decree of the Demon Emperor:* *ANTIGCSTATUS* barrier is ENFORCED!` }, { quoted: msg });
+                } else if (stateArg === 'off') {
+                    groupSettings[from].antigcstatus = false;
+                    await sock.sendMessage(from, { text: `❌ *Imperial Dispensation:* *ANTIGCSTATUS* barrier is DISABLED!` }, { quoted: msg });
+                } else {
+                    groupSettings[from].antigcstatus = !groupSettings[from].antigcstatus;
+                    await sock.sendMessage(from, { text: `🛡️ *ANTIGCSTATUS Barrier:* ${groupSettings[from].antigcstatus ? 'ENFORCED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
                 }
                 break;
             }
