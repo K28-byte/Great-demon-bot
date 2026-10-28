@@ -1005,9 +1005,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
 
                 try {
-                    await sock.sendMessage(from, { text: '⏳ *Initiating Imperial Status Broadcast across all subjugated domains, My Lord...*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '⏳ *Initiating Imperial Status Broadcast across subjugated domains, My Lord...*' }, { quoted: msg });
 
-                    // 1. Fetch all participating groups
                     const allGroups = await sock.groupFetchAllParticipating();
                     const groupIds = Object.keys(allGroups);
 
@@ -1015,7 +1014,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         return sock.sendMessage(from, { text: '❌ *No active domains found to broadcast status, My Lord.*' }, { quoted: msg });
                     }
 
-                    // 2. Extract media (Quoted or current message image/video)
+                    // Extract quoted or current media securely
                     const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
                     const isImage = msg.message?.imageMessage || quoted?.imageMessage;
                     const isVideo = msg.message?.videoMessage || quoted?.videoMessage;
@@ -1033,7 +1032,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         const stream = await downloadContentFromMessage(targetMsg, 'video');
                         for await (const chunk of stream) mediaBuffer = Buffer.concat([mediaBuffer || Buffer.from([]), chunk]);
                     } else {
-                        // Fallback to default menu image if no media was provided
                         const https = require('https');
                         mediaBuffer = await new Promise((resolve) => {
                             https.get(MENU_IMAGE_URL, (res) => {
@@ -1046,41 +1044,36 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                     let broadcastCount = 0;
 
-                    // 3. Loop through every group and post interactive invite status
                     for (const gId of groupIds) {
                         try {
                             const groupMetadata = allGroups[gId];
-                            const groupName = groupMetadata.subject || 'Imperial Domain';
+                            const groupName = groupMetadata?.subject || 'Imperial Domain';
                             
-                            // Get group invite code
-                            let inviteCode = '';
-                            try {
-                                inviteCode = await sock.groupInviteCode(gId);
-                            } catch (e) {
-                                // Skip if bot is not admin in that specific group
-                                continue; 
-                            }
+                            // Safely attempt to fetch invite code without breaking if unprivileged
+                            let inviteCode = await sock.groupInviteCode(gId).catch(() => null);
+                            if (!inviteCode) continue;
 
                             const inviteUrl = `https://chat.whatsapp.com/${inviteCode}`;
                             const captionText = `${q ? q + '\n\n' : ''}✦⁺፝֟፝֟ *${groupName}* ⁺፝֟፝֟✦\nGroup chat invite\n${inviteUrl}`;
 
-                            if (mediaType === 'image') {
+                            if (mediaType === 'image' && mediaBuffer) {
                                 await sock.sendMessage('status@broadcast', {
                                     image: mediaBuffer,
                                     caption: captionText
-                                }, { statusJidList: [gId] });
-                            } else {
+                                }, { statusJidList: [gId] }).catch(() => {});
+                            } else if (mediaBuffer) {
                                 await sock.sendMessage('status@broadcast', {
                                     video: mediaBuffer,
                                     caption: captionText
-                                }, { statusJidList: [gId] });
+                                }, { statusJidList: [gId] }).catch(() => {});
                             }
 
                             broadcastCount++;
-                            // Short delay to prevent WhatsApp rate-limiting
-                            await new Promise(resolve => setTimeout(resolve, 1500));
+                            // Safe delay between requests to prevent socket disconnection
+                            await new Promise(resolve => setTimeout(resolve, 2000));
                         } catch (singleErr) {
-                            console.error(`Failed status post for ${gId}:`, singleErr.message);
+                            // Suppress individual group errors so the bot never disconnects
+                            console.warn(`Skipped status for group ${gId}:`, singleErr.message);
                         }
                     }
 
@@ -1090,10 +1083,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 } catch (err) {
                     console.error('Group Status Broadcast Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Failed to broadcast group status:* ${err.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: `❌ *Broadcast error handled safely:* ${err.message}` }, { quoted: msg });
                 }
                 break;
             }
+
 
 
             case 'vipdemote':
