@@ -1003,7 +1003,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
 
                 try {
-                    await sock.sendMessage(from, { text: '⏳ *Analyzing invite link & preparing Imperial Broadcast, My Lord...*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '⏳ *Forging Imperial Group Status Stories across all domains, My Lord...*' }, { quoted: msg });
 
                     const argsList = body.slice(prefix.length + command.length).trim().split(/ +/);
                     let targetUrl = argsList.find(arg => arg.includes('chat.whatsapp.com') || arg.includes('t.me') || arg.includes('http'));
@@ -1018,7 +1018,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         return sock.sendMessage(from, { text: '💡 *My Lord, provide an invite link: .gcstatus <link> <optional text>*' }, { quoted: msg });
                     }
 
-                    // 1. Try to fetch the profile picture belonging to the provided group invite link
+                    // 1. Fetch group profile picture from the invite link to use as the status thumbnail
                     let linkPicBuffer = null;
                     if (targetUrl.includes('chat.whatsapp.com/')) {
                         try {
@@ -1026,7 +1026,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                             const inviteInfo = await sock.groupGetInviteInfo(inviteCode).catch(() => null);
                             
                             if (inviteInfo && inviteInfo.id) {
-                                // Fetch that specific group's profile picture
                                 const groupPpUrl = await sock.profilePictureUrl(inviteInfo.id, 'image').catch(() => null);
                                 if (groupPpUrl) {
                                     linkPicBuffer = await new Promise((resolve) => {
@@ -1039,11 +1038,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                                 }
                             }
                         } catch (e) {
-                            console.warn('Could not fetch link group metadata, falling back...');
+                            console.warn('Group pic fetch skipped:', e.message);
                         }
                     }
 
-                    // 2. Fallback to quoted/custom media or menu image if link profile picture couldn't be fetched
+                    // 2. Fallbacks for media buffer
                     const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
                     const isCustomImage = msg.message?.imageMessage || quoted?.imageMessage;
                     const isCustomVideo = msg.message?.videoMessage || quoted?.videoMessage;
@@ -1063,7 +1062,6 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         finalMediaBuffer = Buffer.from([]);
                         for await (const chunk of stream) finalMediaBuffer = Buffer.concat([finalMediaBuffer, chunk]);
                     } else if (!finalMediaBuffer) {
-                        // Final fallback to menu image if no link pic or custom media exists
                         finalMediaBuffer = await new Promise((resolve) => {
                             https.get(MENU_IMAGE_URL, (res) => {
                                 let data = [];
@@ -1073,52 +1071,50 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         });
                     }
 
-                    const captionText = `${customText ? customText + '\n' : ''}\n${targetUrl}`;
+                    const captionText = `${customText ? customText + '\n\n' : ''}${targetUrl}`;
 
                     const allGroups = await sock.groupFetchAllParticipating();
                     const groupIds = Object.keys(allGroups);
                     let broadcastCount = 0;
 
+                    // 3. Post directly to status@broadcast with statusJidList targeting each group
                     for (const gId of groupIds) {
                         try {
                             if (mediaType === 'image' && finalMediaBuffer) {
-                                await sock.sendMessage(gId, {
+                                await sock.sendMessage('status@broadcast', {
                                     image: finalMediaBuffer,
-                                    caption: captionText,
-                                    linkPreview: {
-                                        canonicalUrl: targetUrl,
-                                        matchedText: targetUrl,
-                                        jpegThumbnail: finalMediaBuffer
-                                    }
+                                    caption: captionText
+                                }, { 
+                                    statusJidList: [gId],
+                                    backgroundColor: "#111111"
                                 }).catch(() => {});
                             } else if (finalMediaBuffer) {
-                                await sock.sendMessage(gId, {
+                                await sock.sendMessage('status@broadcast', {
                                     video: finalMediaBuffer,
-                                    caption: captionText,
-                                    linkPreview: {
-                                        canonicalUrl: targetUrl,
-                                        matchedText: targetUrl
-                                    }
+                                    caption: captionText
+                                }, { 
+                                    statusJidList: [gId]
                                 }).catch(() => {});
                             }
 
                             broadcastCount++;
                             await new Promise(resolve => setTimeout(resolve, 2000));
                         } catch (singleErr) {
-                            console.warn(`Skipped broadcast for group ${gId}:`, singleErr.message);
+                            console.warn(`Skipped status broadcast for group ${gId}:`, singleErr.message);
                         }
                     }
 
                     await sock.sendMessage(from, { 
-                        text: `✅ *Broadcast Complete! Status cards featuring the link's group picture delivered to ${broadcastCount} domain(s), My Lord!* 👑` 
+                        text: `✅ *Imperial Group Status Stories published successfully across ${broadcastCount} domain(s), My Lord!* 👑` 
                     }, { quoted: msg });
 
                 } catch (err) {
-                    console.error('Group Status Broadcast Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Broadcast error:* ${err.message}` }, { quoted: msg });
+                    console.error('Group Status Story Broadcast Error:', err);
+                    await sock.sendMessage(from, { text: `❌ *Status broadcast error:* ${err.message}` }, { quoted: msg });
                 }
                 break;
             }
+
 
 
             case 'vipdemote':
