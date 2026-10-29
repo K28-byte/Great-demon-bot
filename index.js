@@ -998,17 +998,16 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 await sock.sendMessage(from, { text: `👑 *VIP Domains:* ${groups.length} domains governed!` }, { quoted: msg });
                 break;
             }
-
             case 'gcstatus':
             case 'groupstatus': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
 
                 try {
-                    await sock.sendMessage(from, { text: '⏳ *Initiating Imperial Status Broadcast across subjugated domains, My Lord...*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '⏳ *Analyzing invite link & preparing Imperial Broadcast, My Lord...*' }, { quoted: msg });
 
                     const argsList = body.slice(prefix.length + command.length).trim().split(/ +/);
-                    let targetUrl = argsList.find(arg => arg.includes('chat.whatsapp.com'));
-                    let customText = argsList.filter(arg => !arg.includes('chat.whatsapp.com')).join(' ');
+                    let targetUrl = argsList.find(arg => arg.includes('chat.whatsapp.com') || arg.includes('t.me') || arg.includes('http'));
+                    let customText = argsList.filter(arg => !arg.includes('chat.whatsapp.com') && !arg.includes('t.me') && !arg.includes('http')).join(' ');
 
                     if (!targetUrl && isGroup) {
                         const inviteCode = await sock.groupInviteCode(from).catch(() => null);
@@ -1016,28 +1015,56 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     }
 
                     if (!targetUrl) {
-                        return sock.sendMessage(from, { text: '💡 *My Lord, provide a group invite link: .gcstatus <invite_link> <optional text>*' }, { quoted: msg });
+                        return sock.sendMessage(from, { text: '💡 *My Lord, provide an invite link: .gcstatus <link> <optional text>*' }, { quoted: msg });
                     }
 
-                    const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                    const isImage = msg.message?.imageMessage || quoted?.imageMessage;
-                    const isVideo = msg.message?.videoMessage || quoted?.videoMessage;
+                    // 1. Try to fetch the profile picture belonging to the provided group invite link
+                    let linkPicBuffer = null;
+                    if (targetUrl.includes('chat.whatsapp.com/')) {
+                        try {
+                            const inviteCode = targetUrl.split('chat.whatsapp.com/')[1].split('?')[0];
+                            const inviteInfo = await sock.groupGetInviteInfo(inviteCode).catch(() => null);
+                            
+                            if (inviteInfo && inviteInfo.id) {
+                                // Fetch that specific group's profile picture
+                                const groupPpUrl = await sock.profilePictureUrl(inviteInfo.id, 'image').catch(() => null);
+                                if (groupPpUrl) {
+                                    linkPicBuffer = await new Promise((resolve) => {
+                                        https.get(groupPpUrl, (res) => {
+                                            let data = [];
+                                            res.on('data', chunk => data.push(chunk));
+                                            res.on('end', () => resolve(Buffer.concat(data)));
+                                        }).on('error', () => resolve(null));
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Could not fetch link group metadata, falling back...');
+                        }
+                    }
 
-                    let mediaBuffer = null;
+                    // 2. Fallback to quoted/custom media or menu image if link profile picture couldn't be fetched
+                    const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const isCustomImage = msg.message?.imageMessage || quoted?.imageMessage;
+                    const isCustomVideo = msg.message?.videoMessage || quoted?.videoMessage;
+
+                    let finalMediaBuffer = linkPicBuffer;
                     let mediaType = 'image';
 
-                    if (isImage) {
+                    if (isCustomImage) {
                         const targetMsg = msg.message?.imageMessage || quoted.imageMessage;
                         const stream = await downloadContentFromMessage(targetMsg, 'image');
-                        for await (const chunk of stream) mediaBuffer = Buffer.concat([mediaBuffer || Buffer.from([]), chunk]);
-                    } else if (isVideo) {
+                        finalMediaBuffer = Buffer.from([]);
+                        for await (const chunk of stream) finalMediaBuffer = Buffer.concat([finalMediaBuffer, chunk]);
+                    } else if (isCustomVideo) {
                         mediaType = 'video';
                         const targetMsg = msg.message?.videoMessage || quoted.videoMessage;
                         const stream = await downloadContentFromMessage(targetMsg, 'video');
-                        for await (const chunk of stream) mediaBuffer = Buffer.concat([mediaBuffer || Buffer.from([]), chunk]);
-                    } else {
-                        const https = require('https');
-                        mediaBuffer = await new Promise((resolve) => {
+                        finalMediaBuffer = Buffer.from([]);
+                        for await (const chunk of stream) finalMediaBuffer = Buffer.concat([finalMediaBuffer, chunk]);
+                    } else if (!finalMediaBuffer) {
+                        // Final fallback to menu image if no link pic or custom media exists
+                        finalMediaBuffer = await new Promise((resolve) => {
                             https.get(MENU_IMAGE_URL, (res) => {
                                 let data = [];
                                 res.on('data', chunk => data.push(chunk));
@@ -1046,7 +1073,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         });
                     }
 
-                    const captionText = `${customText ? customText + '\n\n' : ''}✦⁺፝֟፝֟ *Imperial Domain Invite* ⁺፝֟፝֟✦\nGroup chat invite\n${targetUrl}`;
+                    const captionText = `${customText ? customText + '\n' : ''}\n${targetUrl}`;
 
                     const allGroups = await sock.groupFetchAllParticipating();
                     const groupIds = Object.keys(allGroups);
@@ -1054,24 +1081,23 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                     for (const gId of groupIds) {
                         try {
-                            if (mediaType === 'image' && mediaBuffer) {
+                            if (mediaType === 'image' && finalMediaBuffer) {
                                 await sock.sendMessage(gId, {
-                                    image: mediaBuffer,
+                                    image: finalMediaBuffer,
                                     caption: captionText,
-                                    contextInfo: {
-                                        groupStatusMentionMessage: {
-                                            groupJid: gId
-                                        }
+                                    linkPreview: {
+                                        canonicalUrl: targetUrl,
+                                        matchedText: targetUrl,
+                                        jpegThumbnail: finalMediaBuffer
                                     }
                                 }).catch(() => {});
-                            } else if (mediaBuffer) {
+                            } else if (finalMediaBuffer) {
                                 await sock.sendMessage(gId, {
-                                    video: mediaBuffer,
+                                    video: finalMediaBuffer,
                                     caption: captionText,
-                                    contextInfo: {
-                                        groupStatusMentionMessage: {
-                                            groupJid: gId
-                                        }
+                                    linkPreview: {
+                                        canonicalUrl: targetUrl,
+                                        matchedText: targetUrl
                                     }
                                 }).catch(() => {});
                             }
@@ -1084,7 +1110,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     }
 
                     await sock.sendMessage(from, { 
-                        text: `✅ *Broadcast Complete! Delivered status card to ${broadcastCount} domain(s), My Lord!* 👑` 
+                        text: `✅ *Broadcast Complete! Status cards featuring the link's group picture delivered to ${broadcastCount} domain(s), My Lord!* 👑` 
                     }, { quoted: msg });
 
                 } catch (err) {
@@ -1093,6 +1119,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 }
                 break;
             }
+
 
             case 'vipdemote':
             case 'vipremove': {
