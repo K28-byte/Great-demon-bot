@@ -427,6 +427,7 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
 ╔══✪  ⭐ **VIP NOBILITY**  ✪══╗
 ✿ connectedusers
 ✿ inspectsock
+✿ status
 ✿ vipadd
 ✿ vipadmin
 ✿ vipallgroups
@@ -491,7 +492,7 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
 ✿ tagpoll
 ✿ warning
 ✿ pin
-✿ status
+✿ textbox
 ✿ vv
 ╚═════════════════════════╝
 
@@ -988,6 +989,34 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 
                 vipUsers.add(target.split('@')[0]);
                 await sock.sendMessage(from, { text: '⭐ *Granted VIP Nobility status to subject, My Lord!*' }, { quoted: msg });
+                break;
+            }
+            case 'textbox':
+            case 'chatbox': {
+                if (!isOwner && !isVip) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor or VIP Nobility only!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* Reply to a message with `.textbox Line 1 | Line 2 | Line 3`' }, { quoted: msg });
+
+                const quotedContext = msg.message?.extendedTextMessage?.contextInfo;
+                if (!quotedContext || !quotedContext.quotedMessage) {
+                    return sock.sendMessage(from, { text: '💡 *My Lord, reply to the message you want to attach this to!*' }, { quoted: msg });
+                }
+
+                try {
+                    // Split your custom text by `|` so each section drops cleanly onto a new vertical line
+                    const lines = q.split('|').map(s => s.trim()).join('\n');
+
+                    // Send the message replying to the target, creating that clean vertical text block
+                    await sock.sendMessage(from, {
+                        text: lines
+                    }, { quoted: msg });
+
+                    // Delete your command trigger message
+                    await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+
+                } catch (err) {
+                    console.error('Textbox Command Error:', err);
+                    await sock.sendMessage(from, { text: `❌ *Failed to generate text box:* ${err.message}` }, { quoted: msg });
+                }
                 break;
             }
 
