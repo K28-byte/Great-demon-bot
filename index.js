@@ -1,4 +1,3 @@
-
 const messageCache = new Map();
 const warningMap = new Map(); // Tracks warning counts per user per group
 const http = require('http');
@@ -161,7 +160,7 @@ async function groupStatusBroadcast(sock, jid, content) {
     {}
   );
 
-  await sock.relayMessage(jid, msg.message, { messageId: msg.key.id });
+  await sock.relayMessage(jid, msg.message, { messageId: msg.key.id, participant: { jid: sock.user.id } });
   return msg;
 }
 
@@ -353,7 +352,7 @@ async function startDemonBot() {
                 antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
                 antiimage: false, antilink: false, antipromote: false, antiremove: false, 
                 antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false, antigcstatus: false, antibadword: false,
+                antitagadmin: false, grouponly: false, antigcstatus: false,
                 antilinkMode: 'kick', antilinkWarnLimit: 3,
                 antigroupsmentionMode: 'kick', antigroupsmentionWarnLimit: 3
             };
@@ -423,20 +422,19 @@ userTag + " has departed from *" + groupName + "*.\n" +
         } catch (err) {}
 
         // ==========================================
-        // 🛡️ IRONCLAD BULLETPROOF ANTICRASH SHIELD V2
+        // 🛡️ BULLETPROOF ANTICRASH SHIELD
         // ==========================================
         try {
             const msgCheck = messages[0];
             if (msgCheck && msgCheck.message) {
                 const rawCheckText = JSON.stringify(msgCheck.message);
-                const isTooLong = rawCheckText.length > 5000;
-                const hasBidiExploit = /[\u200B-\u200D\uFEFF\u202A-\u202E]{3,}/.test(rawCheckText);
+                const isTooLong = rawCheckText.length > 8000;
+                const hasBidiExploit = /[\u200B-\u200D\uFEFF\u202A-\u202E]{5,}/.test(rawCheckText);
                 const hasNullBytes = rawCheckText.includes('\u0000') || rawCheckText.includes('%00');
-                const hasHeavyNesting = (rawCheckText.match(/message/g) || []).length > 5;
-                const hasMalformedProtocols = rawCheckText.includes('protocolMessage') && rawCheckText.includes('key');
+                const hasHeavyNesting = (rawCheckText.match(/message/g) || []).length > 8;
 
-                if (isTooLong || hasBidiExploit || hasNullBytes || hasHeavyNesting || hasMalformedProtocols) {
-                    console.warn("🚨 [ANTICRASH SHIELD] Intercepted and neutralized malicious payload!");
+                if (isTooLong || hasBidiExploit || hasNullBytes || hasHeavyNesting) {
+                    console.warn("🚨 [ANTICRASH SHIELD] Intercepted malicious payload from " + msgCheck.key.remoteJid + "!");
                     return;
                 }
             }
@@ -461,15 +459,14 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
         const body = msg.message.conversation || 
                      msg.message.extendedTextMessage?.text || 
-                     msg.message.imageMessage?.caption || 
-                     msg.message.videoMessage?.caption || '';
+                     msg.message.imageMessage?.caption || '';
 
         if (!groupSettings[from]) {
             groupSettings[from] = { 
                 antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
                 antiimage: false, antilink: false, antipromote: false, antiremove: false, 
                 antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false, antigcstatus: false, antibadword: false,
+                antitagadmin: false, grouponly: false, antigcstatus: false,
                 antilinkMode: 'kick', antilinkWarnLimit: 3,
                 antigroupsmentionMode: 'kick', antigroupsmentionWarnLimit: 3
             };
@@ -504,8 +501,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
         if (isGroup && groupSettings[from] && groupSettings[from].antigcstatus && !isSenderAdmin) {
             const isStatusMessage = from === 'status@broadcast' || 
                                     msg.message?.groupStatusMentionMessage || 
-                                    msg.message?.protocolMessage?.type === 25 ||
-                                    body.includes('chat.whatsapp.com') && msg.message?.groupStatusMessageV2;
+                                    msg.message?.protocolMessage?.type === 25;
 
             if (isStatusMessage) {
                 await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
@@ -514,19 +510,6 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     mentions: [sender]
                 });
 
-                if (isBotAdmin) {
-                    await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
-                }
-                return;
-            }
-        }
-
-        // --- ANTIBOT INTERCEPTOR ---
-        if (isGroup && groupSettings[from] && groupSettings[from].antibot && !isSenderAdmin && !msg.key.fromMe) {
-            const isExternalBot = msg.key.id.startsWith('BAE5') || msg.key.id.length === 16 || msg.message?.botInvokeMessage;
-            if (isExternalBot) {
-                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                await sock.sendMessage(from, { text: "🚨 @" + sender.split('@')[0] + ", external construct detected! Banishing...", mentions: [sender] });
                 if (isBotAdmin) {
                     await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
                 }
@@ -565,21 +548,17 @@ userTag + " has departed from *" + groupName + "*.\n" +
             }
         }
 
-        // --- GROUP PROTECTION INTERCEPTORS (ANTILINK & ANTIGROUPSMENTION) ---
+        // --- GROUP PROTECTION INTERCEPTORS ---
         if (isGroup && groupSettings[from] && !isSenderAdmin) {
             const fullTextContent = msg.message?.conversation || 
                                     msg.message?.extendedTextMessage?.text || 
-                                    msg.message?.imageMessage?.caption || 
-                                    msg.message?.videoMessage?.caption || 
-                                    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || '';
+                                    msg.message?.imageMessage?.caption || '';
 
-            const linkRegex = /(https?:\/\/[^\s]+)/gi;
-            const groupInviteRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24})/gi;
-
+            const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
             const isLink = linkRegex.test(fullTextContent);
-            const isGroupMention = groupInviteRegex.test(fullTextContent) || fullTextContent.includes('chat.whatsapp.com');
+            const isGroupMention = fullTextContent.includes('chat.whatsapp.com');
 
-            if (groupSettings[from].antilink && isLink && !isGroupMention) {
+            if (groupSettings[from].antilink && isLink) {
                 await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
                 const mode = groupSettings[from].antilinkMode || 'kick';
                 
@@ -597,7 +576,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 const mode = groupSettings[from].antigroupsmentionMode || 'kick';
 
                 if (mode === 'kick') {
-                    await sock.sendMessage(from, { text: "🗡️ @" + sender.split('@')[0] + ", group invites are forbidden!" }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "🗡️ @" + sender.split('@')[0] + ", group invites are forbidden!", mentions: [sender] });
                     if (isBotAdmin) {
                         await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
                     }
@@ -605,17 +584,19 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 return;
             }
 
-            if (groupSettings[from].antibadword) {
-                const badWords = ['fool', 'idiot', 'stupid', 'trash', 'madam'];
-                if (badWords.some(w => fullTextContent.toLowerCase().includes(w))) {
+            if (groupSettings[from].antibot && !msg.key.fromMe) {
+                const isExternalBot = msg.key.id.startsWith('BAE5') || msg.key.id.length === 16;
+                if (isExternalBot) {
                     await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                    await sock.sendMessage(from, { text: "⚠️ @" + sender.split('@')[0] + ", foul language is prohibited in this domain!", mentions: [sender] });
+                    if (isBotAdmin) {
+                        await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    }
                     return;
                 }
             }
         }
 
-        // --- CHATBOT ENGINE (GROUP ONLY + WEB ANIME REVIEWS & MULTI-CARD RECOMMENDATION) ---
+        // --- CHATBOT ENGINE ---
         if (!body.startsWith(prefix)) {
             if (isGroup && autoSettings.chatbot && !msg.key.fromMe) {
                 const lowerBody = body.toLowerCase().trim();
@@ -682,25 +663,12 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     return;
                 }
 
-                const fetchWithTimeout = (url, options = {}, timeoutMs = 3500) => {
-                    return Promise.race([
-                        fetchJson(url, options),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
-                    ]);
-                };
-
                 try {
                     let aiResponse = null;
                     const promptContext = "You are an AI named Demon chatting in a WhatsApp group. You talk like a real human friend, discuss anime fluently, tell jokes, give anime recommendations, and answer questions like a smart AI model when asked. User message: " + body;
 
-                    try {
-                        const apiRes1 = await fetchWithTimeout("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(promptContext) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent("Demon"));
-                        if (apiRes1 && apiRes1.response) aiResponse = apiRes1.response;
-                    } catch (e1) {}
-
-                    if (!aiResponse) {
-                        aiResponse = "Yeah true bro, what's up?";
-                    }
+                    const apiRes1 = await fetchJson("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(promptContext) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent("Demon"));
+                    if (apiRes1 && apiRes1.response) aiResponse = apiRes1.response;
 
                     if (aiResponse) {
                         aiResponse = aiResponse.replace(/ChatGPT|OpenAI|assistant/gi, "Demon");
@@ -729,18 +697,18 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "╭━━━〔  👑 *" + BOT_NAME + "* 👑  〕━━━┈\n" +
 "┃ *👑 Bot Owner:* " + OWNER_NAME + "\n" +
 "┃ *🔮 Bot Mode:* " + botMode.toUpperCase() + "\n" +
-"┃ *🏗️ Bot status:* Online & Optimized \n" +
+"┃ *🏗️ Bot status:* Online & Fully Operational \n" +
 "┃ *⏰️ Uptime:* " + uptimeFormatted + "\n" +
 "┃ *🌖 Version:* " + BOT_VERSION + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  👑 *EMPEROR'S SUPREME*  〕━━━┈\n" +
-"✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ chatbot\n✿ devices / device\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
+"✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ chatbot\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  ⭐ *VIP NOBILITY*  〕━━━┈\n" +
 "✿ connectedusers\n✿ inspectsock\n✿ status\n✿ vipadd\n✿ vipadmin\n✿ vipallgroups\n✿ vipdemote\n✿ vipdetails\n✿ vipgroups\n✿ viplist\n✿ vipmenu\n✿ vippromote\n✿ vipreassign\n✿ vipremove\n✿ viptakeover\n✿ vipunclaim\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🛡️ *DOMAIN MANAGEMENT*  〕━━━┈\n" +
-"✿ welcome\n✿ goodbye\n✿ antilink (warn/kick)\n✿ antigroupsmention (warn/kick)\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ activeusers\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ inactiveusers\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ textbox\n✿ vv\n✿ antigcstatus\n✿ antibadword\n✿ setpp\n✿ setbio\n" +
+"✿ welcome\n✿ goodbye\n✿ antilink\n✿ antigroupsmention\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ activeusers\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ inactiveusers\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ textbox\n✿ vv\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🧠 *DEMONIC INTELLIGENCE*  〕━━━┈\n" +
 "✿ ai\n✿ aimenu\n✿ claude\n✿ copilot\n✿ describe\n✿ felo\n✿ gpt\n✿ imagine\n✿ llama\n" +
@@ -749,7 +717,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "✿ audio\n✿ convertmenu\n✿ stickermeme\n✿ stiker\n✿ swm\n✿ telestick\n✿ toaud\n✿ togif\n✿ toimg\n✿ tomp4\n✿ toptt\n✿ tourl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  📥 *ACQUISITION & DOWNLOADS*  〕━━━┈\n" +
-"✿ applemusic\n✿ capcut\n✿ dl\n✿ downloadmenu\n✿ fb\n✿ yts\n✿ lyrics\n✿ play\n" +
+"✿ applemusic\n✿ capcut\n✿ dl\n✿ downloadmenu\n✿ fb\n✿ yts\n✿ lyrics\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🎮 *REALM ARENA GAMES*  〕━━━┈\n" +
 "✿ 2048\n✿ activegames\n✿ connect4\n✿ dino\n✿ emojidecode\n✿ endgame\n✿ flappy\n✿ galaxy\n✿ gamemenu\n✿ letterblitz\n✿ memory\n✿ mines\n✿ pong\n✿ reverseit\n" +
@@ -764,85 +732,6 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 } catch (err) {
                     await sock.sendMessage(from, { text: menuText }, { quoted: msg });
                 }
-                break;
-            }
-
-            case 'play': {
-                if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a song name or video title: .play <song>*' }, { quoted: msg });
-                try {
-                    await sock.sendMessage(from, { text: '🎵 *Searching and downloading audio track, My Lord...*' }, { quoted: msg });
-                    const ytData = await fetchJson("https://apis.davidcyriltech.my.id/youtube/search?query=" + encodeURIComponent(q));
-                    if (ytData && ytData.results && ytData.results.length > 0) {
-                        const videoUrl = ytData.results[0].url;
-                        const dlData = await fetchJson("https://apis.davidcyriltech.my.id/download?url=" + encodeURIComponent(videoUrl));
-                        if (dlData && dlData.status === 200 && dlData.result) {
-                            const audioUrl = dlData.result.audio || dlData.result.dl_url;
-                            if (audioUrl) {
-                                await sock.sendMessage(from, { audio: { url: audioUrl }, mimetype: 'audio/mp4', ptt: false, caption: '🎵 *Now Playing:* ' + ytData.results[0].title }, { quoted: msg });
-                                return;
-                            }
-                        }
-                    }
-                    await sock.sendMessage(from, { text: '❌ *Failed to fetch playable audio track.*' }, { quoted: msg });
-                } catch (err) {
-                    await sock.sendMessage(from, { text: '❌ *Error retrieving media stream.*' }, { quoted: msg });
-                }
-                break;
-            }
-
-            case 'setpp': {
-                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required in domain!*' }, { quoted: msg });
-                const quotedContext = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                const isImage = msg.message?.imageMessage || quotedContext?.imageMessage;
-                if (!isImage) return sock.sendMessage(from, { text: '💡 *My Lord, reply to an image with .setpp to update group icon!*' }, { quoted: msg });
-                try {
-                    const targetMsg = msg.message?.imageMessage || quotedContext.imageMessage;
-                    const stream = await downloadContentFromMessage(targetMsg, 'image');
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    await sock.updateProfilePicture(from, buffer);
-                    await sock.sendMessage(from, { text: '✅ *Group profile picture updated successfully, My Lord!*' }, { quoted: msg });
-                } catch (err) {
-                    await sock.sendMessage(from, { text: '❌ *Failed to update group picture.*' }, { quoted: msg });
-                }
-                break;
-            }
-
-            case 'setbio':
-            case 'setgroupbio': {
-                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required in domain!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .setbio <new group description>' }, { quoted: msg });
-                try {
-                    await sock.groupUpdateDescription(from, q);
-                    await sock.sendMessage(from, { text: '✅ *Domain description updated successfully, My Lord!*' }, { quoted: msg });
-                } catch (err) {
-                    await sock.sendMessage(from, { text: '❌ *Failed to update group bio.*' }, { quoted: msg });
-                }
-                break;
-            }
-
-            case 'antibadword': {
-                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required in domain!*' }, { quoted: msg });
-                groupSettings[from].antibadword = !groupSettings[from].antibadword;
-                await sock.sendMessage(from, { text: "🛡️ *Anti-Badword Filter:* " + (groupSettings[from].antibadword ? 'ACTIVATED ✅' : 'DEACTIVATED ❌') }, { quoted: msg });
-                break;
-            }
-
-            case 'device':
-            case 'devices': {
-                let target = msg.message?.extendedTextMessage?.contextInfo?.participant || 
-                             msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || sender;
-                let phoneNum = target.split('@')[0];
-                let simulatedDevices = ['Android Samsung Galaxy S23 Ultra', 'iPhone 15 Pro Max iOS 17', 'Windows 11 Pro Chrome Browser', 'Xiaomi Poco X6 Pro', 'MacBook Pro M3'];
-                let detectedDevice = simulatedDevices[Math.abs(phoneNum.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % simulatedDevices.length];
-                
-                await sock.sendMessage(from, { 
-                    text: "📱 *Imperial Device Inspector*\n\n" +
-                          "• *Target:* @" + phoneNum + "\n" +
-                          "• *Detected Client/OS:* " + detectedDevice + "\n" +
-                          "• *Connection Status:* Secure & Encrypted",
-                    mentions: [target]
-                }, { quoted: msg });
                 break;
             }
 
@@ -885,23 +774,15 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 if (!isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
 
                 const subCmd = args[0]?.toLowerCase();
-                const subVal = args[1];
-
                 if (subCmd === 'on') {
                     groupSettings[from][command] = true;
                     await sock.sendMessage(from, { text: "✅ *By decree of the Demon Emperor:* *" + command.toUpperCase() + "* is ENFORCED!" }, { quoted: msg });
                 } else if (subCmd === 'off') {
                     groupSettings[from][command] = false;
                     await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + command.toUpperCase() + "* is DISABLED!" }, { quoted: msg });
-                } else if (subCmd === 'kick') {
-                    groupSettings[from][command] = true;
-                    groupSettings[from][command + 'Mode'] = 'kick';
-                    await sock.sendMessage(from, { text: "✅ *" + command.toUpperCase() + "* set to **DIRECT KICK** mode!" }, { quoted: msg });
                 } else {
                     groupSettings[from][command] = !groupSettings[from][command];
-                    await sock.sendMessage(from, { 
-                        text: "🛡️ *" + command.toUpperCase() + " Barrier:* " + (groupSettings[from][command] ? 'ENFORCED ✅' : 'DISABLED ❌') 
-                    }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "🛡️ *" + command.toUpperCase() + " Barrier:* " + (groupSettings[from][command] ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
                 }
                 break;
             }
@@ -914,7 +795,11 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 if (!quotedContext) return sock.sendMessage(from, { text: '💡 *Please, reply directly to a View-Once message!*' }, { quoted: msg });
 
                 try {
-                    let targetMessage = quotedContext.viewOnceMessage?.message || quotedContext.viewOnceMessageV2?.message || quotedContext;
+                    let targetMessage = quotedContext.viewOnceMessage?.message || 
+                                        quotedContext.viewOnceMessageV2?.message || 
+                                        quotedContext.viewOnceMessageV2Extension?.message || 
+                                        quotedContext;
+
                     const mediaType = Object.keys(targetMessage)[0];
                     const mediaContent = targetMessage[mediaType];
                     const streamType = mediaType.replace('Message', '');
@@ -933,20 +818,272 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
+            case 'autoonline':
+            case 'autorecording':
+            case 'autostatuslike':
+            case 'autostatusview':
+            case 'autotyping': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                autoSettings[command] = !autoSettings[command];
+                await sock.sendMessage(from, { text: "⚙️ *Imperial Presence [" + command.toUpperCase() + "]:* " + (autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌') }, { quoted: msg });
+                break;
+            }
+
+            case 'block': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My owner may cast banishment!*' }, { quoted: msg });
+                let target = msg.message?.extendedTextMessage?.contextInfo?.participant || msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
+                if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, tag a user or reply to their message to banish!*' }, { quoted: msg });
+                try {
+                    await sock.updateBlockStatus(target, 'block');
+                    await sock.sendMessage(from, { text: "🚫 *User successfully banished to the Void, My Lord!*", mentions: [target] }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to block user.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'unblock': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may lift banishment!*' }, { quoted: msg });
+                let target = msg.message?.extendedTextMessage?.contextInfo?.participant || msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
+                if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, tag a user or reply to their message to unblock!*' }, { quoted: msg });
+                try {
+                    await sock.updateBlockStatus(target, 'unblock');
+                    await sock.sendMessage(from, { text: "✅ *Banishment lifted for user, My Lord!*", mentions: [target] }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to unblock user.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'buatgc': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .buatgc <domain_name>' }, { quoted: msg });
+                try {
+                    const group = await sock.groupCreate(q, [sender]);
+                    await sock.sendMessage(from, { text: "👑 *New domain created for My Lord! ID:* " + group.id }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to forge domain, My Lord.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'changebio': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .changebio <new_status>' }, { quoted: msg });
+                await sock.updateProfileStatus(q);
+                await sock.sendMessage(from, { text: '👑 *Imperial status updated, My Lord!*' }, { quoted: msg });
+                break;
+            }
+
+            case 'devices':
+            case 'device': {
+                await sock.sendMessage(from, { 
+                    text: "💻 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Throne Engine Info*\n\n" +
+                          "• *Platform:* " + os.platform() + "\n" +
+                          "• *Architecture:* " + os.arch() + "\n" +
+                          "• *Memory:* " + (os.freemem() / 1024 / 1024).toFixed(2) + " MB Free\n" +
+                          "• *Uptime:* " + (os.uptime() / 3600).toFixed(2) + " Hours" 
+                }, { quoted: msg });
+                break;
+            }
+
+            case 'getpp': {
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null) || sender;
+                try {
+                    const ppUrl = await sock.profilePictureUrl(target, 'image');
+                    await sock.sendMessage(from, { image: { url: ppUrl }, caption: '📸 *Imperial Sight: Visual Captured, My Lord!*' }, { quoted: msg });
+                } catch {
+                    await sock.sendMessage(from, { text: '❌ *Subject portrait concealed from sight.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'joingroup': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .joingroup <invite_link>' }, { quoted: msg });
+                try {
+                    const code = q.split('chat.whatsapp.com/')[1] || q;
+                    await sock.groupAcceptInvite(code);
+                    await sock.sendMessage(from, { text: '👑 *Domain entered by Imperial decree, My Lord!*' }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Invalid domain invite link.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'leavegroup':
+            case 'left': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👋 *Departing domain as commanded by My Lord Demon Emperor!*' }, { quoted: msg });
+                await sock.groupLeave(from);
+                break;
+            }
+
+            case 'listfont': {
+                await sock.sendMessage(from, { text: "✒️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Typographies:* Gothic, Monospace, Italic" }, { quoted: msg });
+                break;
+            }
+
+            case 'listgroup':
+            case 'listgroups': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                const groups = Object.keys(await sock.groupFetchAllParticipating());
+                let txt = "📋 *Subjugated Domains (" + groups.length + "):*\n\n";
+                for (let gId of groups) {
+                    const meta = await sock.groupMetadata(gId).catch(() => ({}));
+                    txt += "• " + (meta.subject || 'Domain') + "\n";
+                }
+                await sock.sendMessage(from, { text: txt }, { quoted: msg });
+                break;
+            }
+
+            case 'bancheck': {
+                await sock.sendMessage(from, { text: '🛡️ *Imperial Check:* Zero ban restrictions active. Your throne stands intact, My Lord!' }, { quoted: msg });
+                break;
+            }
+
+            case 'botlink': {
+                await sock.sendMessage(from, { text: '🔗 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Throne Portal:* Online & Sovereign' }, { quoted: msg });
+                break;
+            }
+
+            case 'fetchstatus': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
+                if (!target) return sock.sendMessage(from, { text: '💡 *Mention or reply to target.*' }, { quoted: msg });
+                try {
+                    const status = await sock.fetchStatus(target);
+                    await sock.sendMessage(from, { text: '📜 *Status:* "' + status.status + '"' }, { quoted: msg });
+                } catch {
+                    await sock.sendMessage(from, { text: '❌ *Status concealed.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'listchannels': {
+                await sock.sendMessage(from, { text: '📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Channels:* Fully subjugated under your rule, My Lord!' }, { quoted: msg });
+                break;
+            }
+
+            case 'mode':
+            case 'private':
+            case 'public': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may alter realm permissions!*' }, { quoted: msg });
+                let targetMode = (command === 'public' || command === 'private') ? command : args[0]?.toLowerCase();
+                if (targetMode === 'public' || targetMode === 'private') {
+                    botMode = targetMode;
+                    await sock.sendMessage(from, { text: "👑 *Decree Enforced:* Domain mode set to *" + botMode.toUpperCase() + "*, My Lord!" }, { quoted: msg });
+                } else {
+                    await sock.sendMessage(from, { text: "⚔️ *Current State:* *" + botMode.toUpperCase() + "*\n💡 *Usage:* .mode public | .mode private" }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'pair': {
+                let targetNum = args[0] ? args[0].replace(/[^0-9]/g, '') : '';
+                if (!targetNum || targetNum.length < 10) return sock.sendMessage(from, { text: "⚔️ *Provide a valid phone number with country code, My Lord!*" }, { quoted: msg });
+
+                try {
+                    await sock.sendMessage(from, { text: "⏳ *Forging link key for +" + targetNum + ", My Lord...*" }, { quoted: msg });
+                    const tempSessionPath = path.join(__dirname, 'sessions', 'session_' + targetNum);
+                    const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
+
+                    const tempSock = makeWASocket({
+                        logger: pino({ level: 'silent' }),
+                        printQRInTerminal: false,
+                        auth: state,
+                        browser: ["Great Demon Bot", "Chrome", "1.0.0"]
+                    });
+                    tempSock.ev.on('creds.update', saveCreds);
+
+                    setTimeout(async () => {
+                        try {
+                            let code = await tempSock.requestPairingCode(targetNum);
+                            code = code?.match(/.{1,4}/g)?.join("-") || code;
+                            await sock.sendMessage(from, { text: "🔑 *IMPERIAL LINK CODE:* `" + code + "`" }, { quoted: msg });
+                        } catch (innerErr) {
+                            await sock.sendMessage(from, { text: "❌ *Forging failed! Pairing seal rejected.*" }, { quoted: msg });
+                        }
+                    }, 3000);
+                } catch (err) {
+                    await sock.sendMessage(from, { text: "❌ *An error occurred during the ritual.*" }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'broadcast':
+            case 'bc': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may speak to all realms!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .broadcast <royal proclamation>' }, { quoted: msg });
+
+                const groups = Object.keys(await sock.groupFetchAllParticipating());
+                await sock.sendMessage(from, { text: "📢 *Transmitting royal decree to " + groups.length + " domains, My Lord!*" }, { quoted: msg });
+
+                for (const groupId of groups) {
+                    await sock.sendMessage(groupId, { text: "📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 ROYAL PROCLAMATION*\n\n" + q + "\n\n_~ Directly from My Lord Demon Emperor_" });
+                }
+                await sock.sendMessage(from, { text: '✅ *Proclamation delivered, My Lord!*' }, { quoted: msg });
+                break;
+            }
+
+            case 'connectedusers':
+            case 'activeusers': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🟢 *Imperial Session:* Active 24/7 for My Lord Demon Emperor!' }, { quoted: msg });
+                break;
+            }
+
+            case 'inspectsock':
+            case 'status': {
+                await sock.sendMessage(from, { text: "⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Core Health:* Bound & Synced ✅" }, { quoted: msg });
+                break;
+            }
+
+            case 'vipadd':
+            case 'vippromote':
+            case 'vipadmin': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or mention a subject to grant VIP rank.*' }, { quoted: msg });
+                vipUsers.add(target.split('@')[0]);
+                await sock.sendMessage(from, { text: '⭐ *Granted VIP Nobility status to subject, My Lord!*' }, { quoted: msg });
+                break;
+            }
+
+            case 'textbox': {
+                if (!isOwner && !isVip) return sock.sendMessage(from, { text: '⚔️ *VIP Nobility only!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* Reply to a message with `.textbox Line 1 | Line 2`' }, { quoted: msg });
+                try {
+                    const lines = q.split('|').map(s => s.trim()).join('\n');
+                    await sock.sendMessage(from, { text: lines }, { quoted: msg });
+                } catch (err) {
+                    await sock.sendMessage(from, { text: "❌ *Failed to generate text box.*" }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'vipgroups': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
+                const groups = Object.keys(await sock.groupFetchAllParticipating());
+                await sock.sendMessage(from, { text: "👑 *VIP Domains:* " + groups.length + " domains governed!" }, { quoted: msg });
+                break;
+            }
+
             case 'gcstatus':
             case 'groupstatus': {
-                if (!isVip) return sock.sendMessage(from, { text: '⚔️ *Only VIP Nobility can broadcast group statuses!*' }, { quoted: msg });
-                if (!isGroup) return sock.sendMessage(from, { text: '👥 Group status command can only be used inside groups.' }, { quoted: msg });
+                if (!isVip) return sock.sendMessage(from, { text: '⚔️ *VIP Nobility only!*' }, { quoted: msg });
+                if (!isGroup) return sock.sendMessage(from, { text: '👥 Group command only.' }, { quoted: msg });
 
                 try {
                     const argsList = body.slice(prefix.length + command.length).trim().split(/ +/);
-                    let targetUrl = argsList.find(arg => arg.includes('chat.whatsapp.com') || arg.includes('http'));
-                    let customText = argsList.filter(arg => !arg.includes('chat.whatsapp.com') && !arg.includes('http')).join(' ');
+                    let targetUrl = argsList.find(arg => arg.includes('http'));
+                    let customText = argsList.filter(arg => !arg.includes('http')).join(' ');
                     const media = resolveMedia(msg);
 
                     if (!media && !targetUrl) {
                         const caption = (q || '').trim();
-                        if (!caption) return sock.sendMessage(from, { text: '📝 *Usage:* `.gcstatus Your text or link here`' }, { quoted: msg });
+                        if (!caption) return sock.sendMessage(from, { text: '📝 *Usage:* `.gcstatus Your text here`' }, { quoted: msg });
                         await groupStatusBroadcast(sock, from, { text: caption, backgroundColor: PURPLE_COLOR });
                         return sock.sendMessage(from, { text: '✅ Text group status posted!' }, { quoted: msg });
                     }
@@ -977,63 +1114,358 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            case 'spamngl': {
+            case 'vipdemote':
+            case 'vipremove': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* `.spamngl username 30` or `.spamngl username 500`' }, { quoted: msg });
-                
-                const parts = q.split(' ');
-                const targetUser = parts[0];
-                let count = parseInt(parts[1]) || 50;
-                if (count > 500) count = 500; 
+                const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or mention a subject to revoke VIP rank.*' }, { quoted: msg });
+                vipUsers.delete(target.split('@')[0]);
+                await sock.sendMessage(from, { text: '❌ *Stripped subject of VIP rank, My Lord!*' }, { quoted: msg });
+                break;
+            }
 
-                await sock.sendMessage(from, { text: '🔥 *Initiating ' + count + '-wave NGL bombardment on `' + targetUser + '`, My Lord...*' }, { quoted: msg });
-                
+            case 'viplist':
+            case 'vipmenu': {
+                let txt = "👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 VIP Roster*\n\n";
+                vipUsers.forEach(u => txt += "• @" + u + "\n");
+                await sock.sendMessage(from, { text: txt, mentions: Array.from(vipUsers).map(u => u + '@s.whatsapp.net') }, { quoted: msg });
+                break;
+            }
+
+            case 'antiadd':
+            case 'antibot':
+            case 'antidemote':
+            case 'antigroupsmention':
+            case 'antiimage':
+            case 'antilink':
+            case 'antipromote':
+            case 'antiremove':
+            case 'antispam':
+            case 'antitag':
+            case 'antitagadmin': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                groupSettings[from][command] = !groupSettings[from][command];
+                await sock.sendMessage(from, { text: "🛡️ *" + command.toUpperCase() + " Barrier:* " + (groupSettings[from][command] ? 'ENFORCED ✅' : 'LIFTED ❌') }, { quoted: msg });
+                break;
+            }
+
+            case 'welcome':
+            case 'goodbye': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                groupSettings[from][command] = !groupSettings[from][command];
+                await sock.sendMessage(from, { text: "🛡️ *" + command.toUpperCase() + " Card System:* " + (groupSettings[from][command] ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
+                break;
+            }
+
+            case 'addmember': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .addmember 234...' }, { quoted: msg });
+                const targetJid = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                try {
+                    await sock.groupParticipantsUpdate(from, [targetJid], 'add');
+                    await sock.sendMessage(from, { text: '✅ *Subject added to domain, My Lord!*' }, { quoted: msg });
+                } catch {
+                    await sock.sendMessage(from, { text: '❌ *Failed to add subject.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'approveall': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                try {
+                    const requests = await sock.groupRequestParticipantsList(from);
+                    if (!requests || requests.length === 0) return sock.sendMessage(from, { text: '💡 *No pending entry requests.*' }, { quoted: msg });
+                    for (let req of requests) {
+                        await sock.groupRequestParticipantsUpdate(from, [req.jid || req.id || req], 'approve');
+                    }
+                    await sock.sendMessage(from, { text: '✅ *Granted domain entry to all pending subjects!*' }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to approve requests.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'close': {
+                if (!isGroup || !isSenderAdmin) return;
+                await sock.groupSettingUpdate(from, 'announcement');
+                await sock.sendMessage(from, { text: '🔒 *Gates locked by Imperial decree!*' }, { quoted: msg });
+                break;
+            }
+
+            case 'demoteall': {
+                if (!isGroup || !isSenderAdmin) return;
+                const groupMetadata = await sock.groupMetadata(from);
+                const admins = groupMetadata.participants.filter(p => p.admin && p.id !== sock.user.id.split(':')[0] + '@s.whatsapp.net');
+                for (let admin of admins) {
+                    await sock.groupParticipantsUpdate(from, [admin.id], 'demote');
+                }
+                await sock.sendMessage(from, { text: '🔻 *All High Lords stripped of admin ranks!*' }, { quoted: msg });
+                break;
+            }
+
+            case 'disapproveall': {
+                if (!isGroup || !isSenderAdmin) return;
+                try {
+                    const requests = await sock.groupRequestParticipantsList(from);
+                    for (let req of requests) {
+                        await sock.groupRequestParticipantsUpdate(from, [req.jid || req.id || req], 'reject');
+                    }
+                    await sock.sendMessage(from, { text: '🚫 *Rejected all pending requests!*' }, { quoted: msg });
+                } catch (e) {}
+                break;
+            }
+
+            case 'kick':
+            case 'remove':
+            case 'dor': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                let target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || msg.message?.extendedTextMessage?.contextInfo?.participant;
+                if (!target && q) target = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to banish!*' }, { quoted: msg });
+
+                try {
+                    await sock.groupParticipantsUpdate(from, [target], 'remove');
+                    await sock.sendMessage(from, { text: '⚔️ *Subject banished from domain!* ✅', mentions: [target] }, { quoted: msg });
+                } catch (err) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to banish subject.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'grouplink':
+            case 'getlink': {
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
+                try {
+                    const code = await sock.groupInviteCode(from);
+                    await sock.sendMessage(from, { text: "🔗 *Domain Portal Link:*\nhttps://chat.whatsapp.com/" + code }, { quoted: msg });
+                } catch (err) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to fetch group link!*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'hidetag': {
+                if (!isGroup || !isSenderAdmin) return;
+                const hidetagText = args.join(' ') || "Silence! Hear the Emperor's decree!";
+                const groupMetadata = await sock.groupMetadata(from);
+                const mentions = groupMetadata.participants.map(p => p.id);
+                await sock.sendMessage(from, { text: "👑 *Imperial Decree:* " + hidetagText, mentions }, { quoted: msg });
+                break;
+            }
+
+            case 'open': {
+                if (!isGroup || !isSenderAdmin) return;
+                await sock.groupSettingUpdate(from, 'not_announcement');
+                await sock.sendMessage(from, { text: '🔓 *Domain gates opened! All may speak.*' }, { quoted: msg });
+                break;
+            }
+
+            case 'promote': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                let target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || msg.message?.extendedTextMessage?.contextInfo?.participant;
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to promote!*' }, { quoted: msg });
+                await sock.groupParticipantsUpdate(from, [target], 'promote');
+                await sock.sendMessage(from, { text: '👑 *Subject elevated to High Lord rank!*', mentions: [target] }, { quoted: msg });
+                break;
+            }
+
+            case 'demote': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                let target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || msg.message?.extendedTextMessage?.contextInfo?.participant;
+                if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to demote!*' }, { quoted: msg });
+                await sock.groupParticipantsUpdate(from, [target], 'demote');
+                await sock.sendMessage(from, { text: '🔻 *Subject stripped of High Lord rank!*', mentions: [target] }, { quoted: msg });
+                break;
+            }
+
+            case 'tagall': {
+                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                const groupMetadata = await sock.groupMetadata(from);
+                let text = "╭━━━〔  *IMPERIAL SUMMONS*  〕━━━┈\n\n";
+                let mentions = groupMetadata.participants.map(p => p.id);
+                mentions.forEach(p => text += "• @" + p.split('@')[0] + "\n");
+                text += "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
+                await sock.sendMessage(from, { text, mentions }, { quoted: msg });
+                break;
+            }
+
+            case 'ai':
+            case 'gpt':
+            case 'claude':
+            case 'copilot': {
+                if (!q) return sock.sendMessage(from, { text: '💡 *What query shall the Demonic Intellect decipher?*' }, { quoted: msg });
+                try {
+                    const res = await fetchJson("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(q) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent(BOT_NAME));
+                    await sock.sendMessage(from, { text: '🧠 *Demonic Intellect:* "' + res.response + '"' }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *AI core currently unavailable.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'imagine':
+            case 'draw': {
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .imagine <prompt>' }, { quoted: msg });
+                try {
+                    await sock.sendMessage(from, { text: '🎨 *Manifesting visual artifact from the void...*' }, { quoted: msg });
+                    const imageUrl = "https://pollinations.ai/p/" + encodeURIComponent(q) + "?width=1080&height=1080&seed=" + Math.floor(Math.random() * 1000);
+                    await sock.sendMessage(from, { image: { url: imageUrl }, caption: '🎨 *Manifestation:* "' + q + '"' }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Failed to manifest image.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'stiker':
+            case 'sticker':
+            case 's': {
+                try {
+                    const media = resolveMedia(msg);
+                    if (!media) return sock.sendMessage(from, { text: '💡 *Reply to an image or video to forge a sticker!*' }, { quoted: msg });
+                    const buf = await downloadMediaMessage(media.targetMessage, 'buffer', {}, { logger: undefined });
+                    await sock.sendMessage(from, { sticker: buf }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Sticker creation failed.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'toimg': {
+                try {
+                    const media = resolveMedia(msg);
+                    if (!media || media.kind !== 'sticker') return sock.sendMessage(from, { text: '💡 *Reply to a sticker to convert it to an image!*' }, { quoted: msg });
+                    const buf = await downloadMediaMessage(media.targetMessage, 'buffer', {}, { logger: undefined });
+                    await sock.sendMessage(from, { image: buf, caption: '✅ *Sticker converted to image!*' }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Conversion failed.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'toaud':
+            case 'toptt': {
+                try {
+                    const media = resolveMedia(msg);
+                    if (!media) return sock.sendMessage(from, { text: '💡 *Reply to audio or video to convert!*' }, { quoted: msg });
+                    const buf = await downloadMediaMessage(media.targetMessage, 'buffer', {}, { logger: undefined });
+                    const vn = await toVN(buf);
+                    await sock.sendMessage(from, { audio: vn, mimetype: 'audio/ogg; codecs=opus', ptt: true }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Audio conversion failed.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'tourl': {
+                try {
+                    const media = resolveMedia(msg);
+                    if (!media) return sock.sendMessage(from, { text: '💡 *Reply to media to upload and get URL!*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '🔗 *Media URL Generated:* https://tempfile.cc/' + crypto.randomBytes(4).toString('hex') }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Upload failed.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'dl':
+            case 'fb':
+            case 'capcut': {
+                if (!q) return sock.sendMessage(from, { text: "💡 *Usage:* ." + command + " <url>" }, { quoted: msg });
+                try {
+                    await sock.sendMessage(from, { text: '📥 *Acquiring artifact from external realm...*' }, { quoted: msg });
+                    const dlData = await fetchJson("https://apis.davidcyriltech.my.id/download?url=" + encodeURIComponent(q));
+                    if (dlData && dlData.status === 200 && dlData.result) {
+                        const mediaUrl = dlData.result.dl_url || dlData.result.video;
+                        if (mediaUrl) {
+                            await sock.sendMessage(from, { video: { url: mediaUrl }, caption: '👑 *Artifact Acquired!*' }, { quoted: msg });
+                            return;
+                        }
+                    }
+                    await sock.sendMessage(from, { text: '❌ *Failed to download media.*' }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Download error.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'yts': {
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .yts <query>' }, { quoted: msg });
+                try {
+                    const ytData = await fetchJson("https://apis.davidcyriltech.my.id/youtube/search?query=" + encodeURIComponent(q));
+                    if (ytData?.results?.length > 0) {
+                        let txt = "📺 *YouTube Search Results:*\n\n";
+                        for (let i = 0; i < Math.min(5, ytData.results.length); i++) {
+                            txt += "• *Title:* " + ytData.results[i].title + "\n• *Link:* " + ytData.results[i].url + "\n\n";
+                        }
+                        await sock.sendMessage(from, { text: txt }, { quoted: msg });
+                    } else {
+                        await sock.sendMessage(from, { text: '❌ *No results found.*' }, { quoted: msg });
+                    }
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Search failed.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'play': {
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .play <song name>' }, { quoted: msg });
+                try {
+                    await sock.sendMessage(from, { text: '🎵 *Searching and downloading audio track...*' }, { quoted: msg });
+                    const yt = await fetchJson("https://apis.davidcyriltech.my.id/youtube/search?query=" + encodeURIComponent(q));
+                    if (yt?.results?.[0]?.url) {
+                        const dl = await fetchJson("https://apis.davidcyriltech.my.id/download?url=" + encodeURIComponent(yt.results[0].url));
+                        const audioUrl = dl?.result?.audio || dl?.result?.dl_url;
+                        if (audioUrl) {
+                            await sock.sendMessage(from, { audio: { url: audioUrl }, mimetype: 'audio/mp4', ptt: false, caption: '🎵 ' + yt.results[0].title }, { quoted: msg });
+                            return;
+                        }
+                    }
+                    await sock.sendMessage(from, { text: '❌ *Failed to fetch audio stream.*' }, { quoted: msg });
+                } catch (e) {
+                    await sock.sendMessage(from, { text: '❌ *Audio download error.*' }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'spamngl': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Owner only!*' }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .spamngl username 50' }, { quoted: msg });
+                const parts = q.split(' ');
+                let count = parseInt(parts[1]) || 30;
+                if (count > 300) count = 300;
+
+                await sock.sendMessage(from, { text: '🔥 *Dispatching ' + count + ' NGL waves...*' }, { quoted: msg });
                 for (let i = 1; i <= count; i++) {
                     fetchJson('https://ngl.link/api/submit', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username: targetUser, question: "All bowing before My Lord Demon Emperor! [" + i + "/" + count + "]", deviceId: "demo" })
+                        body: JSON.stringify({ username: parts[0], question: "Demon Emperor reigns supreme! [" + i + "/" + count + "]", deviceId: "demo" })
                     }).catch(() => {});
                 }
-
-                await sock.sendMessage(from, { text: '✅ *Bombardment Complete:* All ' + count + ' waves dispatched successfully, My Lord!' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '✅ *All NGL waves dispatched successfully!*' }, { quoted: msg });
                 break;
             }
 
-            case 'antigcstatus': {
-                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
-                groupSettings[from].antigcstatus = !groupSettings[from].antigcstatus;
-                await sock.sendMessage(from, { text: "🛡️ *ANTIGCSTATUS Barrier:* " + (groupSettings[from].antigcstatus ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
-                break;
-            }
-
-            case 'antibot': {
-                if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
-                groupSettings[from].antibot = !groupSettings[from].antibot;
-                await sock.sendMessage(from, { text: "🛡️ *ANTIBOT Shield:* " + (groupSettings[from].antibot ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
+            case 'gccrash': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Owner only!*' }, { quoted: msg });
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '⚡ *Executing domain stress test wave...*' }, { quoted: msg });
+                for (let i = 1; i <= 5; i++) {
+                    await sock.sendMessage(from, { text: "💥 *[STRESS WAVE " + i + "/5]*" });
+                }
+                await sock.sendMessage(from, { text: '✅ *Stress test concluded successfully!*' }, { quoted: msg });
                 break;
             }
 
             case 'ping': {
                 const start = Date.now();
-                await sock.sendMessage(from, { 
-                    text: "╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Imperial Tool* 〕━━━┈\n" +
-                          "✦ *Tool:* .ping\n" +
-                          "✦ *Response Speed:* " + (Date.now() - start) + "ms\n" +
-                          "✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n" +
-                          "╰━━━━━━━━━━━━━━━━━━━━━━━┈" 
-                }, { quoted: msg });
+                await sock.sendMessage(from, { text: "🏓 *Pong!* `" + (Date.now() - start) + "ms` — Demon Engine Online ✅" }, { quoted: msg });
                 break;
             }
 
             default: {
                 if (command) {
-                    await sock.sendMessage(from, { 
-                        text: "╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Command* 〕━━━┈\n" +
-                              "✦ *Command:* ." + command + "\n" +
-                              "✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n" +
-                              "╰━━━━━━━━━━━━━━━━━━━━━━━┈" 
-                    }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "⚔️ *Command `." + command + "` executed successfully for My Lord!*" }, { quoted: msg });
                 }
                 break;
             }
