@@ -1,3 +1,6 @@
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('ffmpeg-static');
+ffmpeg.setFfmpegPath(ffmpegPath);
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
