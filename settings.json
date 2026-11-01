@@ -1,0 +1,33 @@
+// --- PERSISTENT STORAGE ENGINE ---
+const SETTINGS_FILE = './settings.json';
+
+function loadSettings() {
+    if (!fs.existsSync(SETTINGS_FILE)) {
+        const defaultSettings = {
+            prefix: ".",
+            sudoUsers: [OWNER_NUMBER],
+            autoSettings: {
+                autoonline: true,
+                autorecording: false,
+                autostatuslike: true,
+                autostatusview: true,
+                autotyping: false,
+                chatbot: true,
+                anticall: true // 📞 Anti-Call Protection
+            }
+        };
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(defaultSettings, null, 2));
+        return defaultSettings;
+    }
+    return JSON.parse(fs.readFileSync(SETTINGS_FILE));
+}
+
+function saveSettings(data) {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
+}
+
+// Load persisted configuration
+const db = loadSettings();
+let prefix = db.prefix;
+const sudoUsers = new Set(db.sudoUsers);
+const autoSettings = db.autoSettings;
