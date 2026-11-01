@@ -1,4 +1,3 @@
-
 const messageCache = new Map();
 const warningMap = new Map(); // Tracks warning counts per user per group
 const http = require('http');
@@ -693,7 +692,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "│ ⚔️ *3. World Trigger*\n" +
 "│ ⭐ Score: 9.2/10 | 📺 Status: Seasoned\n" +
 "│ 📜 Incredible tactical team battles, sci-fi world-building, and strict power balance.\n" +
-"└────────────────────────\n" +
+"└────────────────────────\n\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
 
                     await sock.sendMessage(from, { text: multiCardFallback }, { quoted: msg });
