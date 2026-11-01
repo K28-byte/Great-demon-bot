@@ -1,3 +1,4 @@
+
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -1282,7 +1283,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                                 }).on('error', () => resolve(null));
                             });
                         }
-const captionText = (customText ? customText + "\n\n" : "") + targetUrl;
+
+                        const captionText = (customText ? customText + "\n\n" : "") + targetUrl;
 
                         await groupStatusBroadcast(sock, from, {
                             image: linkPicBuffer,
@@ -1384,7 +1386,7 @@ const captionText = (customText ? customText + "\n\n" : "") + targetUrl;
             case 'vipdetails':
             case 'viplist':
             case 'vipmenu': {
-                let txt = `👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 VIP Roster*\n\n`;
+                let txt = "👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 VIP Roster*\n\n";
                 vipUsers.forEach(u => txt += `• @${u}\n`);
                 await sock.sendMessage(from, { text: txt, mentions: Array.from(vipUsers).map(u => u + '@s.whatsapp.net') }, { quoted: msg });
                 break;
