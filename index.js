@@ -1282,8 +1282,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                                 }).on('error', () => resolve(null));
                             });
                         }
-
- const captionText = `${customText ? customText + '\n\n' : ''}${targetUrl}`;
+const captionText = (customText ? customText + "\n\n" : "") + targetUrl;
 
                         await groupStatusBroadcast(sock, from, {
                             image: linkPicBuffer,
