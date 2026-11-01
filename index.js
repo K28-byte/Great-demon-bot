@@ -616,20 +616,99 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     return;
                 }
             }
-        }
+       )
 
-        if (!body.startsWith(prefix)) {
-            // --- AUTOMATIC CHATBOT FOR NORMAL MESSAGES ---
-            if (!isGroup || body.toLowerCase().includes(BOT_NAME.toLowerCase()) || msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(sock.user.id)) {
+            if (isGroup && autoSettings.chatbot && !msg.key.fromMe) {
+                const lowerBody = body.toLowerCase().trim();
+
+                // --- 1. SPECIAL FIXED RESPONSES ---
+                // Identity - Name Query
+                if (/what(s|\s+is)\s+(ur|your)\s+name|who\s+are\s+you/i.test(lowerBody)) {
+                    await sock.sendMessage(from, { text: "I'm Demon" }, { quoted: msg });
+                    return;
+                }
+
+                // Identity - AI Query
+                if (/are\s+you\s+(an?\s+)?(ai|bot|robot)/i.test(lowerBody)) {
+                    await sock.sendMessage(from, { text: "Nope, I'm a real person" }, { quoted: msg });
+                    return;
+                }
+
+                // Reaction to Jokes & Laughs
+                if (/\b(lol|lmao|haha|funny|joke|xd)\b/i.test(lowerBody)) {
+                    await sock.sendMessage(from, { text: "😂😂 real funny bro" }, { quoted: msg });
+                    return;
+                }
+
+                // --- 2. ANIME & RECOMMENDATION ENGINE ---
+                if (/recommend( me)?( an)? anime|best anime|anime recommendation|good anime/i.test(lowerBody)) {
+                    const animeList = [
+                        "🔥 *Lord of the Mysteries* — If you love mystery, victorian steampunk, and deep horror/magic power systems, this is a masterpiece!",
+                        "⚔️ *Reverend Insanity (Fang Yuan)* — Dark fantasy, ruthless cultivation, and an unbeatable MC who pursues eternal life with zero regrets.",
+                        "🌀 *Re:Zero - Starting Life in Another World* — Dark, psychological Isekai featuring Subaru dealing with Return by Death.",
+                        "🎯 *World Trigger* — Incredible tactical team battles, sci-fi world-building, and strict power balance.",
+                        "👁️ *Jujutsu Kaisen* — High-octane curse battles, domain expansions, and god-tier animation scenes.",
+                        "🗡️ *Solo Leveling* — Fast-paced dungeon hunter progression with incredible hype fights!"
+                    ];
+                    const picked = animeList[Math.floor(Math.random() * animeList.length)];
+                    await sock.sendMessage(from, { text: "Here is a top-tier anime recommendation for you:\n\n" + picked }, { quoted: msg });
+                    return;
+                }
+
+                // --- 3. MULTI-API FAST AI FALLBACK SYSTEM (PREVENTS TIMEOUTS) ---
+                const fetchWithTimeout = (url, options = {}, timeoutMs = 7000) => {
+                    return Promise.race([
+                        fetchJson(url, options),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('API Request Timed Out')), timeoutMs))
+                    ]);
+                };
+
                 try {
-                    const chatRes = await fetchJson("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(body) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent(BOT_NAME));
-                    if (chatRes && chatRes.response) {
-                        await sock.sendMessage(from, { text: chatRes.response }, { quoted: msg });
+                    let aiResponse = null;
+
+                    // System prompt context to guide response style
+                    const promptContext = "You are an AI named Demon chatting in a WhatsApp group. You talk like a real human friend, discuss anime fluently, tell jokes, give anime recommendations, and answer questions like a smart AI model when asked. User message: " + body;
+
+                    // Primary API Attempt (Fast Chatbot API)
+                    try {
+                        const apiRes1 = await fetchWithTimeout("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(promptContext) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent("Demon"));
+                        if (apiRes1 && apiRes1.response) {
+                            aiResponse = apiRes1.response;
+                        }
+                    } catch (e1) {
+                        console.log("Primary Chatbot API timed out or failed. Switching to Backup AI API...");
                     }
-                } catch (e) {}
+
+                    // Secondary API Fallback (DavidCyril AI API)
+                    if (!aiResponse) {
+                        try {
+                            const apiRes2 = await fetchWithTimeout("https://apis.davidcyriltech.my.id/ai/gpt4?text=" + encodeURIComponent(promptContext));
+                            if (apiRes2 && (apiRes2.message || apiRes2.result)) {
+                                aiResponse = apiRes2.message || apiRes2.result;
+                            }
+                        } catch (e2) {
+                            console.log("Secondary AI API failed.");
+                        }
+                    }
+
+                    // Send AI Response if obtained
+                    if (aiResponse) {
+                        // Clean up generic bot terms if any remain
+                        aiResponse = aiResponse.replace(/ChatGPT|OpenAI|assistant/gi, "Demon");
+                        await sock.sendMessage(from, { text: aiResponse }, { quoted: msg });
+                    }
+
+                } catch (err) {
+                    console.error("Chatbot system error:", err.message);
+                }
             }
             return;
         }
+
+        // --- 3. COMMAND PARSING CONTINUES HERE ---
+        const args = body.slice(prefix.length).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
+        // ... (rest of your switch(command) block)
 
         const args = body.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
