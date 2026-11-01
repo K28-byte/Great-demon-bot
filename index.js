@@ -1,4 +1,3 @@
-
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -6,7 +5,7 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Great Demon Bot is active 24/7 under the rule of Demon Emperor!\n');
 }).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 Keep-alive server running on 0.0.0.0:${PORT}`);
+    console.log('🌐 Keep-alive server running on 0.0.0.0:' + PORT);
 });
 
 const { 
@@ -125,7 +124,7 @@ function resolveMedia(msg) {
 }
 
 async function downloadMedia(msg, type) {
-  const mediaMsg = msg[`${type}Message`] || msg.documentMessage || msg;
+  const mediaMsg = msg[type + 'Message'] || msg.documentMessage || msg;
   const stream = await downloadContentFromMessage(mediaMsg, type === 'sticker' ? 'sticker' : type);
   const chunks = [];
   for await (const chunk of stream) {
@@ -289,10 +288,10 @@ async function startDemonBot() {
 
         try {
             await new Promise(res => setTimeout(res, 5000));
-            console.log(`⏳ Requesting Imperial Pairing Code for +${phoneNumber}...`);
+            console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
             const code = await sock.requestPairingCode(phoneNumber);
             const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            console.log(`\n🔑 YOUR PAIRING CODE: \x1b[32m${formattedCode}\x1b[0m\n`);
+            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + '\x1b[0m\n');
             console.log('==================================================\n');
         } catch (err) {
             console.log('❌ Error requesting pairing code:', err.message);
@@ -337,7 +336,7 @@ async function startDemonBot() {
 
             for (let num of participants) {
                 const userJid = num;
-                const userTag = `@${userJid.split('@')[0]}`;
+                const userTag = '@' + userJid.split('@')[0];
 
                 let ppUrl;
                 try {
@@ -349,10 +348,9 @@ async function startDemonBot() {
                 // --- AUTOMATIC WELCOME CARD ---
                 if (action === 'add' && groupSettings[from].welcome) {
                     const welcomeMsg = 
-`👑 *IMPERIAL WELCOME* 👑
-
-Welcome to *${groupName}*, ${userTag}! ⚔️
-We hope you enjoy your time here under the rule of Demon Emperor!`;
+"👑 *IMPERIAL WELCOME* 👑\n\n" +
+"Welcome to *" + groupName + "*, " + userTag + "! ⚔️\n" +
+"We hope you enjoy your time here under the rule of Demon Emperor!";
 
                     await sock.sendMessage(from, { 
                         image: { url: ppUrl }, 
@@ -364,10 +362,9 @@ We hope you enjoy your time here under the rule of Demon Emperor!`;
                 // --- AUTOMATIC GOODBYE CARD ---
                 if (action === 'remove' && groupSettings[from].goodbye) {
                     const goodbyeMsg = 
-`👋 *IMPERIAL FAREWELL* 👋
-
-${userTag} has departed from *${groupName}*.
-We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! ⚔️`;
+"👋 *IMPERIAL FAREWELL* 👋\n\n" +
+userTag + " has departed from *" + groupName + "*.\n" +
+"We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! ⚔️";
 
                     await sock.sendMessage(from, { 
                         image: { url: ppUrl }, 
@@ -412,7 +409,7 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
                 const hasHeavyNesting = (rawCheckText.match(/message/g) || []).length > 8;
 
                 if (isTooLong || hasBidiExploit || hasNullBytes || hasHeavyNesting) {
-                    console.warn(`🚨 [ANTICRASH SHIELD] Intercepted malicious payload from ${msgCheck.key.remoteJid}!`);
+                    console.warn("🚨 [ANTICRASH SHIELD] Intercepted malicious payload from " + msgCheck.key.remoteJid + "!");
                     return;
                 }
             }
@@ -475,7 +472,7 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
             if (isStatusMessage) {
                 await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
                 await sock.sendMessage(from, { 
-                    text: `🗡️ *@${sender.split('@')[0]}*, group status transmissions are forbidden in this domain!`,
+                    text: "🗡️ @" + sender.split('@')[0] + ", group status transmissions are forbidden in this domain!",
                     mentions: [sender]
                 });
 
@@ -524,7 +521,7 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
                 if (linkRegex.test(body)) {
                     await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
                     await sock.sendMessage(from, { 
-                        text: `🗡️ *@${sender.split('@')[0]}*, foreign domain links are forbidden by decree of the Demon Emperor!`,
+                        text: "🗡️ @" + sender.split('@')[0] + ", foreign domain links are forbidden by decree of the Demon Emperor!",
                         mentions: [sender]
                     });
                     if (isBotAdmin) {
@@ -539,7 +536,7 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
                 if (isExternalBot && !isSenderAdmin) {
                     await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
                     await sock.sendMessage(from, { 
-                        text: `🚨 *@${sender.split('@')[0]}*, external construct detected! Banishing...`,
+                        text: "🚨 @" + sender.split('@')[0] + ", external construct detected! Banishing...",
                         mentions: [sender]
                     });
                     if (isBotAdmin) {
@@ -566,188 +563,41 @@ We hope you enjoyed your time here under the rule of Demon Emperor! Farewell! �
                 const hours = Math.floor(uptimeSeconds / 3600);
                 const minutes = Math.floor((uptimeSeconds % 3600) / 60);
                 const seconds = uptimeSeconds % 60;
-                const uptimeFormatted = `${hours}h ${minutes}m ${seconds}s`;
+                const uptimeFormatted = hours + "h " + minutes + "m " + seconds + "s";
 
                 const menuText = 
-`╔══✪  👑 **${BOT_NAME}** 👑  ✪══╗
-║ *👑Bot Owner:* ${OWNER_NAME}
-║ *🔮Bot Mode:* ${botMode.toUpperCase()}
-║ *🏗Bot status:* under construction 
-║ *⏰️Uptime:* ${uptimeFormatted}
-║ *🌖Version:* Great Demon V4
-╚═════════════════════════╝
-
-╔══✪  👑 **EMPEROR'S SUPREME**  ✪══╗
-✿ addowner
-✿ antidelete
-✿ antiviewonce
-✿ autoonline
-✿ autorecording
-✿ autostatuslike
-✿ autostatusview
-✿ autotyping
-✿ block
-✿ unblock
-✿ buatgc
-✿ changebio
-✿ devices
-✿ getpp
-✿ gcstatus
-✿ joingroup
-✿ leavegroup
-✿ listfont
-✿ listgroup
-✿ bancheck
-✿ botlink
-✿ fetchstatus
-✿ listchannels
-✿ mode
-✿ pair
-✿ broadcast
-✿ spamngl
-╚═════════════════════════╝
-
-╔══✪  ⭐ **VIP NOBILITY**  ✪══╗
-✿ connectedusers
-✿ inspectsock
-✿ status
-✿ vipadd
-✿ vipadmin
-✿ vipallgroups
-✿ vipdemote
-✿ vipdetails
-✿ vipgroups
-✿ viplist
-✿ vipmenu
-✿ vippromote
-✿ vipreassign
-✿ vipremove
-✿ viptakeover
-✿ vipunclaim
-╚═════════════════════════╝
-
-╔══✪  🛡️ **DOMAIN MANAGEMENT**  ✪══╗
-✿ welcome
-✿ goodbye
-✿ antilink
-✿ antibot
-✿ antispam
-✿ antitag
-✿ antitagadmin
-✿ antiremove
-✿ activeusers
-✿ addmember
-✿ antiadd
-✿ antidemote
-✿ antigroupsmention
-✿ antiimage
-✿ antipromote
-✿ approveall
-✿ close
-✿ closetime
-✿ demoteall
-✿ demoteuser
-✿ disapproveall
-✿ dor
-✿ gcs
-✿ glostat
-✿ grouplink
-✿ groupmenu
-✿ grouponly
-✿ hidetag
-✿ inactiveusers
-✿ kickall
-✿ left
-✿ listgroups
-✿ mediatag
-✿ open
-✿ opentime
-✿ promoteall
-✿ promoteuser
-✿ remove
-✿ setgroupbio
-✿ setgroupname
-✿ setgrouppp
-✿ setwarning
-✿ tagadmin
-✿ tagall
-✿ tagonline
-✿ tagpoll
-✿ warning
-✿ pin
-✿ textbox
-✿ vv
-╚═════════════════════════╝
-
-╔══✪  🧠 **DEMONIC INTELLIGENCE**  ✪══╗
-✿ ai
-✿ aimenu
-✿ claude
-✿ copilot
-✿ describe
-✿ felo
-✿ gpt
-✿ imagine
-✿ llama
-╚═════════════════════════╝
-
-╔══✪  🧪 **ALCHEMY & CONVERSION**  ✪══╗
-✿ audio
-✿ convertmenu
-✿ stickermeme
-✿ stiker
-✿ swm
-✿ telestick
-✿ toaud
-✿ togif
-✿ toimg
-✿ tomp4
-✿ toptt
-✿ tourl
-╚═════════════════════════╝
-
-╔══✪  📥 **ACQUISITION & DOWNLOADS**  ✪══╗
-✿ applemusic
-✿ capcut
-✿ dl
-✿ downloadmenu
-✿ fb
-✿ yts
-✿ lyrics
-╚═════════════════════════╝
-
-╔══✪  🎮 **REALM ARENA GAMES**  ✪══╗
-✿ 2048
-✿ activegames
-✿ connect4
-✿ dino
-✿ emojidecode
-✿ endgame
-✿ flappy
-✿ galaxy
-✿ gamemenu
-✿ letterblitz
-✿ memory
-✿ mines
-✿ pong
-✿ reverseit
-╚═════════════════════════╝
-
-╔══✪  🛠️ **AUXILIARY TOOLS**  ✪══╗
-✿ androidcrash
-✿ bugmenu
-✿ gccrash
-✿ hd
-✿ iosfc
-✿ ocr
-✿ removebg
-✿ screenshot
-✿ searchmenu
-✿ toolmenu
-✿ ping
-╚═════════════════════════╝
-
-_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝒊𝒗𝒆_`;
+"╔══✪  👑 **" + BOT_NAME + "** 👑  ✪══╗\n" +
+"║ *👑Bot Owner:* " + OWNER_NAME + "\n" +
+"║ *🔮Bot Mode:* " + botMode.toUpperCase() + "\n" +
+"║ *🏗Bot status:* under construction \n" +
+"║ *⏰️Uptime:* " + uptimeFormatted + "\n" +
+"║ *🌖Version:* Great Demon V4\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  👑 **EMPEROR'S SUPREME**  ✪══╗\n" +
+"✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  ⭐ **VIP NOBILITY**  ✪══╗\n" +
+"✿ connectedusers\n✿ inspectsock\n✿ status\n✿ vipadd\n✿ vipadmin\n✿ vipallgroups\n✿ vipdemote\n✿ vipdetails\n✿ vipgroups\n✿ viplist\n✿ vipmenu\n✿ vippromote\n✿ vipreassign\n✿ vipremove\n✿ viptakeover\n✿ vipunclaim\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  🛡️ **DOMAIN MANAGEMENT**  ✪══╗\n" +
+"✿ welcome\n✿ goodbye\n✿ antilink\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ activeusers\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antigroupsmention\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ inactiveusers\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ textbox\n✿ vv\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  🧠 **DEMONIC INTELLIGENCE**  ✪══╗\n" +
+"✿ ai\n✿ aimenu\n✿ claude\n✿ copilot\n✿ describe\n✿ felo\n✿ gpt\n✿ imagine\n✿ llama\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  🧪 **ALCHEMY & CONVERSION**  ✪══╗\n" +
+"✿ audio\n✿ convertmenu\n✿ stickermeme\n✿ stiker\n✿ swm\n✿ telestick\n✿ toaud\n✿ togif\n✿ toimg\n✿ tomp4\n✿ toptt\n✿ tourl\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  📥 **ACQUISITION & DOWNLOADS**  ✪══╗\n" +
+"✿ applemusic\n✿ capcut\n✿ dl\n✿ downloadmenu\n✿ fb\n✿ yts\n✿ lyrics\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  🎮 **REALM ARENA GAMES**  ✪══╗\n" +
+"✿ 2048\n✿ activegames\n✿ connect4\n✿ dino\n✿ emojidecode\n✿ endgame\n✿ flappy\n✿ galaxy\n✿ gamemenu\n✿ letterblitz\n✿ memory\n✿ mines\n✿ pong\n✿ reverseit\n" +
+"╚═════════════════════════╝\n\n" +
+"╔══✪  🛠️ **AUXILIARY TOOLS**  ✪══╗\n" +
+"✿ androidcrash\n✿ bugmenu\n✿ gccrash\n✿ hd\n✿ iosfc\n✿ ocr\n✿ removebg\n✿ screenshot\n✿ searchmenu\n✿ toolmenu\n✿ ping\n" +
+"╚═════════════════════════╝\n\n" +
+"_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝒊𝒗𝒆_";
 
                 try {
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
@@ -770,7 +620,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 if (!isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
                 groupSettings[from].antidelete = !groupSettings[from].antidelete;
-                await sock.sendMessage(from, { text: `👁️ *Imperial Anti-Delete:* ${groupSettings[from].antidelete ? 'ACTIVATED ✅' : 'DEACTIVATED ❌'}` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "👁️ *Imperial Anti-Delete:* " + (groupSettings[from].antidelete ? 'ACTIVATED ✅' : 'DEACTIVATED ❌') }, { quoted: msg });
                 break;
             }
 
@@ -806,7 +656,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         buffer = Buffer.concat([buffer, chunk]);
                     }
 
-                    const captionText = mediaContent.caption ? `📜 *Caption:* ${mediaContent.caption}` : '🕵️‍♂️ *ViewOnce Veil Pierced successfully, My Lord!*';
+                    const captionText = mediaContent.caption ? "📜 *Caption:* " + mediaContent.caption : '🕵️‍♂️ *ViewOnce Veil Pierced successfully, My Lord!*';
 
                     if (mediaType.includes('image')) {
                         await sock.sendMessage(from, { image: buffer, caption: captionText }, { quoted: msg });
@@ -818,7 +668,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 } catch (err) {
                     console.error('ViewOnce Extraction Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Failed to pierce View-Once payload:* ${err.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Failed to pierce View-Once payload:* " + err.message }, { quoted: msg });
                 }
                 break;
             }
@@ -830,7 +680,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'autotyping': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 autoSettings[command] = !autoSettings[command];
-                await sock.sendMessage(from, { text: `⚙️ *Imperial Presence [${command.toUpperCase()}]:* ${autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "⚙️ *Imperial Presence [" + command.toUpperCase() + "]:* " + (autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌') }, { quoted: msg });
                 break;
             }
 
@@ -883,13 +733,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                     blockedUsers.add(normalizedJid);
                     await sock.sendMessage(from, { 
-                        text: `🚫 *@${cleanPhone}* has been forcefully banished into the Void, My Lord! ✅`, 
+                        text: "🚫 @" + cleanPhone + " has been forcefully banished into the Void, My Lord! ✅", 
                         mentions: [normalizedJid] 
                     }, { quoted: msg });
 
                 } catch (err) {
                     console.error('Forced Block Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Banishment Seal Rejected:* ${err.message || 'Server connection error.'}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Banishment Seal Rejected:* " + (err.message || 'Server connection error.') }, { quoted: msg });
                 }
                 break;
             }
@@ -941,13 +791,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                     blockedUsers.delete(normalizedJid);
                     await sock.sendMessage(from, { 
-                        text: `✅ *Banishment rescinded for *@${cleanPhone}*, My Lord!`, 
+                        text: "✅ *Banishment rescinded for @" + cleanPhone + ", My Lord!*", 
                         mentions: [normalizedJid] 
                     }, { quoted: msg });
 
                 } catch (err) {
                     console.error('Forced Unblock Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Failed to unblock user:* ${err.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Failed to unblock user:* " + err.message }, { quoted: msg });
                 }
                 break;
             }
@@ -957,7 +807,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .buatgc <domain_name>' }, { quoted: msg });
                 try {
                     const group = await sock.groupCreate(q, [sender]);
-                    await sock.sendMessage(from, { text: `👑 *New domain created for My Lord! ID:* ${group.id}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "👑 *New domain created for My Lord! ID:* " + group.id }, { quoted: msg });
                 } catch (e) {
                     await sock.sendMessage(from, { text: '❌ *Failed to forge domain, My Lord.*' }, { quoted: msg });
                 }
@@ -975,11 +825,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'devices':
             case 'device': {
                 await sock.sendMessage(from, { 
-                    text: `💻 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Throne Engine Info*\n\n` +
-                          `• *Platform:* ${os.platform()}\n` +
-                          `• *Architecture:* ${os.arch()}\n` +
-                          `• *Memory:* ${(os.freemem() / 1024 / 1024).toFixed(2)} MB Free / ${(os.totalmem() / 1024 / 1024).toFixed(2)} MB Total\n` +
-                          `• *Uptime:* ${(os.uptime() / 3600).toFixed(2)} Hours` 
+                    text: "💻 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Throne Engine Info*\n\n" +
+                          "• *Platform:* " + os.platform() + "\n" +
+                          "• *Architecture:* " + os.arch() + "\n" +
+                          "• *Memory:* " + (os.freemem() / 1024 / 1024).toFixed(2) + " MB Free / " + (os.totalmem() / 1024 / 1024).toFixed(2) + " MB Total\n" +
+                          "• *Uptime:* " + (os.uptime() / 3600).toFixed(2) + " Hours" 
                 }, { quoted: msg });
                 break;
             }
@@ -1019,10 +869,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
             case 'listfont': {
                 await sock.sendMessage(from, { 
-                    text: `✒️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Script Typographies*\n\n` +
-                          `1. Imperial Gothic: 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓\n` +
-                          `2. Royal Monospace: Great Demon\n` +
-                          `3. Shadow Italic: Great Demon`
+                    text: "✒️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Script Typographies*\n\n" +
+                          "1. Imperial Gothic: 𝕲𝖗𝖊𝖆𝖙 𝕯𝖊𝖒𝖔𝖓\n" +
+                          "2. Royal Monospace: Great Demon\n" +
+                          "3. Shadow Italic: Great Demon"
                 }, { quoted: msg });
                 break;
             }
@@ -1031,10 +881,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'listgroups': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 const groups = Object.keys(await sock.groupFetchAllParticipating());
-                let txt = `📋 *Subjugated Domains (${groups.length}):*\n\n`;
+                let txt = "📋 *Subjugated Domains (" + groups.length + "):*\n\n";
                 for (let gId of groups) {
                     const meta = await sock.groupMetadata(gId).catch(() => ({}));
-                    txt += `• ${meta.subject || 'Unknown Domain'} (${gId})\n`;
+                    txt += "• " + (meta.subject || 'Unknown Domain') + " (" + gId + ")\n";
                 }
                 await sock.sendMessage(from, { text: txt }, { quoted: msg });
                 break;
@@ -1056,7 +906,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!target) return sock.sendMessage(from, { text: '💡 *Mention or reply to target.*' }, { quoted: msg });
                 try {
                     const status = await sock.fetchStatus(target);
-                    await sock.sendMessage(from, { text: `📜 *Status:* "${status.status}"` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '📜 *Status:* "' + status.status + '"' }, { quoted: msg });
                 } catch {
                     await sock.sendMessage(from, { text: '❌ *Status concealed.*' }, { quoted: msg });
                 }
@@ -1082,9 +932,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 if (targetMode === 'public' || targetMode === 'private') {
                     botMode = targetMode;
-                    await sock.sendMessage(from, { text: `👑 *Decree Enforced:* Domain mode set to *${botMode.toUpperCase()}*, My Lord!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "👑 *Decree Enforced:* Domain mode set to *" + botMode.toUpperCase() + "*, My Lord!" }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: `⚔️ *Current State:* *${botMode.toUpperCase()}*\n\n💡 *Usage:* .mode public | .mode private | .public | .private` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "⚔️ *Current State:* *" + botMode.toUpperCase() + "*\n\n💡 *Usage:* .mode public | .mode private | .public | .private" }, { quoted: msg });
                 }
                 break;
             }
@@ -1096,8 +946,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 }
 
                 try {
-                    await sock.sendMessage(from, { text: `⏳ *Forging link key for +${targetNum}, My Lord Demon Emperor...*` }, { quoted: msg });
-                    const tempSessionPath = path.join(__dirname, 'sessions', `session_${targetNum}`);
+                    await sock.sendMessage(from, { text: "⏳ *Forging link key for +" + targetNum + ", My Lord Demon Emperor...*" }, { quoted: msg });
+                    const tempSessionPath = path.join(__dirname, 'sessions', 'session_' + targetNum);
                     const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
 
                     const tempSock = makeWASocket({
@@ -1113,7 +963,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         try {
                             let code = await tempSock.requestPairingCode(targetNum);
                             code = code?.match(/.{1,4}/g)?.join("-") || code;
-                            await sock.sendMessage(from, { text: `🔑 *IMPERIAL LINK CODE:* \`${code}\`` }, { quoted: msg });
+                            await sock.sendMessage(from, { text: "🔑 *IMPERIAL LINK CODE:* `" + code + "`" }, { quoted: msg });
                         } catch (innerErr) {
                             await sock.sendMessage(from, { text: "❌ *Forging failed! Pairing seal rejected.*" }, { quoted: msg });
                         }
@@ -1130,11 +980,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .broadcast <royal proclamation>' }, { quoted: msg });
 
                 const groups = Object.keys(await sock.groupFetchAllParticipating());
-                await sock.sendMessage(from, { text: `📢 *Transmitting royal decree to ${groups.length} domains, My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "📢 *Transmitting royal decree to " + groups.length + " domains, My Lord!*" }, { quoted: msg });
 
                 for (const groupId of groups) {
                     await sock.sendMessage(groupId, {
-                        text: `📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 ROYAL PROCLAMATION*\n\n${q}\n\n_~ Directly from My Lord Demon Emperor_`
+                        text: "📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 ROYAL PROCLAMATION*\n\n" + q + "\n\n_~ Directly from My Lord Demon Emperor_"
                     });
                 }
                 await sock.sendMessage(from, { text: '✅ *Proclamation delivered, My Lord!*' }, { quoted: msg });
@@ -1154,10 +1004,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'inspectsock':
             case 'status': {
                 await sock.sendMessage(from, { 
-                    text: `⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Core Health*\n\n` +
-                          `• *Socket:* Bound & Synced ✅\n` +
-                          `• *Latency:* Optimal\n` +
-                          `• *Protection:* Active`
+                    text: "⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Core Health*\n\n" +
+                          "• *Socket:* Bound & Synced ✅\n" +
+                          "• *Latency:* Optimal\n" +
+                          "• *Protection:* Active"
                 }, { quoted: msg });
                 break;
             }
@@ -1190,7 +1040,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
                 } catch (err) {
                     console.error('Textbox Command Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Failed to generate text box:* ${err.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Failed to generate text box:* " + err.message }, { quoted: msg });
                 }
                 break;
             }
@@ -1199,7 +1049,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'vipgroups': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 const groups = Object.keys(await sock.groupFetchAllParticipating());
-                await sock.sendMessage(from, { text: `👑 *VIP Domains:* ${groups.length} domains governed!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "👑 *VIP Domains:* " + groups.length + " domains governed!" }, { quoted: msg });
                 break;
             }
 
@@ -1234,11 +1084,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                             return sock.sendMessage(from, {
                                 text: '📝 *Group Status Usage*\n\n' +
                                       '• Send/reply with an *image/video/audio* and caption:\n' +
-                                      `  \`${prefix}${command} [optional caption]\`\n` +
+                                      '  `' + prefix + command + ' [optional caption]`\n' +
                                       '• Post a *link* as status story with optional text:\n' +
-                                      `  \`${prefix}${command} https://chat.whatsapp.com/xxx Custom text\`\n` +
+                                      '  `' + prefix + command + ' https://chat.whatsapp.com/xxx Custom text`\n' +
                                       '• Or text status only:\n' +
-                                      `  \`${prefix}${command} Your text here\`'
+                                      '  `' + prefix + command + ' Your text here`'
                             }, { quoted: msg });
                         }
 
@@ -1387,7 +1237,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'viplist':
             case 'vipmenu': {
                 let txt = "👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 VIP Roster*\n\n";
-                vipUsers.forEach(u => txt += `• @${u}\n`);
+                vipUsers.forEach(u => txt += "• @" + u + "\n");
                 await sock.sendMessage(from, { text: txt, mentions: Array.from(vipUsers).map(u => u + '@s.whatsapp.net') }, { quoted: msg });
                 break;
             }
@@ -1432,13 +1282,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 if (stateArg === 'on') {
                     groupSettings[from][setting] = true;
-                    await sock.sendMessage(from, { text: `✅ *By decree of the Demon Emperor:* *${setting.toUpperCase()}* is ENFORCED!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "✅ *By decree of the Demon Emperor:* *" + setting.toUpperCase() + "* is ENFORCED!" }, { quoted: msg });
                 } else if (stateArg === 'off') {
                     groupSettings[from][setting] = false;
-                    await sock.sendMessage(from, { text: `❌ *Imperial Dispensation:* *${setting.toUpperCase()}* is DISABLED!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + setting.toUpperCase() + "* is DISABLED!" }, { quoted: msg });
                 } else {
                     groupSettings[from][setting] = !groupSettings[from][setting];
-                    await sock.sendMessage(from, { text: `🛡️ *${setting.toUpperCase()} Barrier:* ${groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌'}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "🛡️ *" + setting.toUpperCase() + " Barrier:* " + (groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌') }, { quoted: msg });
                 }
                 break;
             }
@@ -1453,13 +1303,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 if (stateArg === 'on') {
                     groupSettings[from][setting] = true;
-                    await sock.sendMessage(from, { text: `✅ *By decree of the Demon Emperor:* *${setting.toUpperCase()}* card system is ENFORCED!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "✅ *By decree of the Demon Emperor:* *" + setting.toUpperCase() + "* card system is ENFORCED!" }, { quoted: msg });
                 } else if (stateArg === 'off') {
                     groupSettings[from][setting] = false;
-                    await sock.sendMessage(from, { text: `❌ *Imperial Dispensation:* *${setting.toUpperCase()}* card system is DISABLED!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + setting.toUpperCase() + "* card system is DISABLED!" }, { quoted: msg });
                 } else {
                     groupSettings[from][setting] = !groupSettings[from][setting];
-                    await sock.sendMessage(from, { text: `🛡️ *${setting.toUpperCase()} Card System:* ${groupSettings[from][setting] ? 'ENFORCED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "🛡️ *" + setting.toUpperCase() + " Card System:* " + (groupSettings[from][setting] ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
                 }
                 break;
             }
@@ -1494,7 +1344,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         await sock.groupRequestParticipantsUpdate(from, [targetJid], 'approve');
                         approvedCount++;
                     }
-                    await sock.sendMessage(from, { text: `✅ *Granted domain entry to ${approvedCount} subject(s), My Lord!*` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "✅ *Granted domain entry to " + approvedCount + " subject(s), My Lord!*" }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to approve requests.*' }, { quoted: msg });
                 }
@@ -1514,15 +1364,15 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
                 
                 const timer = parseInt(args[0]);
-                if (isNaN(timer)) return sock.sendMessage(from, { text: `💡 *Usage:* .${command} <minutes>` }, { quoted: msg });
+                if (isNaN(timer)) return sock.sendMessage(from, { text: "💡 *Usage:* ." + command + " <minutes>" }, { quoted: msg });
 
                 const actionType = command === 'closetime' ? 'announcement' : 'not_announcement';
                 const actionText = command === 'closetime' ? 'sealed (Admins Only)' : 'opened to all';
 
-                await sock.sendMessage(from, { text: `⏳ *Domain gates will be ${actionText} in ${timer} minute(s), My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "⏳ *Domain gates will be " + actionText + " in " + timer + " minute(s), My Lord!*" }, { quoted: msg });
                 setTimeout(async () => {
                     await sock.groupSettingUpdate(from, actionType);
-                    await sock.sendMessage(from, { text: `🔒 *Domain gates are now ${actionText}!*` });
+                    await sock.sendMessage(from, { text: "🔒 *Domain gates are now " + actionText + "!*" });
                 }, timer * 60 * 1000);
                 break;
             }
@@ -1607,12 +1457,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'gcs':
             case 'groupmenu': {
                 await sock.sendMessage(from, { 
-                    text: `👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Domain Menu*\n\n` +
-                          `• .open / .close\n` +
-                          `• .kick / .promote / .demote\n` +
-                          `• .tagall / .hidetag\n` +
-                          `• .approveall / .disapproveall\n` +
-                          `• .grouplink / .setgroupname`
+                    text: '👑 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Domain Menu*\n\n' +
+                          '• .open / .close\n' +
+                          '• .kick / .promote / .demote\n' +
+                          '• .tagall / .hidetag\n' +
+                          '• .approveall / .disapproveall\n' +
+                          '• .grouplink / .setgroupname'
                 }, { quoted: msg });
                 break;
             }
@@ -1628,7 +1478,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 try {
                     const code = await sock.groupInviteCode(from);
-                    await sock.sendMessage(from, { text: `🔗 *Domain Portal Link:*\nhttps://chat.whatsapp.com/${code}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "🔗 *Domain Portal Link:*\nhttps://chat.whatsapp.com/" + code }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to fetch group link!*' }, { quoted: msg });
                 }
@@ -1638,16 +1488,16 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'grouponly': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 groupSettings[from].grouponly = !groupSettings[from].grouponly;
-                await sock.sendMessage(from, { text: `🛡️ *Group Only Mode:* ${groupSettings[from].grouponly ? 'ENABLED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "🛡️ *Group Only Mode:* " + (groupSettings[from].grouponly ? 'ENABLED ✅' : 'DISABLED ❌') }, { quoted: msg });
                 break;
             }
 
             case 'hidetag': {
                 if (!isGroup || !isSenderAdmin) return;
-                const hidetagText = args.join(' ') || 'Silence! Hear the Emperor\'s decree!';
+                const hidetagText = args.join(' ') || "Silence! Hear the Emperor's decree!";
                 const groupMetadata = await sock.groupMetadata(from);
                 const mentions = groupMetadata.participants.map(p => p.id);
-                await sock.sendMessage(from, { text: `👑 *Imperial Decree:* ${hidetagText}`, mentions }, { quoted: msg });
+                await sock.sendMessage(from, { text: "👑 *Imperial Decree:* " + hidetagText, mentions }, { quoted: msg });
                 break;
             }
 
@@ -1659,7 +1509,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 const groupMetadata = await sock.groupMetadata(from);
                 const participants = groupMetadata.participants.filter(p => !p.admin && p.id !== sock.user.id.split(':')[0] + '@s.whatsapp.net' && !p.id.includes(OWNER_NUMBER));
 
-                await sock.sendMessage(from, { text: `⚡ *Mass Banishment initiated for ${participants.length} subjects!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "⚡ *Mass Banishment initiated for " + participants.length + " subjects!*" }, { quoted: msg });
                 for (let p of participants) {
                     await sock.groupParticipantsUpdate(from, [p.id], 'remove');
                 }
@@ -1744,7 +1594,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!target) return sock.sendMessage(from, { text: '💡 *Reply to or tag a subject to warn.*' }, { quoted: msg });
 
                 await sock.sendMessage(from, { 
-                    text: `⚠️ *@${target.split('@')[0]}*, you have received an Imperial Warning!`,
+                    text: "⚠️ @" + target.split('@')[0] + ", you have received an Imperial Warning!",
                     mentions: [target]
                 }, { quoted: msg });
                 break;
@@ -1755,8 +1605,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 const groupMetadata = await sock.groupMetadata(from);
                 const admins = groupMetadata.participants.filter(p => p.admin).map(p => p.id);
-                let txt = `🛡️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 High Lords*\n\n`;
-                admins.forEach(a => txt += `• @${a.split('@')[0]}\n`);
+                let txt = "🛡️ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 High Lords*\n\n";
+                admins.forEach(a => txt += "• @" + a.split('@')[0] + "\n");
                 await sock.sendMessage(from, { text: txt, mentions: admins }, { quoted: msg });
                 break;
             }
@@ -1764,10 +1614,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'tagall': {
                 if (!isGroup || !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Only High Lords may summon the populace!*' }, { quoted: msg });
                 const groupMetadata = await sock.groupMetadata(from);
-                let text = `╭━━━〔  *IMPERIAL SUMMONS — DEMON EMPEROR*  〕━━━┈\n_“All subjects, acknowledge your Sovereign!”_\n\n`;
+                let text = "╭━━━〔  *IMPERIAL SUMMONS — DEMON EMPEROR*  〕━━━┈\n_“All subjects, acknowledge your Sovereign!”_\n\n";
                 let mentions = groupMetadata.participants.map(p => p.id);
-                mentions.forEach(p => text += `⡡ @${p.split('@')[0]}\n`);
-                text += `╰━━━━━━━━━━━━━━━━━━━━━━━┈`;
+                mentions.forEach(p => text += "⡡ @" + p.split('@')[0] + "\n");
+                text += "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
                 await sock.sendMessage(from, { text, mentions }, { quoted: msg });
                 break;
             }
@@ -1818,10 +1668,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'llama': {
                 if (!q) return sock.sendMessage(from, { text: '💡 *My Lord Demon Emperor, what query shall the Demonic Intellect decipher?*' }, { quoted: msg });
                 try {
-                    const res = await fetchJson(`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(q)}&owner=${encodeURIComponent(OWNER_NAME)}&botname=${encodeURIComponent(BOT_NAME)}`);
-                    await sock.sendMessage(from, { text: `🧠 *Demonic Intellect:* "${res.response}"` }, { quoted: msg });
+                    const res = await fetchJson("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(q) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent(BOT_NAME));
+                    await sock.sendMessage(from, { text: '🧠 *Demonic Intellect:* "' + res.response + '"' }, { quoted: msg });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: `🧠 *Demonic Response:* "${q}"` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '🧠 *Demonic Response:* "' + q + '"' }, { quoted: msg });
                 }
                 break;
             }
@@ -1831,8 +1681,8 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, describe the visual to manifest: .imagine <prompt>*' }, { quoted: msg });
                 try {
                     await sock.sendMessage(from, { text: '🎨 *Manifesting visual artifact from the void...*' }, { quoted: msg });
-                    const imageUrl = `https://pollinations.ai/p/${encodeURIComponent(q)}?width=1080&height=1080&seed=${Math.floor(Math.random() * 1000)}`;
-                    await sock.sendMessage(from, { image: { url: imageUrl }, caption: `🎨 *Manifestation:* "${q}"` }, { quoted: msg });
+                    const imageUrl = "https://pollinations.ai/p/" + encodeURIComponent(q) + "?width=1080&height=1080&seed=" + Math.floor(Math.random() * 1000);
+                    await sock.sendMessage(from, { image: { url: imageUrl }, caption: '🎨 *Manifestation:* "' + q + '"' }, { quoted: msg });
                 } catch (e) {
                     await sock.sendMessage(from, { text: '❌ *Failed to manifest image from void.*' }, { quoted: msg });
                 }
@@ -1851,7 +1701,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     const stream = await downloadContentFromMessage(targetMessage, 'image');
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-                    await sock.sendMessage(from, { text: `📜 *Visual Artifact Analyzed:* Successfully processed image stream (${buffer.length} bytes).` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "📜 *Visual Artifact Analyzed:* Successfully processed image stream (" + buffer.length + " bytes)." }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to analyze visual artifact.*' }, { quoted: msg });
                 }
@@ -1884,11 +1734,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         buffer = Buffer.concat([buffer, chunk]);
                     }
 
-                    const tempIn = `./temp_sticker_${Date.now()}.${mediaType === 'image' ? 'jpg' : 'mp4'}`;
-                    const tempOut = `./temp_sticker_${Date.now()}.webp`;
+                    const tempIn = "./temp_sticker_" + Date.now() + "." + (mediaType === 'image' ? 'jpg' : 'mp4');
+                    const tempOut = "./temp_sticker_" + Date.now() + ".webp";
                     fs.writeFileSync(tempIn, buffer);
 
-                    exec(`ffmpeg -i ${tempIn} -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000" ${tempOut}`, async (err) => {
+                    exec("ffmpeg -i " + tempIn + " -vcodec libwebp -filter:v \"scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000\" " + tempOut, async (err) => {
                         if (!err && fs.existsSync(tempOut)) {
                             const stickerBuffer = fs.readFileSync(tempOut);
                             await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
@@ -1897,7 +1747,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                         } else {
                             try {
                                 const base64Image = buffer.toString('base64');
-                                const apiRes = await fetchJson(`https://api.lolhuman.xyz/api/convert/towebp?apikey=GataDios`, {
+                                const apiRes = await fetchJson('https://api.lolhuman.xyz/api/convert/towebp?apikey=GataDios', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ img: base64Image })
@@ -1919,7 +1769,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 } catch (err) {
                     console.error('Sticker Error:', err);
-                    await sock.sendMessage(from, { text: `❌ *Sticker creation failed:* ${err.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Sticker creation failed:* " + err.message }, { quoted: msg });
                 }
                 break;
             }
@@ -1937,11 +1787,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-                    const tempWebp = `./temp_${Date.now()}.webp`;
-                    const tempPng = `./temp_${Date.now()}.png`;
+                    const tempWebp = "./temp_" + Date.now() + ".webp";
+                    const tempPng = "./temp_" + Date.now() + ".png";
                     fs.writeFileSync(tempWebp, buffer);
 
-                    exec(`ffmpeg -i ${tempWebp} ${tempPng}`, async (err) => {
+                    exec("ffmpeg -i " + tempWebp + " " + tempPng, async (err) => {
                         if (err) {
                             if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
                             return sock.sendMessage(from, { text: '❌ Transmutation failed, My Lord!' }, { quoted: msg });
@@ -1973,11 +1823,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-                    const tempIn = `./temp_${Date.now()}.${mediaType === 'video' ? 'mp4' : 'ogg'}`;
-                    const tempOut = `./temp_${Date.now()}.mp3`;
+                    const tempIn = "./temp_" + Date.now() + "." + (mediaType === 'video' ? 'mp4' : 'ogg');
+                    const tempOut = "./temp_" + Date.now() + ".mp3";
                     fs.writeFileSync(tempIn, buffer);
 
-                    exec(`ffmpeg -i ${tempIn} -vn -ar 44100 -ac 2 -b:a 192k ${tempOut}`, async (err) => {
+                    exec("ffmpeg -i " + tempIn + " -vn -ar 44100 -ac 2 -b:a 192k " + tempOut, async (err) => {
                         if (err) {
                             if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
                             return sock.sendMessage(from, { text: '❌ Audio transmutation failed!' }, { quoted: msg });
@@ -2009,11 +1859,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-                    const tempWebp = `./temp_${Date.now()}.webp`;
-                    const tempMp4 = `./temp_${Date.now()}.mp4`;
+                    const tempWebp = "./temp_" + Date.now() + ".webp";
+                    const tempMp4 = "./temp_" + Date.now() + ".mp4";
                     fs.writeFileSync(tempWebp, buffer);
 
-                    exec(`ffmpeg -i ${tempWebp} -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ${tempMp4}`, async (err) => {
+                    exec("ffmpeg -i " + tempWebp + " -movflags faststart -pix_fmt yuv420p -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\" " + tempMp4, async (err) => {
                         if (err) {
                             if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
                             return sock.sendMessage(from, { text: '❌ Failed to transmute sticker to GIF.' }, { quoted: msg });
@@ -2045,10 +1895,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'fb':
             case 'capcut':
             case 'applemusic': {
-                if (!q) return sock.sendMessage(from, { text: `💡 *My Lord, provide a media link: .${command} <url>*` }, { quoted: msg });
+                if (!q) return sock.sendMessage(from, { text: "💡 *My Lord, provide a media link: ." + command + " <url>*" }, { quoted: msg });
                 try {
                     await sock.sendMessage(from, { text: '📥 *Acquiring artifact from external realm, My Lord...*' }, { quoted: msg });
-                    const dlData = await fetchJson(`https://apis.davidcyriltech.my.id/download?url=${encodeURIComponent(q)}`);
+                    const dlData = await fetchJson("https://apis.davidcyriltech.my.id/download?url=" + encodeURIComponent(q));
                     if (dlData && dlData.status === 200 && dlData.result) {
                         const mediaUrl = dlData.result.dl_url || dlData.result.video || dlData.result.link;
                         if (mediaUrl) {
@@ -2057,7 +1907,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                             throw new Error();
                         }
                     } else {
-                        await sock.sendMessage(from, { text: `🔗 *External Link Logged:* ${q}` }, { quoted: msg });
+                        await sock.sendMessage(from, { text: "🔗 *External Link Logged:* " + q }, { quoted: msg });
                     }
                 } catch (err) {
                     await sock.sendMessage(from, { text: '❌ *Failed to harvest media artifact.*' }, { quoted: msg });
@@ -2069,12 +1919,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a search term: .yts <query>*' }, { quoted: msg });
                 try {
                     await sock.sendMessage(from, { text: '🔍 *Searching YouTube archives...*' }, { quoted: msg });
-                    const ytData = await fetchJson(`https://apis.davidcyriltech.my.id/youtube/search?query=${encodeURIComponent(q)}`);
+                    const ytData = await fetchJson("https://apis.davidcyriltech.my.id/youtube/search?query=" + encodeURIComponent(q));
                     if (ytData && ytData.results && ytData.results.length > 0) {
-                        let txt = `📺 *YouTube Search Results (${q}):*\n\n`;
+                        let txt = "📺 *YouTube Search Results (" + q + "):*\n\n";
                         for (let i = 0; i < Math.min(5, ytData.results.length); i++) {
                             const v = ytData.results[i];
-                            txt += `• *Title:* ${v.title}\n• *Duration:* ${v.timestamp}\n• *Link:* ${v.url}\n\n`;
+                            txt += "• *Title:* " + v.title + "\n• *Duration:* " + v.timestamp + "\n• *Link:* " + v.url + "\n\n";
                         }
                         await sock.sendMessage(from, { text: txt }, { quoted: msg });
                     } else {
@@ -2094,13 +1944,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
 
                 if (stateArg === 'on') {
                     groupSettings[from].antigcstatus = true;
-                    await sock.sendMessage(from, { text: `✅ *By decree of the Demon Emperor:* *ANTIGCSTATUS* barrier is ENFORCED!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '✅ *By decree of the Demon Emperor:* *ANTIGCSTATUS* barrier is ENFORCED!' }, { quoted: msg });
                 } else if (stateArg === 'off') {
                     groupSettings[from].antigcstatus = false;
-                    await sock.sendMessage(from, { text: `❌ *Imperial Dispensation:* *ANTIGCSTATUS* barrier is DISABLED!` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ *Imperial Dispensation:* *ANTIGCSTATUS* barrier is DISABLED!' }, { quoted: msg });
                 } else {
                     groupSettings[from].antigcstatus = !groupSettings[from].antigcstatus;
-                    await sock.sendMessage(from, { text: `🛡️ *ANTIGCSTATUS Barrier:* ${groupSettings[from].antigcstatus ? 'ENFORCED ✅' : 'DISABLED ❌'}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "🛡️ *ANTIGCSTATUS Barrier:* " + (groupSettings[from].antigcstatus ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
                 }
                 break;
             }
@@ -2108,9 +1958,9 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'lyrics': {
                 if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a song name: .lyrics <song>*' }, { quoted: msg });
                 try {
-                    const lyricData = await fetchJson(`https://apis.davidcyriltech.my.id/lyrics?song=${encodeURIComponent(q)}`);
+                    const lyricData = await fetchJson("https://apis.davidcyriltech.my.id/lyrics?song=" + encodeURIComponent(q));
                     if (lyricData && lyricData.lyrics) {
-                        await sock.sendMessage(from, { text: `📜 *Lyrics — ${lyricData.title || q}*\n\n${lyricData.lyrics}` }, { quoted: msg });
+                        await sock.sendMessage(from, { text: "📜 *Lyrics — " + (lyricData.title || q) + "*\n\n" + lyricData.lyrics }, { quoted: msg });
                     } else {
                         await sock.sendMessage(from, { text: '❌ *Lyrics could not be found.*' }, { quoted: msg });
                     }
@@ -2143,7 +1993,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'pong':
             case 'reverseit': {
                 activeGames[from] = command;
-                await sock.sendMessage(from, { text: `🎮 *Arena Challenge (${command.toUpperCase()}) initialized! Type your moves.*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "🎮 *Arena Challenge (" + command.toUpperCase() + ") initialized! Type your moves.*" }, { quoted: msg });
                 break;
             }
 
@@ -2164,7 +2014,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'searchmenu':
             case 'downloadmenu':
             case 'convertmenu': {
-                await sock.sendMessage(from, { text: `🛠️ *Imperial Tool [${command.toUpperCase()}] executed successfully, My Lord!*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: "🛠️ *Imperial Tool [" + command.toUpperCase() + "] executed successfully, My Lord!*" }, { quoted: msg });
                 break;
             }
 
@@ -2172,13 +2022,13 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .spamngl <target_username or text/link>' }, { quoted: msg });
                 
-                await sock.sendMessage(from, { text: `🔥 *Initiating 500-wave bombardment across the realm, My Lord...*` }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🔥 *Initiating 500-wave bombardment across the realm, My Lord...*' }, { quoted: msg });
                 
                 for (let i = 1; i <= 500; i++) {
                     if (q.includes('http://') || q.includes('https://') || !q.match(/^[a-zA-Z0-9_]+$/)) {
-                        await sock.sendMessage(from, { text: `${q} [Wave ${i}/500]` }).catch(() => {});
+                        await sock.sendMessage(from, { text: q + " [Wave " + i + "/500]" }).catch(() => {});
                     } else {
-                        fetchJson(`https://ngl.link/api/submit`, {
+                        fetchJson('https://ngl.link/api/submit', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ username: q, question: "All bowing before My Lord Demon Emperor!", deviceId: "demo" })
@@ -2186,7 +2036,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                     }
                 }
 
-                await sock.sendMessage(from, { text: `✅ *Bombardment Complete:* All 500 waves dispatched successfully, My Lord!` }, { quoted: msg });
+                await sock.sendMessage(from, { text: '✅ *Bombardment Complete:* All 500 waves dispatched successfully, My Lord!' }, { quoted: msg });
                 break;
             }
 
@@ -2194,7 +2044,7 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'bugmenu':
             case 'iosfc': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor possesses access to war payloads!*' }, { quoted: msg });
-                await sock.sendMessage(from, { text: `🛡️ *Shield V10 ULTRA:* Defense matrix active. Bug testing commands locked.` }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🛡️ *Shield V10 ULTRA:* Defense matrix active. Bug testing commands locked.' }, { quoted: msg });
                 break;
             }
 
@@ -2207,12 +2057,12 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
                 try {
                     for (let i = 1; i <= 5; i++) {
                         await sock.sendMessage(from, { 
-                            text: `💥 *[IMPERIAL STRESS WAVE ${i}/5]*\n_Demon Emperor Domain Pressure Test Active._` 
+                            text: "💥 *[IMPERIAL STRESS WAVE " + i + "/5]*\n_Demon Emperor Domain Pressure Test Active._" 
                         });
                     }
                     await sock.sendMessage(from, { text: '✅ *Domain stress test wave concluded successfully, My Lord!* clubhouse' }, { quoted: msg });
                 } catch (err) {
-                    await sock.sendMessage(from, { text: `❌ *Stress test encountered resistance:* ${err.message}` }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "❌ *Stress test encountered resistance:* " + err.message }, { quoted: msg });
                 }
                 break;
             }
@@ -2220,11 +2070,11 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             case 'ping': {
                 const start = Date.now();
                 await sock.sendMessage(from, { 
-                    text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Imperial Tool* 〕━━━┈\n` +
-                          `✦ *Tool:* .ping\n` +
-                          `✦ *Response Speed:* ${Date.now() - start}ms\n` +
-                          `✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n` +
-                          `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
+                    text: "╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Imperial Tool* 〕━━━┈\n" +
+                          "✦ *Tool:* .ping\n" +
+                          "✦ *Response Speed:* " + (Date.now() - start) + "ms\n" +
+                          "✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n" +
+                          "╰━━━━━━━━━━━━━━━━━━━━━━━┈" 
                 }, { quoted: msg });
                 break;
             }
@@ -2232,10 +2082,10 @@ _© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆�
             default: {
                 if (command) {
                     await sock.sendMessage(from, { 
-                        text: `╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Command* 〕━━━┈\n` +
-                              `✦ *Command:* .${command}\n` +
-                              `✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n` +
-                              `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
+                        text: "╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Command* 〕━━━┈\n" +
+                              "✦ *Command:* ." + command + "\n" +
+                              "✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n" +
+                              "╰━━━━━━━━━━━━━━━━━━━━━━━┈" 
                     }, { quoted: msg });
                 }
                 break;
