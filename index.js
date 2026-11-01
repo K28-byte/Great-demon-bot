@@ -1,3 +1,4 @@
+
 const messageCache = new Map();
 const warningMap = new Map(); // Tracks warning counts per user per group
 const http = require('http');
@@ -293,7 +294,7 @@ async function startDemonBot() {
             console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
             const code = await sock.requestPairingCode(phoneNumber);
             const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + \x1b[0m\n');
+            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + '\x1b[0m\n');
             console.log('==================================================\n');
         } catch (err) {
             console.log('❌ Error requesting pairing code:', err.message);
@@ -674,7 +675,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "│ ⚔️ *3. World Trigger*\n" +
 "│ ⭐ Score: 9.2/10 | 📺 Status: Seasoned\n" +
 "│ 📜 Incredible tactical team battles, sci-fi world-building, and strict power balance.\n" +
-"└────────────────────────\n" +
+"└────────────────────────\n\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
 
                     await sock.sendMessage(from, { text: multiCardFallback }, { quoted: msg });
@@ -983,7 +984,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 const parts = q.split(' ');
                 const targetUser = parts[0];
                 let count = parseInt(parts[1]) || 50;
-                if (count > 500) count = 500; // safety ceiling
+                if (count > 500) count = 500; 
 
                 await sock.sendMessage(from, { text: '🔥 *Initiating ' + count + '-wave NGL bombardment on `' + targetUser + '`, My Lord...*' }, { quoted: msg });
                 
