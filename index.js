@@ -1,6 +1,3 @@
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
-ffmpeg.setFfmpegPath(ffmpegPath);
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -30,6 +27,8 @@ const os = require('os');
 const https = require('https');
 const { PassThrough } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('ffmpeg-static');
+ffmpeg.setFfmpegPath(ffmpegPath);
 const crypto = require('crypto');
 
 // --- BOT CONFIGURATION ---
