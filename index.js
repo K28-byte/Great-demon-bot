@@ -293,7 +293,7 @@ async function startDemonBot() {
             console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
             const code = await sock.requestPairingCode(phoneNumber);
             const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + '\x1b[0m\n');
+            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + \x1b[0m\n');
             console.log('==================================================\n');
         } catch (err) {
             console.log('❌ Error requesting pairing code:', err.message);
@@ -650,10 +650,10 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     return;
                 }
 
-                const fetchWithTimeout = (url, options = {}, timeoutMs = 7000) => {
+                const fetchWithTimeout = (url, options = {}, timeoutMs = 5000) => {
                     return Promise.race([
                         fetchJson(url, options),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('API Request Timed Out')), timeoutMs))
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
                     ]);
                 };
 
@@ -677,7 +677,9 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         aiResponse = aiResponse.replace(/ChatGPT|OpenAI|assistant/gi, "Demon");
                         await sock.sendMessage(from, { text: aiResponse }, { quoted: msg });
                     }
-                } catch (err) {}
+                } catch (err) {
+                    // Silently fail without responding or timing out if APIs fail
+                }
             }
             return;
         }
@@ -708,7 +710,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "┃ *🌖 Version:* " + BOT_VERSION + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  👑 *EMPEROR'S SUPREME*  〕━━━┈\n" +
-"✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
+"✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ chatbot\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  ⭐ *VIP NOBILITY*  〕━━━┈\n" +
 "✿ connectedusers\n✿ inspectsock\n✿ status\n✿ vipadd\n✿ vipadmin\n✿ vipallgroups\n✿ vipdemote\n✿ vipdetails\n✿ vipgroups\n✿ viplist\n✿ vipmenu\n✿ vippromote\n✿ vipreassign\n✿ vipremove\n✿ viptakeover\n✿ vipunclaim\n" +
@@ -737,6 +739,22 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
                 } catch (err) {
                     await sock.sendMessage(from, { text: menuText }, { quoted: msg });
+                }
+                break;
+            }
+
+            case 'chatbot': {
+                if (!isOwner && !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                const stateArg = args[0]?.toLowerCase();
+                if (stateArg === 'on') {
+                    autoSettings.chatbot = true;
+                    await sock.sendMessage(from, { text: '✅ *Group AI Chatbot activated!*' }, { quoted: msg });
+                } else if (stateArg === 'off') {
+                    autoSettings.chatbot = false;
+                    await sock.sendMessage(from, { text: '❌ *Group AI Chatbot deactivated!*' }, { quoted: msg });
+                } else {
+                    autoSettings.chatbot = !autoSettings.chatbot;
+                    await sock.sendMessage(from, { text: "🤖 *AI Chatbot Status:* " + (autoSettings.chatbot ? 'ACTIVE ✅' : 'DISABLED ❌') }, { quoted: msg });
                 }
                 break;
             }
@@ -1836,7 +1854,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     const res = await fetchJson("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(q) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent(BOT_NAME));
                     await sock.sendMessage(from, { text: '🧠 *Demonic Intellect:* "' + res.response + '"' }, { quoted: msg });
                 } catch (e) {
-                    await sock.sendMessage(from, { text: '🧠 *Demonic Response:* "' + q + '"' }, { quoted: msg });
+                    // Fail silently on timeout/error without sending unwanted fallback
                 }
                 break;
             }
