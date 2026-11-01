@@ -554,9 +554,15 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
         // --- GROUP PROTECTION INTERCEPTORS (ANTILINK & ANTIGROUPSMENTION & ANTIBOT) ---
         if (isGroup && groupSettings[from] && !isSenderAdmin) {
+            const fullTextContent = msg.message?.conversation || 
+                                    msg.message?.extendedTextMessage?.text || 
+                                    msg.message?.imageMessage?.caption || 
+                                    msg.message?.videoMessage?.caption || 
+                                    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation || '';
+
             const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
-            const isLink = linkRegex.test(body);
-            const isGroupMention = body.includes('chat.whatsapp.com');
+            const isLink = linkRegex.test(fullTextContent);
+            const isGroupMention = fullTextContent.includes('chat.whatsapp.com');
 
             if (groupSettings[from].antilink && isLink) {
                 await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
@@ -564,7 +570,9 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 
                 if (mode === 'kick') {
                     await sock.sendMessage(from, { text: "🗡️ @" + sender.split('@')[0] + ", links are forbidden by decree of the Demon Emperor!", mentions: [sender] });
-                    if (isBotAdmin) await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    if (isBotAdmin) {
+                        await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    }
                 } else if (mode === 'warn') {
                     const limit = groupSettings[from].antilinkWarnLimit || 3;
                     const warnKey = from + '_' + sender;
@@ -588,7 +596,9 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 if (mode === 'kick') {
                     await sock.sendMessage(from, { text: "🗡️ @" + sender.split('@')[0] + ", group invites are forbidden!", mentions: [sender] });
-                    if (isBotAdmin) await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    if (isBotAdmin) {
+                        await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    }
                 } else if (mode === 'warn') {
                     const limit = groupSettings[from].antigroupsmentionWarnLimit || 3;
                     const warnKey = from + '_gm_' + sender;
