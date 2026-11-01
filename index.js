@@ -293,7 +293,7 @@ async function startDemonBot() {
             console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
             const code = await sock.requestPairingCode(phoneNumber);
             const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + \x1b[0m\n');
+            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + '\x1b[0m\n');
             console.log('==================================================\n');
         } catch (err) {
             console.log('❌ Error requesting pairing code:', err.message);
@@ -619,7 +619,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             }
         }
 
-        // --- CHATBOT ENGINE (GROUP ONLY + ANIME & PERSONA) ---
+        // --- CHATBOT ENGINE (GROUP ONLY + WEB ANIME REVIEWS & MULTI-CARD RECOMMENDATION) ---
         if (!body.startsWith(prefix)) {
             if (isGroup && autoSettings.chatbot && !msg.key.fromMe) {
                 const lowerBody = body.toLowerCase().trim();
@@ -636,17 +636,56 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     await sock.sendMessage(from, { text: "😂😂 real funny bro" }, { quoted: msg });
                     return;
                 }
-                if (/recommend( me)?( an)? anime|best anime|anime recommendation|good anime/i.test(lowerBody)) {
-                    const animeList = [
-                        "🔥 *Lord of the Mysteries* — If you love mystery, victorian steampunk, and deep horror/magic power systems, this is a masterpiece!",
-                        "⚔️ *Reverend Insanity (Fang Yuan)* — Dark fantasy, ruthless cultivation, and an unbeatable MC who pursues eternal life with zero regrets.",
-                        "🌀 *Re:Zero - Starting Life in Another World* — Dark, psychological Isekai featuring Subaru dealing with Return by Death.",
-                        "🎯 *World Trigger* — Incredible tactical team battles, sci-fi world-building, and strict power balance.",
-                        "👁️ *Jujutsu Kaisen* — High-octane curse battles, domain expansions, and god-tier animation scenes.",
-                        "🗡️ *Solo Leveling* — Fast-paced dungeon hunter progression with incredible hype fights!"
-                    ];
-                    const picked = animeList[Math.floor(Math.random() * animeList.length)];
-                    await sock.sendMessage(from, { text: "Here is a top-tier anime recommendation for you:\n\n" + picked }, { quoted: msg });
+
+                // --- DYNAMIC WEB ANIME SEARCH & MULTI-CARD RECOMMENDATION ---
+                if (/recommend( me)?( an)? anime|best anime|anime recommendation|good anime|tell me about it|anime list/i.test(lowerBody)) {
+                    try {
+                        const webSearchQuery = lowerBody.includes('tell me about it') ? body : 'top dark fantasy action anime';
+                        const jikanRes = await fetchJson("https://api.jikan.moe/v4/anime?q=" + encodeURIComponent(webSearchQuery) + "&limit=3");
+                        
+                        if (jikanRes && jikanRes.data && jikanRes.data.length > 0) {
+                            let cardText = "╭━━━〔  👑 *DEMON EMPEROR ANIME VAULT* 👑  〕━━━┈\n";
+                            cardText += "_“Fetched live from the Web Archives”_\n\n";
+
+                            for (let i = 0; i < jikanRes.data.length; i++) {
+                                const anime = jikanRes.data[i];
+                                cardText += "┌────────────────────────\n";
+                                cardText += "│ ⚔️ *Title:* " + (anime.title_english || anime.title) + "\n";
+                                cardText += "│ ⭐ *Score:* " + (anime.score || 'N/A') + " | 📺 *Episodes:* " + (anime.episodes || 'Ongoing') + "\n";
+                                cardText += "│ 📜 *Synopsis:* " + (anime.synopsis ? anime.synopsis.slice(0, 140) + "..." : "No synopsis available.") + "\n";
+                                cardText += "│ 🔗 *URL:* " + anime.url + "\n";
+                                cardText += "└────────────────────────\n\n";
+                            }
+                            cardText += "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
+
+                            await sock.sendMessage(from, { text: cardText }, { quoted: msg });
+                            return;
+                        }
+                    } catch (webErr) {
+                        // Fallback multi-card curation if web search fails
+                    }
+
+                    const multiCardFallback = 
+"╭━━━〔  👑 *DEMON EMPEROR ANIME VAULT* 👑  〕━━━┈\n" +
+"_“Top-Tier Recommendations For My Lord”_\n\n" +
+"┌────────────────────────\n" +
+"│ ⚔️ *1. Reverend Insanity (Fang Yuan)*\n" +
+"│ ⭐ Score: 9.8/10 | 📺 Status: Masterpiece\n" +
+"│ 📜 Dark fantasy, ruthless cultivation, and an unbeatable MC who pursues eternal life with zero regrets.\n" +
+"└────────────────────────\n\n" +
+"┌────────────────────────\n" +
+"│ ⚔️ *2. Lord of the Mysteries*\n" +
+"│ ⭐ Score: 9.6/10 | 📺 Status: Ongoing\n" +
+"│ 📜 Victorian steampunk, mystery, and deep horror/magic power systems.\n" +
+"└────────────────────────\n\n" +
+"┌────────────────────────\n" +
+"│ ⚔️ *3. World Trigger*\n" +
+"│ ⭐ Score: 9.2/10 | 📺 Status: Seasoned\n" +
+"│ 📜 Incredible tactical team battles, sci-fi world-building, and strict power balance.\n" +
+"└────────────────────────\n" +
+"╰━━━━━━━━━━━━━━━━━━━━━━━┈";
+
+                    await sock.sendMessage(from, { text: multiCardFallback }, { quoted: msg });
                     return;
                 }
 
@@ -678,7 +717,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         await sock.sendMessage(from, { text: aiResponse }, { quoted: msg });
                     }
                 } catch (err) {
-                    // Silently fail without responding or timing out if APIs fail
+                    // Fail silently without responding or timing out if APIs fail
                 }
             }
             return;
