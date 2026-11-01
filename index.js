@@ -55,7 +55,8 @@ const autoSettings = {
     autorecording: false,
     autostatuslike: true,   // Enabled for status liking
     autostatusview: true,   // Enabled for status viewing
-    autotyping: false
+    autotyping: false,
+    chatbot: true           // Enabled AI Chatbot
 };
 
 function unwrapMessage(message) {
@@ -616,31 +617,25 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     return;
                 }
             }
-       )
+        }
 
+        // --- CHATBOT ENGINE (GROUP ONLY + ANIME & PERSONA) ---
+        if (!body.startsWith(prefix)) {
             if (isGroup && autoSettings.chatbot && !msg.key.fromMe) {
                 const lowerBody = body.toLowerCase().trim();
 
-                // --- 1. SPECIAL FIXED RESPONSES ---
-                // Identity - Name Query
                 if (/what(s|\s+is)\s+(ur|your)\s+name|who\s+are\s+you/i.test(lowerBody)) {
                     await sock.sendMessage(from, { text: "I'm Demon" }, { quoted: msg });
                     return;
                 }
-
-                // Identity - AI Query
                 if (/are\s+you\s+(an?\s+)?(ai|bot|robot)/i.test(lowerBody)) {
                     await sock.sendMessage(from, { text: "Nope, I'm a real person" }, { quoted: msg });
                     return;
                 }
-
-                // Reaction to Jokes & Laughs
                 if (/\b(lol|lmao|haha|funny|joke|xd)\b/i.test(lowerBody)) {
                     await sock.sendMessage(from, { text: "😂😂 real funny bro" }, { quoted: msg });
                     return;
                 }
-
-                // --- 2. ANIME & RECOMMENDATION ENGINE ---
                 if (/recommend( me)?( an)? anime|best anime|anime recommendation|good anime/i.test(lowerBody)) {
                     const animeList = [
                         "🔥 *Lord of the Mysteries* — If you love mystery, victorian steampunk, and deep horror/magic power systems, this is a masterpiece!",
@@ -655,7 +650,6 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     return;
                 }
 
-                // --- 3. MULTI-API FAST AI FALLBACK SYSTEM (PREVENTS TIMEOUTS) ---
                 const fetchWithTimeout = (url, options = {}, timeoutMs = 7000) => {
                     return Promise.race([
                         fetchJson(url, options),
@@ -665,51 +659,30 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 try {
                     let aiResponse = null;
-
-                    // System prompt context to guide response style
                     const promptContext = "You are an AI named Demon chatting in a WhatsApp group. You talk like a real human friend, discuss anime fluently, tell jokes, give anime recommendations, and answer questions like a smart AI model when asked. User message: " + body;
 
-                    // Primary API Attempt (Fast Chatbot API)
                     try {
                         const apiRes1 = await fetchWithTimeout("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(promptContext) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent("Demon"));
-                        if (apiRes1 && apiRes1.response) {
-                            aiResponse = apiRes1.response;
-                        }
-                    } catch (e1) {
-                        console.log("Primary Chatbot API timed out or failed. Switching to Backup AI API...");
-                    }
+                        if (apiRes1 && apiRes1.response) aiResponse = apiRes1.response;
+                    } catch (e1) {}
 
-                    // Secondary API Fallback (DavidCyril AI API)
                     if (!aiResponse) {
                         try {
                             const apiRes2 = await fetchWithTimeout("https://apis.davidcyriltech.my.id/ai/gpt4?text=" + encodeURIComponent(promptContext));
-                            if (apiRes2 && (apiRes2.message || apiRes2.result)) {
-                                aiResponse = apiRes2.message || apiRes2.result;
-                            }
-                        } catch (e2) {
-                            console.log("Secondary AI API failed.");
-                        }
+                            if (apiRes2 && (apiRes2.message || apiRes2.result)) aiResponse = apiRes2.message || apiRes2.result;
+                        } catch (e2) {}
                     }
 
-                    // Send AI Response if obtained
                     if (aiResponse) {
-                        // Clean up generic bot terms if any remain
                         aiResponse = aiResponse.replace(/ChatGPT|OpenAI|assistant/gi, "Demon");
                         await sock.sendMessage(from, { text: aiResponse }, { quoted: msg });
                     }
-
-                } catch (err) {
-                    console.error("Chatbot system error:", err.message);
-                }
+                } catch (err) {}
             }
             return;
         }
 
-        // --- 3. COMMAND PARSING CONTINUES HERE ---
-        const args = body.slice(prefix.length).trim().split(/ +/);
-        const command = args.shift().toLowerCase();
-        // ... (rest of your switch(command) block)
-
+        // --- 3. COMMAND PARSING ---
         const args = body.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
         const q = args.join(' ');
@@ -758,7 +731,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "╭━━━〔  🛠️ *AUXILIARY TOOLS*  〕━━━┈\n" +
 "✿ androidcrash\n✿ bugmenu\n✿ gccrash\n✿ hd\n✿ iosfc\n✿ ocr\n✿ removebg\n✿ screenshot\n✿ searchmenu\n✿ toolmenu\n✿ ping\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝒊𝒗𝒆_";
+"_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝙞𝒗𝒆_";
 
                 try {
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
