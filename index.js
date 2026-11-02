@@ -943,7 +943,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            // 4. Moving Anime GIF Card Command
+            // 4. Stabilized Anime Visual Card Command (Non-Crashing)
             case 'animecard':
             case 'gifcard':
             case 'animegif': {
@@ -964,21 +964,13 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "┣━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
 "┃ 📜 " + (anime.synopsis ? anime.synopsis.slice(0, 160) + "..." : "No description available.") + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
-"_“A legendary moving artifact bound to the Demon Realm”_";
+"_“A legendary artifact bound to the Demon Realm”_";
 
                         const imageUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || MENU_IMAGE_URL;
 
-                        const gifLoops = [
-                            "https://media.giphy.com/media/3oKIPzAy6d2179w2e4/giphy.mp4",
-                            "https://media.giphy.com/media/10UxkF9u5iZ2nS/giphy.mp4",
-                            "https://media.giphy.com/media/12j7u14k1c7C4o/giphy.mp4",
-                            "https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.mp4"
-                        ];
-                        const randomGif = gifLoops[Math.floor(Math.random() * gifLoops.length)];
-
+                        // Spawn as a high-speed stable visual image card to prevent disconnects
                         await sock.sendMessage(from, { 
-                            video: { url: randomGif }, 
-                            gifPlayback: true,
+                            image: { url: imageUrl }, 
                             caption: cardCaption,
                             contextInfo: {
                                 externalAdReply: {
@@ -1004,8 +996,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
 
                     await sock.sendMessage(from, { 
-                        video: { url: "https://media.giphy.com/media/3oKIPzAy6d2179w2e4/giphy.mp4" }, 
-                        gifPlayback: true,
+                        image: { url: MENU_IMAGE_URL }, 
                         caption: fallbackCaption,
                         contextInfo: {
                             externalAdReply: {
