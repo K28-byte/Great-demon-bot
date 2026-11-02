@@ -775,7 +775,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "✿ sudo\n✿ sudolist\n✿ sudoremove\n✿ setprefix\n✿ anticall\n✿ antigroupstatus\n✿ delgcstatus\n✿ delete / del\n✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ autoreact\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🎭 *𝐇𝐚𝐯𝐞 𝐅𝐮𝐧 𝐰𝐢𝐭𝐡 𝐄𝐦𝐩*  〕━━━┈\n" +
-"✿ song / play\n✿ animecard / gifcard\n✿ wasted\n✿ top / activeusers\n✿ gayrate\n✿ flirt\n✿ dare\n✿ truth\n" +
+"✿ konachan / konachansfw\n✿ wasted\n✿ top / activeusers\n✿ gayrate\n✿ flirt\n✿ dare\n✿ truth\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🛡️ *𝘿𝒐𝒎𝒂𝒊𝒏 𝙈𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕*  〕━━━┈\n" +
 "✿ welcome\n✿ goodbye\n✿ antilink (warn/kick)\n✿ antigroupsmention (warn/kick)\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ textbox\n✿ vv\n" +
@@ -888,133 +888,54 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            // 3. Upgraded Bulletproof YouTube Audio Downloader (.play / .song)
-            case 'play':
-            case 'song': {
-                if (!q) return extra.reply(`💡 *My Lord, provide a song name or YouTube link: ${prefix}play <song name>*`);
-                await extra.reply('🎵 *Searching YouTube archives & forging audio stream, My Lord...*');
-                
-                let audioUrl = null;
-                let videoTitle = q;
-                let videoThumbnail = MENU_IMAGE_URL;
-                let videoUrl = 'https://youtube.com';
-
+            // 3. Konachan Anime Visual Command (.konachan)
+            case 'konachan':
+            case 'konachansfw': {
                 try {
-                    const search = await yts(q);
-                    if (search && search.videos.length > 0) {
-                        const video = search.videos[0];
-                        videoTitle = video.title;
-                        videoThumbnail = video.thumbnail;
-                        videoUrl = video.url;
-                    }
-                } catch (e) {}
+                    await sock.sendMessage(from, { text: '🎨 *Harvesting Konachan anime visual, My Lord...*' }, { quoted: msg });
 
-                // Attempt 1: Guru API
-                try {
-                    const res = await fetchJson(`https://guruapi.tech/api/ytmp3?url=` + encodeURIComponent(videoUrl));
-                    if (res && res.dl_url) audioUrl = res.dl_url;
-                } catch (e) {}
-
-                // Attempt 2: David Cyril Tech API
-                if (!audioUrl) {
+                    let imageUrl = null;
                     try {
-                        const res = await fetchJson(`https://apis.davidcyriltech.my.id/download?url=` + encodeURIComponent(videoUrl));
-                        if (res?.result?.dl_url || res?.result?.audio) audioUrl = res.result.dl_url || res.result.audio;
-                    } catch (e) {}
-                }
-
-                // Attempt 3: Siputzx API
-                if (!audioUrl) {
-                    try {
-                        const search = await yts(q);
-                        const vUrl = search?.videos?.[0]?.url || videoUrl;
-                        const res = await fetchJson(`https://api.siputzx.my.id/api/d/ytmp3?url=` + encodeURIComponent(vUrl));
-                        if (res?.data) audioUrl = res.data;
-                    } catch (e) {}
-                }
-
-                if (audioUrl) {
-                    try {
-                        const audioRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-                        await sock.sendMessage(from, { 
-                            audio: Buffer.from(audioRes.data), 
-                            mimetype: 'audio/mp4', 
-                            ptt: false,
-                            contextInfo: {
-                                externalAdReply: {
-                                    title: videoTitle,
-                                    body: "Demon Emperor Audio Archive",
-                                    thumbnailUrl: videoThumbnail,
-                                    sourceUrl: videoUrl,
-                                    mediaType: 2,
-                                    renderLargerThumbnail: true
-                                }
+                        const res = await fetchJson('https://konachan.net/post.json?limit=20');
+                        if (Array.isArray(res) && res.length > 0) {
+                            const validPosts = res.filter(p => p.file_url);
+                            if (validPosts.length > 0) {
+                                const randomPost = validPosts[Math.floor(Math.random() * validPosts.length)];
+                                imageUrl = randomPost.file_url.startsWith('http') ? randomPost.file_url : 'https:' + randomPost.file_url;
                             }
-                        }, { quoted: msg });
-                        return;
-                    } catch (e) {}
-                }
+                        }
+                    } catch (err) {}
 
-                await extra.reply('❌ *Failed to harvest audio stream from all archives. Try again with a direct YouTube link!*');
-                break;
-            }
-
-            // 4. Guaranteed 100% Stable Bulletproof Anime Visual Card Command (.animecard)
-            case 'animecard':
-            case 'gifcard':
-            case 'animegif': {
-                await sock.sendMessage(from, { text: '🎨 *Summoning anime card from the nether realms, My Lord...*' }, { quoted: msg });
-                
-                let cardTitle = "Reverend Insanity";
-                let cardImg = "https://cdn.myanimelist.net/images/anime/1029/119279.jpg";
-                let cardSynopsis = "A masterpiece dark fantasy cultivation chronicle.";
-                let cardScore = "9.8/10";
-
-                try {
-                    // Try Waifu.pics SFW waifu endpoint first for guaranteed high quality portrait
-                    const waifuRes = await fetchJson('https://api.waifu.pics/sfw/waifu');
-                    if (waifuRes && waifuRes.url) {
-                        cardImg = waifuRes.url;
-                    }
-
-                    // Try fetching random top anime info via Jikan v4
-                    const jikanRes = await fetchJson('https://api.jikan.moe/v4/random/anime');
-                    if (jikanRes && jikanRes.data) {
-                        const dat = jikanRes.data;
-                        if (dat.title) cardTitle = dat.title;
-                        if (dat.score) cardScore = dat.score + "/10";
-                        if (dat.synopsis) cardSynopsis = dat.synopsis.slice(0, 150) + "...";
-                        if (dat.images?.jpg?.large_image_url) {
-                            cardImg = dat.images.jpg.large_image_url;
+                    if (!imageUrl) {
+                        const fallbackRes = await fetchJson('https://api.waifu.pics/sfw/waifu');
+                        if (fallbackRes && fallbackRes.url) {
+                            imageUrl = fallbackRes.url;
                         }
                     }
-                } catch (err) {
-                    // Fallback handled cleanly by pre-set variables
-                }
 
-                const cardCaption = 
-"╭━━━〔  👑 *DEMON EMPEROR ANIME CARD* 👑  〕━━━┈\n" +
-"┃ ⚔️ *Title:* " + cardTitle + "\n" +
-"┃ ⭐ *Score:* " + cardScore + " | 📺 *Status:* Masterpiece\n" +
-"┣━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
-"┃ 📜 " + cardSynopsis + "\n" +
-"╰━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
-"_“A legendary artifact bound to the Demon Realm”_";
-
-                await sock.sendMessage(from, { 
-                    image: { url: cardImg }, 
-                    caption: cardCaption,
-                    contextInfo: {
-                        externalAdReply: {
-                            title: "✦ " + cardTitle + " ✦",
-                            body: "Demon Emperor Archive | Tap to inspect",
-                            thumbnailUrl: cardImg,
-                            sourceUrl: "https://myanimelist.net",
-                            mediaType: 1,
-                            renderLargerThumbnail: true
-                        }
+                    if (!imageUrl) {
+                        return extra.reply('❌ *No Konachan image could be harvested at this moment, My Lord.*');
                     }
-                }, { quoted: msg });
+
+                    const imageResponse = await axios.get(imageUrl, {
+                        responseType: 'arraybuffer',
+                        timeout: 30000
+                    });
+
+                    const imageBuffer = Buffer.from(imageResponse.data);
+                    if (!imageBuffer || imageBuffer.length === 0) {
+                        throw new Error('Empty image response received');
+                    }
+
+                    await sock.sendMessage(from, {
+                        image: imageBuffer,
+                        caption: "✦ *Konachan Anime Visual Archive* ✦\n_“Summoned successfully for My Lord Demon Emperor”_"
+                    }, { quoted: msg });
+
+                } catch (error) {
+                    console.error('[konachan error]:', error.message);
+                    await extra.reply(`❌ *Could not fetch konachan image:* ${error.message}`);
+                }
                 break;
             }
 
@@ -1092,17 +1013,6 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 
                 try {
                     const ctx = msg.message?.extendedTextMessage?.contextInfo;
-                    const groupStatusTracker = require('../../utils/groupStatusTracker');
-                    if (!args[0] && ctx?.stanzaId && ctx?.participant && groupStatusTracker) {
-                        const known = groupStatusTracker.list(extra.from).find((e) => e.key.id === ctx.stanzaId);
-                        const target = known || {
-                            key: { remoteJid: extra.from, fromMe: false, id: ctx.stanzaId, participant: ctx.participant },
-                        };
-                        const deleted = sock.revokeGroupStatus ? await sock.revokeGroupStatus(extra.from, target) : false;
-                        if (deleted && groupStatusTracker) groupStatusTracker.remove(extra.from, [ctx.stanzaId]);
-                        return extra.reply(deleted ? '✅ Status has been deleted.' : '❌ Couldn\'t delete the status.');
-                    }
-
                     if (!args[0]) {
                         const settings = groupSettings[extra.from];
                         const status = settings.antigroupstatus ? 'ON' : 'OFF';
