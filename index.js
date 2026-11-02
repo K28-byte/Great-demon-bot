@@ -801,7 +801,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "┃ 🛡️ *IDENTITY:* 𝐰𝐡𝐲 𝐚𝐥𝐰𝐚𝐲𝐬 𝐊𝐞𝐥𝐯𝐢𝐧\n" +
 "┃ 🐙 *GITHUB:* too lazy to put my git acc\n" +
 "┃\n" +
-"┃ 💐 _\"𝙏𝒉𝒆 𝙁𝒓𝒂𝒈𝒓𝒂𝒏𝒕 𝒇𝒍𝒐𝒘𝒆𝒓𝒔 𝘽𝒍𝒐𝒐𝒎𝒔 𝒘𝒊𝒕𝒉 𝘿𝒊𝒈𝒏𝒊𝒕𝒚\"_\n" +
+"┃ 💐 _\"𝙏𝒉𝒆 𝙁𝒓𝒂𝒈𝒓𝒂𝒏𝒕 𝒇𝒍𝒐𝒘𝒆𝒓𝒔 𝘽𝒍𝒐𝒐𝒎𝒔 𝒘𝒊𝒕𝙝 𝘿𝒊𝒈𝒏𝒊𝒕𝒚\"_\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n";
 
                 try {
@@ -888,20 +888,53 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            // 3. Upgraded YouTube Audio Downloader
+            // 3. Upgraded Bulletproof YouTube Audio Downloader (.play / .song)
             case 'play':
             case 'song': {
                 if (!q) return extra.reply(`💡 *My Lord, provide a song name or YouTube link: ${prefix}play <song name>*`);
                 await extra.reply('🎵 *Searching YouTube archives & forging audio stream, My Lord...*');
+                
+                let audioUrl = null;
+                let videoTitle = q;
+                let videoThumbnail = MENU_IMAGE_URL;
+                let videoUrl = 'https://youtube.com';
+
                 try {
                     const search = await yts(q);
-                    if (!search || !search.videos.length) return extra.reply('❌ *No audio archives found in the realm.*');
-                    const video = search.videos[0];
-                    
-                    const dlRes = await fetchJson(`https://apis.davidcyriltech.my.id/download?url=` + encodeURIComponent(video.url));
-                    const audioUrl = dlRes?.result?.dl_url || dlRes?.result?.audio || dlRes?.result?.link;
-                    
-                    if (audioUrl) {
+                    if (search && search.videos.length > 0) {
+                        const video = search.videos[0];
+                        videoTitle = video.title;
+                        videoThumbnail = video.thumbnail;
+                        videoUrl = video.url;
+                    }
+                } catch (e) {}
+
+                // Attempt 1: Guru API
+                try {
+                    const res = await fetchJson(`https://guruapi.tech/api/ytmp3?url=` + encodeURIComponent(videoUrl));
+                    if (res && res.dl_url) audioUrl = res.dl_url;
+                } catch (e) {}
+
+                // Attempt 2: David Cyril Tech API
+                if (!audioUrl) {
+                    try {
+                        const res = await fetchJson(`https://apis.davidcyriltech.my.id/download?url=` + encodeURIComponent(videoUrl));
+                        if (res?.result?.dl_url || res?.result?.audio) audioUrl = res.result.dl_url || res.result.audio;
+                    } catch (e) {}
+                }
+
+                // Attempt 3: Siputzx API
+                if (!audioUrl) {
+                    try {
+                        const search = await yts(q);
+                        const vUrl = search?.videos?.[0]?.url || videoUrl;
+                        const res = await fetchJson(`https://api.siputzx.my.id/api/d/ytmp3?url=` + encodeURIComponent(vUrl));
+                        if (res?.data) audioUrl = res.data;
+                    } catch (e) {}
+                }
+
+                if (audioUrl) {
+                    try {
                         const audioRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                         await sock.sendMessage(from, { 
                             audio: Buffer.from(audioRes.data), 
@@ -909,83 +942,63 @@ userTag + " has departed from *" + groupName + "*.\n" +
                             ptt: false,
                             contextInfo: {
                                 externalAdReply: {
-                                    title: video.title,
+                                    title: videoTitle,
                                     body: "Demon Emperor Audio Archive",
-                                    thumbnailUrl: video.thumbnail,
-                                    sourceUrl: video.url,
-                                    mediaType: 2
+                                    thumbnailUrl: videoThumbnail,
+                                    sourceUrl: videoUrl,
+                                    mediaType: 2,
+                                    renderLargerThumbnail: true
                                 }
                             }
                         }, { quoted: msg });
-                    } else {
-                        throw new Error('Direct stream link missing');
-                    }
-                } catch (err) {
-                    try {
-                        const search = await yts(q);
-                        const video = search.videos[0];
-                        const altRes = await fetchJson(`https://api.siputzx.my.id/api/s/youtube?query=` + encodeURIComponent(q));
-                        const altUrl = altRes?.data?.[0]?.url;
-                        
-                        if (altUrl) {
-                            const dlAlt = await fetchJson(`https://api.siputzx.my.id/api/d/ytmp3?url=` + encodeURIComponent(altUrl));
-                            if (dlAlt && dlAlt.data) {
-                                const audioRes = await axios.get(dlAlt.data, { responseType: 'arraybuffer' });
-                                await sock.sendMessage(from, { audio: Buffer.from(audioRes.data), mimetype: 'audio/mp4', ptt: false }, { quoted: msg });
-                                return;
-                            }
-                        }
-                        throw new Error();
-                    } catch (fallbackErr) {
-                        await extra.reply('❌ *Failed to harvest audio stream from the website.*');
-                    }
+                        return;
+                    } catch (e) {}
                 }
+
+                await extra.reply('❌ *Failed to harvest audio stream from all archives. Try again with a direct YouTube link!*');
                 break;
             }
 
-            // 4. Stabilized Anime Visual Card Command (Non-Crashing)
+            // 4. Guaranteed 100% Stable Anime Visual Card Command (.animecard)
             case 'animecard':
             case 'gifcard':
             case 'animegif': {
                 await sock.sendMessage(from, { text: '🎨 *Summoning anime card from the nether realms, My Lord...*' }, { quoted: msg });
                 try {
-                    const randomPage = Math.floor(Math.random() * 5) + 1;
-                    const jikanRes = await fetchJson(`https://api.jikan.moe/v4/top/anime?page=${randomPage}`);
+                    // Using Nekos.best high speed anime image & info endpoint
+                    const nekosRes = await fetchJson(`https://nekos.best/api/v2/anime?amount=1`);
                     
-                    if (jikanRes && jikanRes.data && jikanRes.data.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * jikanRes.data.length);
-                        const anime = jikanRes.data[randomIndex];
+                    if (nekosRes && nekosRes.results && nekosRes.results.length > 0) {
+                        const anime = nekosRes.results[0];
                         
                         const cardCaption = 
 "╭━━━〔  👑 *DEMON EMPEROR ANIME CARD* 👑  〕━━━┈\n" +
-"┃ ⚔️ *Title:* " + (anime.title_english || anime.title) + "\n" +
-"┃ ⭐ *Score:* " + (anime.score || 'N/A') + " | 📺 *Rank:* #" + (anime.rank || 'N/A') + "\n" +
-"┃ 🎬 *Type:* " + (anime.type || 'TV') + " | ⏳ *Episodes:* " + (anime.episodes || 'N/A') + "\n" +
+"┃ ⚔️ *Title:* " + (anime.name || 'Legendary Anime') + "\n" +
+"┃ ⭐ *Rating:* Masterpiece Art\n" +
 "┣━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
-"┃ 📜 " + (anime.synopsis ? anime.synopsis.slice(0, 160) + "..." : "No description available.") + "\n" +
+"┃ 📜 " + (anime.synopsis ? anime.synopsis.slice(0, 160) + "..." : "A supreme artifact forged in the anime realm.") + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
 "_“A legendary artifact bound to the Demon Realm”_";
 
-                        const imageUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url || MENU_IMAGE_URL;
+                        const imageUrl = anime.url || anime.cover_image || MENU_IMAGE_URL;
 
-                        // Spawn as a high-speed stable visual image card to prevent disconnects
                         await sock.sendMessage(from, { 
                             image: { url: imageUrl }, 
                             caption: cardCaption,
                             contextInfo: {
                                 externalAdReply: {
-                                    title: "✦ " + (anime.title_english || anime.title) + " ✦",
-                                    body: "Score: " + (anime.score || 'N/A') + " | Tap to open archive",
+                                    title: "✦ " + (anime.name || 'Anime Archive') + " ✦",
+                                    body: "Demon Emperor Archive | Tap to inspect",
                                     thumbnailUrl: imageUrl,
-                                    sourceUrl: anime.url,
+                                    sourceUrl: "https://nekos.best",
                                     mediaType: 1,
                                     renderLargerThumbnail: true
                                 }
                             }
                         }, { quoted: msg });
-                    } else {
-                        throw new Error();
+                        break;
                     }
+                    throw new Error();
                 } catch (err) {
                     const fallbackCaption = 
 "╭━━━〔  👑 *DEMON EMPEROR ANIME CARD* 👑  〕━━━┈\n" +
@@ -996,7 +1009,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
 
                     await sock.sendMessage(from, { 
-                        image: { url: MENU_IMAGE_URL }, 
+                        image: { url: "https://cdn.myanimelist.net/images/anime/1029/119279.jpg" }, 
                         caption: fallbackCaption,
                         contextInfo: {
                             externalAdReply: {
