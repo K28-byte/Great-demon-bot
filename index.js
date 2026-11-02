@@ -947,7 +947,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             case 'animecard':
             case 'gifcard':
             case 'animegif': {
-                await sock.sendMessage(from, { text: '🎨 *Summoning moving anime GIF card from the nether realms, My Lord...*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '🎨 *Summoning anime card from the nether realms, My Lord...*' }, { quoted: msg });
                 try {
                     const randomPage = Math.floor(Math.random() * 5) + 1;
                     const jikanRes = await fetchJson(`https://api.jikan.moe/v4/top/anime?page=${randomPage}`);
