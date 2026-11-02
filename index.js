@@ -46,12 +46,13 @@ const MENU_IMAGE_URL = "https://img.sanishtech.com/u/96b35f47cb64cc0f77b9a781b40
 const PURPLE_COLOR = '#9C27B0';
 const startTime = Date.now();
 
-// --- PERSISTENT STORAGE ENGINE ---
-const SETTINGS_FILE = './settings.json';
+// --- FULL PERSISTENT STORAGE ENGINE ---
+const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 
 function loadSettings() {
     if (!fs.existsSync(SETTINGS_FILE)) {
         const defaultSettings = {
+            botMode: "public",
             prefix: ".",
             sudoUsers: [OWNER_NUMBER],
             autoSettings: {
@@ -60,28 +61,40 @@ function loadSettings() {
                 autostatuslike: true,
                 autostatusview: true,
                 autotyping: false,
+                chatbot: true,
                 anticall: true
-            }
+            },
+            groupSettings: {}
         };
         fs.writeFileSync(SETTINGS_FILE, JSON.stringify(defaultSettings, null, 2));
         return defaultSettings;
     }
     try {
-        return JSON.parse(fs.readFileSync(SETTINGS_FILE));
+        return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
     } catch (e) {
         return {
+            botMode: "public",
             prefix: ".",
             sudoUsers: [OWNER_NUMBER],
-            autoSettings: { autoonline: true, autorecording: false, autostatuslike: true, autostatusview: true, autotyping: false, anticall: true }
+            autoSettings: { autoonline: true, autorecording: false, autostatuslike: true, autostatusview: true, autotyping: false, chatbot: true, anticall: true },
+            groupSettings: {}
         };
     }
 }
 
-function saveSettings(data) {
+function saveSettings() {
+    const data = {
+        botMode,
+        prefix,
+        sudoUsers: Array.from(sudoUsers),
+        autoSettings,
+        groupSettings
+    };
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
 }
 
 const db = loadSettings();
+let botMode = db.botMode || "public";
 let prefix = db.prefix || ".";
 const sudoUsers = new Set(db.sudoUsers || [OWNER_NUMBER]);
 const autoSettings = db.autoSettings || {
@@ -90,40 +103,13 @@ const autoSettings = db.autoSettings || {
     autostatuslike: true,
     autostatusview: true,
     autotyping: false,
+    chatbot: true,
     anticall: true
 };
-
-// --- MESSAGE TRACKER FUNCTIONS ---
-const dataFilePath = path.join(__dirname, 'messageCount.json');
-
-function loadMessageCounts() {
-    if (fs.existsSync(dataFilePath)) {
-        const data = fs.readFileSync(dataFilePath);
-        return JSON.parse(data);
-    }
-    return {};
-}
-
-function saveMessageCounts(messageCounts) {
-    fs.writeFileSync(dataFilePath, JSON.stringify(messageCounts, null, 2));
-}
-
-function incrementMessageCount(groupId, userId) {
-    const messageCounts = loadMessageCounts();
-    if (!messageCounts[groupId]) {
-        messageCounts[groupId] = {};
-    }
-    if (!messageCounts[groupId][userId]) {
-        messageCounts[groupId][userId] = 0;
-    }
-    messageCounts[groupId][userId] += 1;
-    saveMessageCounts(messageCounts);
-}
+const groupSettings = db.groupSettings || {};
 
 // --- STATE MANAGEMENT ---
-let botMode = "public"; 
 const activeGames = {};
-const groupSettings = {};
 const blockedUsers = new Set();
 const deletedMessages = new Map();
 
@@ -361,8 +347,7 @@ async function startDemonBot() {
             console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
             const code = await sock.requestPairingCode(phoneNumber);
             const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            console.log('\n🔑 YOUR PAIRING CODE: ' + formattedCode + '\n');
-
+            console.log('\n🔑 YOUR PAIRING CODE: \x1b[32m' + formattedCode + '\x1b[0m\n');
             console.log('==================================================\n');
         } catch (err) {
             console.log('❌ Error requesting pairing code:', err.message);
@@ -431,16 +416,17 @@ async function startDemonBot() {
         try {
             const { id: from, participants, action } = update;
  
-        if (!groupSettings[from]) {
-            groupSettings[from] = { 
-                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false, antigcstatus: false,
-                antilinkMode: 'kick', antilinkWarnLimit: 3,
-                antigroupsmentionMode: 'kick', antigroupsmentionWarnLimit: 3
-            };
-        }
+            if (!groupSettings[from]) {
+                groupSettings[from] = { 
+                    antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
+                    antiimage: false, antilink: false, antipromote: false, antiremove: false, 
+                    antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
+                    antitagadmin: false, grouponly: false, antigcstatus: false,
+                    antilinkMode: 'kick', antilinkWarnLimit: 3,
+                    antigroupsmentionMode: 'kick', antigroupsmentionWarnLimit: 3
+                };
+                saveSettings();
+            }
 
             const groupMetadata = await sock.groupMetadata(from).catch(() => ({ subject: 'Domain' }));
             const groupName = groupMetadata.subject;
@@ -544,11 +530,6 @@ userTag + " has departed from *" + groupName + "*.\n" +
         const sender = msg.key.participant || msg.key.remoteJid;
         const senderNum = sender.split('@')[0];
 
-        // Track message counts for leaderboard
-        if (isGroup && !msg.key.fromMe) {
-            incrementMessageCount(from, sender);
-        }
-
         const body = msg.message.conversation || 
                      msg.message.extendedTextMessage?.text || 
                      msg.message.imageMessage?.caption || '';
@@ -562,6 +543,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 antilinkMode: 'kick', antilinkWarnLimit: 3,
                 antigroupsmentionMode: 'kick', antigroupsmentionWarnLimit: 3
             };
+            saveSettings();
         }
 
         const isOwner = msg.key.fromMe || sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER;
@@ -718,11 +700,106 @@ userTag + " has departed from *" + groupName + "*.\n" +
             }
         }
 
+        // --- CHATBOT ENGINE ---
         if (!body.startsWith(prefix)) {
+            if (isGroup && autoSettings.chatbot && !msg.key.fromMe) {
+                const lowerBody = body.toLowerCase().trim();
+
+                if (/what(s|\s+is)\s+(ur|your)\s+name|who\s+are\s+you/i.test(lowerBody)) {
+                    await sock.sendMessage(from, { text: "I'm Demon" }, { quoted: msg });
+                    return;
+                }
+                if (/are\s+you\s+(an?\s+)?(ai|bot|robot)/i.test(lowerBody)) {
+                    await sock.sendMessage(from, { text: "Nope, I'm a real person" }, { quoted: msg });
+                    return;
+                }
+                if (/\b(lol|lmao|haha|funny|joke|xd)\b/i.test(lowerBody)) {
+                    await sock.sendMessage(from, { text: "😂😂 real funny bro" }, { quoted: msg });
+                    return;
+                }
+
+                if (/recommend( me)?( an)? anime|best anime|anime recommendation|good anime|tell me about it|anime list/i.test(lowerBody)) {
+                    try {
+                        const webSearchQuery = lowerBody.includes('tell me about it') ? body : 'top dark fantasy action anime';
+                        const jikanRes = await fetchJson("https://api.jikan.moe/v4/anime?q=" + encodeURIComponent(webSearchQuery) + "&limit=3");
+                        
+                        if (jikanRes && jikanRes.data && jikanRes.data.length > 0) {
+                            let cardText = "╭━━━〔  👑 *DEMON EMPEROR ANIME VAULT* 👑  〕━━━┈\n";
+                            cardText += "_“Fetched live from the Web Archives”_\n\n";
+
+                            for (let i = 0; i < jikanRes.data.length; i++) {
+                                const anime = jikanRes.data[i];
+                                cardText += "┌────────────────────────\n";
+                                cardText += "│ ⚔️ *Title:* " + (anime.title_english || anime.title) + "\n";
+                                cardText += "│ ⭐ *Score:* " + (anime.score || 'N/A') + " | 📺 *Episodes:* " + (anime.episodes || 'Ongoing') + "\n";
+                                cardText += "│ 📜 *Synopsis:* " + (anime.synopsis ? anime.synopsis.slice(0, 140) + "..." : "No synopsis available.") + "\n";
+                                cardText += "│ 🔗 *URL:* " + anime.url + "\n";
+                                cardText += "└────────────────────────\n\n";
+                            }
+                            cardText += "╰━━━━━━━━━━━━━━━━━━━━━━━┈";
+
+                            await sock.sendMessage(from, { text: cardText }, { quoted: msg });
+                            return;
+                        }
+                    } catch (webErr) {}
+
+                    const multiCardFallback = 
+"╭━━━〔  👑 *DEMON EMPEROR ANIME VAULT* 👑  〕━━━┈\n" +
+"_“Top-Tier Recommendations For My Lord”_\n\n" +
+"┌────────────────────────\n" +
+"│ ⚔️ *1. Reverend Insanity (Fang Yuan)*\n" +
+"│ ⭐ Score: 9.8/10 | 📺 Status: Masterpiece\n" +
+"│ 📜 Dark fantasy, ruthless cultivation, and an unbeatable MC who pursues eternal life with zero regrets.\n" +
+"└────────────────────────\n\n" +
+"┌────────────────────────\n" +
+"│ ⚔️ *2. Lord of the Mysteries*\n" +
+"│ ⭐ Score: 9.6/10 | 📺 Status: Ongoing\n" +
+"│ 📜 Victorian steampunk, mystery, and deep horror/magic power systems.\n" +
+"└────────────────────────\n\n" +
+"┌────────────────────────\n" +
+"│ ⚔️ *3. World Trigger*\n" +
+"│ ⭐ Score: 9.2/10 | 📺 Status: Seasoned\n" +
+"│ 📜 Incredible tactical team battles, sci-fi world-building, and strict power balance.\n" +
+"└────────────────────────\n\n" +
+"╰━━━━━━━━━━━━━━━━━━━━━━━┈";
+
+                    await sock.sendMessage(from, { text: multiCardFallback }, { quoted: msg });
+                    return;
+                }
+
+                const fetchWithTimeout = (url, options = {}, timeoutMs = 5000) => {
+                    return Promise.race([
+                        fetchJson(url, options),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+                    ]);
+                };
+
+                try {
+                    let aiResponse = null;
+                    const promptContext = "You are an AI named Demon chatting in a WhatsApp group. You talk like a real human friend, discuss anime fluently, tell jokes, give anime recommendations, and answer questions like a smart AI model when asked. User message: " + body;
+
+                    try {
+                        const apiRes1 = await fetchWithTimeout("https://api.popcat.xyz/chatbot?msg=" + encodeURIComponent(promptContext) + "&owner=" + encodeURIComponent(OWNER_NAME) + "&botname=" + encodeURIComponent("Demon"));
+                        if (apiRes1 && apiRes1.response) aiResponse = apiRes1.response;
+                    } catch (e1) {}
+
+                    if (!aiResponse) {
+                        try {
+                            const apiRes2 = await fetchWithTimeout("https://apis.davidcyriltech.my.id/ai/gpt4?text=" + encodeURIComponent(promptContext));
+                            if (apiRes2 && (apiRes2.message || apiRes2.result)) aiResponse = apiRes2.message || apiRes2.result;
+                        } catch (e2) {}
+                    }
+
+                    if (aiResponse) {
+                        aiResponse = aiResponse.replace(/ChatGPT|OpenAI|assistant/gi, "Demon");
+                        await sock.sendMessage(from, { text: aiResponse }, { quoted: msg });
+                    }
+                } catch (err) {}
+            }
             return;
         }
 
-        // --- 3. COMMAND PARSING ---
+        // --- COMMAND PARSING ---
         const args = body.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
         const q = args.join(' ');
@@ -740,9 +817,6 @@ userTag + " has departed from *" + groupName + "*.\n" +
         };
 
         switch (command) {
-            // =========================================================================
-            // 1. EMPEROR'S SUPREME MENU (LONG BOX STYLE)
-            // =========================================================================
             case 'menu':
             case 'help': {
                 const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
@@ -759,40 +833,31 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "┃ *⏰️ Uptime:* " + uptimeFormatted + "\n" +
 "┃ *🌖 Version:* " + BOT_VERSION + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  👑 *𝐄𝐌𝐏𝐄𝐑𝐎𝐑 𝐌𝐄𝐍𝐔*  〕━━━┈\n" +
-"✿ sudo\n✿ sudolist\n✿ sudoremove\n✿ setprefix\n✿ anticall\n✿ antigroupstatus\n✿ delgcstatus\n✿ delete / del\n✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ autoreact\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
+"╭━━━〔  👑 *EMPEROR'S SUPREME*  〕━━━┈\n" +
+"✿ sudo\n✿ sudolist\n✿ sudoremove\n✿ setprefix\n✿ anticall\n✿ antigroupstatus\n✿ delgcstatus\n✿ delete / del\n✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ autoreact\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ chatbot\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  🎭 *𝐇𝐚𝐯𝐞 𝐅𝐮𝐧 𝐰𝐢𝐭𝐡 𝐄𝐦𝐩*  〕━━━┈\n" +
-"✿ song / play\n✿ wasted\n✿ top / activeusers\n✿ gayrate\n✿ flirt\n✿ dare\n✿ truth\n" +
+"╭━━━〔  🎭 *REALM FUN*  〕━━━┈\n" +
+"✿ song / play\n✿ gayrate\n✿ flirt\n✿ dare\n✿ truth\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  🛡️ *𝘿𝒐𝒎𝒂𝒊𝒏 𝙈𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕*  〕━━━┈\n" +
-"✿ welcome\n✿ goodbye\n✿ antilink (warn/kick)\n✿ antigroupsmention (warn/kick)\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ textbox\n✿ vv\n" +
+"╭━━━〔  🛡️ *DOMAIN MANAGEMENT*  〕━━━┈\n" +
+"✿ welcome\n✿ goodbye\n✿ antilink (warn/kick)\n✿ antigroupsmention (warn/kick)\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ activeusers\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ inactiveusers\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ textbox\n✿ vv\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  🧠 *𝐃𝐞𝐦𝐨𝐧𝐢𝐜 𝐈𝐧𝐭𝐞𝐥𝐥𝐢𝐠𝐞𝐧𝐜𝐞*  〕━━━┈\n" +
+"╭━━━〔  🧠 *DEMONIC INTELLIGENCE*  〕━━━┈\n" +
 "✿ ai\n✿ aimenu\n✿ claude\n✿ copilot\n✿ describe\n✿ felo\n✿ gpt\n✿ imagine\n✿ llama\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  🧪 *𝐈𝐦𝐩𝐞𝐫𝐢𝐚𝐥  𝐂𝐨𝐧𝐯𝐞𝐫𝐬𝐢𝐨𝐧*  〕━━━┈\n" +
+"╭━━━〔  🧪 *ALCHEMY & CONVERSION*  〕━━━┈\n" +
 "✿ audio\n✿ convertmenu\n✿ stickermeme\n✿ stiker\n✿ swm\n✿ telestick\n✿ toaud\n✿ togif\n✿ toimg\n✿ tomp4\n✿ toptt\n✿ tourl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  📥 *𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐓𝐨𝐨𝐥𝐬*  〕━━━┈\n" +
+"╭━━━〔  📥 *ACQUISITION & DOWNLOADS*  〕━━━┈\n" +
 "✿ applemusic\n✿ capcut\n✿ dl\n✿ downloadmenu\n✿ fb\n✿ yts\n✿ lyrics\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  🎮 *𝐈𝐦𝐩𝐞𝐫𝐢𝐚𝐥  𝐆𝐚𝐦𝐞𝐬*  〕━━━┈\n" +
+"╭━━━〔  🎮 *REALM ARENA GAMES*  〕━━━┈\n" +
 "✿ 2048\n✿ activegames\n✿ connect4\n✿ dino\n✿ emojidecode\n✿ endgame\n✿ flappy\n✿ galaxy\n✿ gamemenu\n✿ letterblitz\n✿ memory\n✿ mines\n✿ pong\n✿ reverseit\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔  🛠️ *𝐃𝐞𝐦𝐨𝐧𝐢𝐜 𝐓𝐨𝐨𝐥𝐬*  〕━━━┈\n" +
+"╭━━━〔  🛠️ *AUXILIARY TOOLS*  〕━━━┈\n" +
 "✿ androidcrash\n✿ bugmenu\n✿ gccrash\n✿ hd\n✿ iosfc\n✿ ocr\n✿ removebg\n✿ screenshot\n✿ searchmenu\n✿ toolmenu\n✿ ping\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
-"╭━━━〔 👑 *𝘼𝘽𝙊𝙐𝙏 𝘾𝙍𝙀𝘼𝙏𝙊𝙍* 👑 〕━━━┈\n" +
-"┃ 👑 *CREATOR:* ᴵᴬᴹ«»ᘜяᥱᥲт ᗪᥱмση ᙓмρ\n" +
-"┃ 📞 *CONTACT:* +2347061696819\n" +
-"┃ 🛡️ *IDENTITY:* 𝐰𝐡𝐲 𝐚𝐥𝐰𝐚𝐲𝐬 𝐊𝐞𝐥𝐯𝐢𝐧\n" +
-"┃ 🐙 *GITHUB:* too lazy to put my git acc\n" +
-"┃\n" +
-"┃ 💐 _\"𝙏𝒉𝒆 𝙁𝒓𝒂𝒈𝒓𝒂𝒏𝒕 𝒇𝒍𝒐𝒘𝒆𝒓𝒔 𝘽𝒍𝒐𝒐𝒎𝒔 𝒘𝒊𝒕𝒉 𝘿𝒊𝒈𝒏𝒊𝒕𝒚\"_\n" +
-"╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n";
-
-
+"_© 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 — 𝙀𝒎𝒑𝒆𝒓𝒐𝒓 𝙀𝒏𝒈𝒊𝒏𝒆 𝙄𝒔 𝘼𝒄𝒕𝙞𝒗𝒆_";
 
                 try {
                     await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
@@ -802,127 +867,28 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            // =========================================================================
-            // CUSTOM ADDED FEATURES INTEGRATION
-            // =========================================================================
-            
-            // 1. Message Count Leaderboard
-            case 'top':
-            case 'topmembers': {
-                if (!isGroup) {
-                    return extra.reply('This command is only available in group chats.');
-                }
-
-                const messageCounts = loadMessageCounts();
-                const groupCounts = messageCounts[from] || {};
-
-                const sortedMembers = Object.entries(groupCounts)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 5);
-
-                if (sortedMembers.length === 0) {
-                    return extra.reply('No message activity recorded yet.');
-                }
-
-                let message = '🏆 Top Members Based on Message Count:\n\n';
-                sortedMembers.forEach(([userId, count], index) => {
-                    message += `${index + 1}. @${userId.split('@')[0]} - ${count} messages\n`;
-                });
-
-                await sock.sendMessage(from, { text: message, mentions: sortedMembers.map(([userId]) => userId) }, { quoted: msg });
-                break;
-            }
-
-            // 2. Wasted Image Command
-            case 'wasted': {
-                let userToWaste;
+            case 'mode':
+            case 'private':
+            case 'public': {
+                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may alter realm permissions!*' }, { quoted: msg });
                 
-                if (msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length > 0) {
-                    userToWaste = msg.message.extendedTextMessage.contextInfo.mentionedJid[0];
-                } else if (msg.message?.extendedTextMessage?.contextInfo?.participant) {
-                    userToWaste = msg.message.extendedTextMessage.contextInfo.participant;
-                }
-                
-                if (!userToWaste) {
-                    await sock.sendMessage(from, { 
-                        text: 'Please mention someone or reply to their message to waste them!' 
-                    }, { quoted: msg });
-                    return;
+                let targetMode = '';
+                if (command === 'public' || command === 'private') {
+                    targetMode = command;
+                } else if (args[0]) {
+                    targetMode = args[0].toLowerCase();
                 }
 
-                try {
-                    let profilePic;
-                    try {
-                        profilePic = await sock.profilePictureUrl(userToWaste, 'image');
-                    } catch {
-                        profilePic = 'https://i.imgur.com/2wzGhpF.jpeg';
-                    }
-
-                    const wastedResponse = await axios.get(
-                        `https://some-random-api.com/canvas/overlay/wasted?avatar=${encodeURIComponent(profilePic)}`,
-                        { responseType: 'arraybuffer' }
-                    );
-
-                    await sock.sendMessage(from, {
-                        image: Buffer.from(wastedResponse.data),
-                        caption: `⚰️ *Wasted* : ${userToWaste.split('@')[0]} 💀\n\nRest in pieces!`,
-                        mentions: [userToWaste]
-                    }, { quoted: msg });
-
-                } catch (error) {
-                    console.error('Error in wasted command:', error);
-                    await sock.sendMessage(from, { 
-                        text: 'Failed to create wasted image! Try again later.'
-                    }, { quoted: msg });
+                if (targetMode === 'public' || targetMode === 'private') {
+                    botMode = targetMode;
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "👑 *Decree Enforced & Saved:* Domain mode set to *" + botMode.toUpperCase() + "*, My Lord!" }, { quoted: msg });
+                } else {
+                    await sock.sendMessage(from, { text: "⚔️ *Current Saved State:* *" + botMode.toUpperCase() + "*\n\n💡 *Usage:* .mode public | .mode private | .public | .private" }, { quoted: msg });
                 }
                 break;
             }
 
-            // 3. YouTube Audio Downloader
-            case 'play':
-            case 'song': {
-                try {
-                    const searchQuery = q;
-                    if (!searchQuery) {
-                        return await extra.reply("What song do you want to download? Usage: " + prefix + "play <song name>");
-                    }
-
-                    const { videos } = await yts(searchQuery);
-                    if (!videos || videos.length === 0) {
-                        return await extra.reply("No songs found!");
-                    }
-
-                    await extra.reply("_Please wait your download is in progress_");
-
-                    const video = videos[0];
-                    const urlYt = video.url;
-
-                    const response = await axios.get(`https://apis-keith.vercel.app/download/dlmp3?url=${urlYt}`);
-                    const data = response.data;
-
-                    if (!data || !data.status || !data.result || !data.result.downloadUrl) {
-                        return await extra.reply("Failed to fetch audio from the API. Please try again later.");
-                    }
-
-                    const audioUrl = data.result.downloadUrl;
-                    const title = data.result.title;
-
-                    await sock.sendMessage(from, {
-                        audio: { url: audioUrl },
-                        mimetype: "audio/mpeg",
-                        fileName: `${title}.mp3`
-                    }, { quoted: msg });
-
-                } catch (error) {
-                    console.error('Error in play command:', error);
-                    await extra.reply("Download failed. Please try again later.");
-                }
-                break;
-            }
-
-            // =========================================================================
-            // EXISTING BOT COMMANDS
-            // =========================================================================
             case 'sudo': {
                 if (!isOwner) return extra.reply('⚔️ *Only My Lord Demon Emperor can appoint Sudo members!*');
                 const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') : null);
@@ -930,9 +896,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 
                 const cleanNum = target.replace(/[^0-9]/g, '');
                 sudoUsers.add(cleanNum);
-                db.sudoUsers = Array.from(sudoUsers);
-                saveSettings(db);
-                await extra.reply(`👑 *Granted Sudo privileges to +${cleanNum}, My Lord!*`);
+                saveSettings();
+                await extra.reply(`👑 *Granted Sudo privileges to +${cleanNum}, My Lord! (Saved persistently)*`);
                 break;
             }
 
@@ -950,9 +915,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 
                 const cleanNum = target.replace(/[^0-9]/g, '');
                 sudoUsers.delete(cleanNum);
-                db.sudoUsers = Array.from(sudoUsers);
-                saveSettings(db);
-                await extra.reply(`❌ *Stripped Sudo rank from +${cleanNum}, My Lord!*`);
+                saveSettings();
+                await extra.reply(`❌ *Stripped Sudo rank from +${cleanNum}, My Lord! (Saved persistently)*`);
                 break;
             }
 
@@ -963,9 +927,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 }
                 const enabled = args[0].toLowerCase() === 'on';
                 autoSettings.anticall = enabled;
-                db.autoSettings = autoSettings;
-                saveSettings(db);
-                await extra.reply(enabled ? '✅ Anti-call enabled. Calls will be auto-rejected & blocked.' : '❌ Anti-call disabled.');
+                saveSettings();
+                await extra.reply(enabled ? '✅ Anti-call enabled & saved. Calls will be auto-rejected & blocked.' : '❌ Anti-call disabled & saved.');
                 break;
             }
 
@@ -980,9 +943,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     return extra.reply('❌ Prefix must be 1-3 characters long!');
                 }
                 prefix = newPrefix;
-                db.prefix = prefix;
-                saveSettings(db);
-                await extra.reply(`✅ Prefix changed to: ${prefix}\n\nNew command format: ${prefix}command`);
+                saveSettings();
+                await extra.reply(`✅ Prefix changed to: ${prefix} (Saved persistently)\n\nNew command format: ${prefix}command`);
                 break;
             }
 
@@ -1021,11 +983,13 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     const opt = args[0].toLowerCase();
                     if (opt === 'on') {
                         groupSettings[extra.from].antigroupstatus = true;
-                        return extra.reply('*Anti group status has been turned ON*');
+                        saveSettings();
+                        return extra.reply('*Anti group status has been turned ON & saved*');
                     }
                     if (opt === 'off') {
                         groupSettings[extra.from].antigroupstatus = false;
-                        return extra.reply('*Anti group status has been turned OFF*');
+                        saveSettings();
+                        return extra.reply('*Anti group status has been turned OFF & saved*');
                     }
                 } catch (e) {
                     await extra.reply(`❌ Error: ${e.message}`);
@@ -1120,9 +1084,53 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
+            case 'song':
+            case 'play':
+            case 'music':
+            case 'yta': {
+                if (!q) return extra.reply(`Usage: ${prefix}song <song name or YouTube link>`);
+                await extra.reply('🎵 Searching & downloading audio from YouTube archives...');
+                try {
+                    const search = await yts(q);
+                    if (!search || !search.videos.length) return extra.reply('No results found.');
+                    const video = search.videos[0];
+                    
+                    const dlRes = await fetchJson(`https://apis.davidcyriltech.my.id/download?url=` + encodeURIComponent(video.url));
+                    const audioUrl = dlRes?.result?.dl_url || dlRes?.result?.audio;
+                    if (audioUrl) {
+                        const audioRes = await axios.get(audioUrl, { responseType: 'arraybuffer' });
+                        await sock.sendMessage(from, { audio: Buffer.from(audioRes.data), mimetype: 'audio/mpeg', ptt: false }, { quoted: msg });
+                    } else {
+                        await extra.reply(`🎵 *Title:* ${video.title}\n🔗 *Link:* ${video.url}\n\n_You can find the full song audio by searching on YouTube._`);
+                    }
+                } catch (err) {
+                    await extra.reply('❌ Failed to download song artifact.');
+                }
+                break;
+            }
+
             case 'autoreact': {
                 if (!isSudo) return extra.reply('⚔️ *Sudo rights required!*');
                 await extra.reply('✅ Auto-react options configured successfully, My Lord!');
+                break;
+            }
+
+            case 'chatbot': {
+                if (!isSudo && !isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+                const stateArg = args[0]?.toLowerCase();
+                if (stateArg === 'on') {
+                    autoSettings.chatbot = true;
+                    saveSettings();
+                    await sock.sendMessage(from, { text: '✅ *Group AI Chatbot activated & saved!*' }, { quoted: msg });
+                } else if (stateArg === 'off') {
+                    autoSettings.chatbot = false;
+                    saveSettings();
+                    await sock.sendMessage(from, { text: '❌ *Group AI Chatbot deactivated & saved!*' }, { quoted: msg });
+                } else {
+                    autoSettings.chatbot = !autoSettings.chatbot;
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "🤖 *AI Chatbot Status:* " + (autoSettings.chatbot ? 'ACTIVE ✅' : 'DISABLED ❌') + " (Saved)" }, { quoted: msg });
+                }
                 break;
             }
 
@@ -1131,9 +1139,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 const target = msg.message?.extendedTextMessage?.contextInfo?.participant || (q ? q.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
                 if (!target) return sock.sendMessage(from, { text: '💡 *My Lord, tag a user or reply to their message.*' }, { quoted: msg });
                 sudoUsers.add(target.split('@')[0]);
-                db.sudoUsers = Array.from(sudoUsers);
-                saveSettings(db);
-                await sock.sendMessage(from, { text: '👑 *Granted throne privileges to subject, My Lord!*' }, { quoted: msg });
+                saveSettings();
+                await sock.sendMessage(from, { text: '👑 *Granted throne privileges to subject, My Lord! (Saved)*' }, { quoted: msg });
                 break;
             }
 
@@ -1141,7 +1148,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
                 if (!isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
                 groupSettings[from].antidelete = !groupSettings[from].antidelete;
-                await sock.sendMessage(from, { text: "👁️ *Imperial Anti-Delete:* " + (groupSettings[from].antidelete ? 'ACTIVATED ✅' : 'DEACTIVATED ❌') }, { quoted: msg });
+                saveSettings();
+                await sock.sendMessage(from, { text: "👁️ *Imperial Anti-Delete:* " + (groupSettings[from].antidelete ? 'ACTIVATED ✅' : 'DEACTIVATED ❌') + " (Saved)" }, { quoted: msg });
                 break;
             }
 
@@ -1155,26 +1163,31 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 if (subCmd === 'on') {
                     groupSettings[from][command] = true;
-                    await sock.sendMessage(from, { text: "✅ *By decree of the Demon Emperor:* *" + command.toUpperCase() + "* is ENFORCED!" }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "✅ *By decree of the Demon Emperor:* *" + command.toUpperCase() + "* is ENFORCED & Saved!" }, { quoted: msg });
                 } else if (subCmd === 'off') {
                     groupSettings[from][command] = false;
-                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + command.toUpperCase() + "* is DISABLED!" }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + command.toUpperCase() + "* is DISABLED & Saved!" }, { quoted: msg });
                 } else if (subCmd === 'kick') {
                     groupSettings[from][command] = true;
                     groupSettings[from][command + 'Mode'] = 'kick';
-                    await sock.sendMessage(from, { text: "✅ *" + command.toUpperCase() + "* set to **DIRECT KICK** mode!" }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "✅ *" + command.toUpperCase() + "* set to **DIRECT KICK** mode & Saved!" }, { quoted: msg });
                 } else if (subCmd === 'warn') {
                     groupSettings[from][command] = true;
                     groupSettings[from][command + 'Mode'] = 'warn';
                     if (subVal && !isNaN(subVal)) {
                         groupSettings[from][command + 'WarnLimit'] = parseInt(subVal);
                     }
+                    saveSettings();
                     const limit = groupSettings[from][command + 'WarnLimit'] || 3;
-                    await sock.sendMessage(from, { text: "✅ *" + command.toUpperCase() + "* set to **WARN** mode (Limit: " + limit + " warnings)!" }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "✅ *" + command.toUpperCase() + "* set to **WARN** mode (Limit: " + limit + " warnings) & Saved!" }, { quoted: msg });
                 } else {
                     groupSettings[from][command] = !groupSettings[from][command];
+                    saveSettings();
                     await sock.sendMessage(from, { 
-                        text: "🛡️ *" + command.toUpperCase() + " Barrier:* " + (groupSettings[from][command] ? 'ENFORCED ✅' : 'DISABLED ❌') + "\n\n💡 *Usage:*\n`." + command + " on/off`\n`." + command + " kick`\n`." + command + " warn 3`" 
+                        text: "🛡️ *" + command.toUpperCase() + " Barrier:* " + (groupSettings[from][command] ? 'ENFORCED ✅' : 'DISABLED ❌') + " (Saved)\n\n💡 *Usage:*\n`." + command + " on/off`\n`." + command + " kick`\n`." + command + " warn 3`" 
                     }, { quoted: msg });
                 }
                 break;
@@ -1236,9 +1249,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
             case 'autotyping': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 autoSettings[command] = !autoSettings[command];
-                db.autoSettings = autoSettings;
-                saveSettings(db);
-                await sock.sendMessage(from, { text: "⚙️ *Imperial Presence [" + command.toUpperCase() + "]:* " + (autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌') }, { quoted: msg });
+                saveSettings();
+                await sock.sendMessage(from, { text: "⚙️ *Imperial Presence [" + command.toUpperCase() + "]:* " + (autoSettings[command] ? 'ENABLED ✅' : 'DISABLED ❌') + " (Saved)" }, { quoted: msg });
                 break;
             }
 
@@ -1473,27 +1485,6 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
             case 'listchannels': {
                 await sock.sendMessage(from, { text: '📢 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Channels:* Fully subjugated under your rule, My Lord!' }, { quoted: msg });
-                break;
-            }
-
-            case 'mode':
-            case 'private':
-            case 'public': {
-                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor may alter realm permissions!*' }, { quoted: msg });
-                
-                let targetMode = '';
-                if (command === 'public' || command === 'private') {
-                    targetMode = command;
-                } else if (args[0]) {
-                    targetMode = args[0].toLowerCase();
-                }
-
-                if (targetMode === 'public' || targetMode === 'private') {
-                    botMode = targetMode;
-                    await sock.sendMessage(from, { text: "👑 *Decree Enforced:* Domain mode set to *" + botMode.toUpperCase() + "*, My Lord!" }, { quoted: msg });
-                } else {
-                    await sock.sendMessage(from, { text: "⚔️ *Current State:* *" + botMode.toUpperCase() + "*\n\n💡 *Usage:* .mode public | .mode private | .public | .private" }, { quoted: msg });
-                }
                 break;
             }
 
@@ -1769,13 +1760,16 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 if (stateArg === 'on') {
                     groupSettings[from][setting] = true;
-                    await sock.sendMessage(from, { text: "✅ *By decree of the Emperor:* *" + setting.toUpperCase() + "* is ENFORCED!" }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "✅ *By decree of the Emperor:* *" + setting.toUpperCase() + "* is ENFORCED & Saved!" }, { quoted: msg });
                 } else if (stateArg === 'off') {
                     groupSettings[from][setting] = false;
-                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + setting.toUpperCase() + "* is DISABLED!" }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + setting.toUpperCase() + "* is DISABLED & Saved!" }, { quoted: msg });
                 } else {
                     groupSettings[from][setting] = !groupSettings[from][setting];
-                    await sock.sendMessage(from, { text: "🛡️ *" + setting.toUpperCase() + " Barrier:* " + (groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌') }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "🛡️ *" + setting.toUpperCase() + " Barrier:* " + (groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌') + " (Saved)" }, { quoted: msg });
                 }
                 break;
             }
@@ -1790,13 +1784,16 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 if (stateArg === 'on') {
                     groupSettings[from][setting] = true;
-                    await sock.sendMessage(from, { text: "✅ *By decree of the Demon Emperor:* *" + setting.toUpperCase() + "* card system is ENFORCED!" }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "✅ *By decree of the Demon Emperor:* *" + setting.toUpperCase() + "* card system is ENFORCED & Saved!" }, { quoted: msg });
                 } else if (stateArg === 'off') {
                     groupSettings[from][setting] = false;
-                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + setting.toUpperCase() + "* card system is DISABLED!" }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + setting.toUpperCase() + "* card system is DISABLED & Saved!" }, { quoted: msg });
                 } else {
                     groupSettings[from][setting] = !groupSettings[from][setting];
-                    await sock.sendMessage(from, { text: "🛡️ *" + setting.toUpperCase() + " Card System:* " + (groupSettings[from][setting] ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "🛡️ *" + setting.toUpperCase() + " Card System:* " + (groupSettings[from][setting] ? 'ENFORCED ✅' : 'DISABLED ❌') + " (Saved)" }, { quoted: msg });
                 }
                 break;
             }
@@ -1975,7 +1972,8 @@ userTag + " has departed from *" + groupName + "*.\n" +
             case 'grouponly': {
                 if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
                 groupSettings[from].grouponly = !groupSettings[from].grouponly;
-                await sock.sendMessage(from, { text: "🛡️ *Group Only Mode:* " + (groupSettings[from].grouponly ? 'ENABLED ✅' : 'DISABLED ❌') }, { quoted: msg });
+                saveSettings();
+                await sock.sendMessage(from, { text: "🛡️ *Group Only Mode:* " + (groupSettings[from].grouponly ? 'ENABLED ✅' : 'DISABLED ❌') + " (Saved)" }, { quoted: msg });
                 break;
             }
 
@@ -2420,13 +2418,16 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 if (stateArg === 'on') {
                     groupSettings[from].antigcstatus = true;
-                    await sock.sendMessage(from, { text: '✅ *By decree of the Demon Emperor:* *ANTIGCSTATUS* barrier is ENFORCED!' }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: '✅ *By decree of the Demon Emperor:* *ANTIGCSTATUS* barrier is ENFORCED & Saved!' }, { quoted: msg });
                 } else if (stateArg === 'off') {
                     groupSettings[from].antigcstatus = false;
-                    await sock.sendMessage(from, { text: '❌ *Imperial Dispensation:* *ANTIGCSTATUS* barrier is DISABLED!' }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: '❌ *Imperial Dispensation:* *ANTIGCSTATUS* barrier is DISABLED & Saved!' }, { quoted: msg });
                 } else {
                     groupSettings[from].antigcstatus = !groupSettings[from].antigcstatus;
-                    await sock.sendMessage(from, { text: "🛡️ *ANTIGCSTATUS Barrier:* " + (groupSettings[from].antigcstatus ? 'ENFORCED ✅' : 'DISABLED ❌') }, { quoted: msg });
+                    saveSettings();
+                    await sock.sendMessage(from, { text: "🛡️ *ANTIGCSTATUS Barrier:* " + (groupSettings[from].antigcstatus ? 'ENFORCED ✅' : 'DISABLED ❌') + " (Saved)" }, { quoted: msg });
                 }
                 break;
             }
@@ -2436,9 +2437,9 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 try {
                     const lyricData = await fetchJson("https://apis.davidcyriltech.my.id/lyrics?song=" + encodeURIComponent(q));
                     if (lyricData && lyricData.lyrics) {
-                        await sock.sendMessage(from, { text: "📜 *Lyrics — " + (lyricData.title || q) + "*\n\n" + lyricData.lyrics }, { quoted: msg });
+                        await sock.sendMessage(from, { text: "📜 *Lyrics — " + (lyricData.title || q) + "*\n\n" + lyricData.lyrics + "\n\n_You can find the full licensed lyrics by searching on Google._" }, { quoted: msg });
                     } else {
-                        await sock.sendMessage(from, { text: '❌ *Lyrics could not be found.*' }, { quoted: msg });
+                        await sock.sendMessage(from, { text: '❌ *Lyrics could not be found. You can find the full lyrics by searching for the song on Google.*' }, { quoted: msg });
                     }
                 } catch (e) {
                     await sock.sendMessage(from, { text: '❌ *Error fetching lyrics.*' }, { quoted: msg });
@@ -2536,21 +2537,18 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 }
                 break;
             }
-            case 'ping':
-            case 'pong': {
+
+            case 'ping': {
                 const start = Date.now();
-                const pingPongText = command.toLowerCase() === 'ping' ? '🏓 *PONG!*' : '🏓 *PING!*';
-                
                 await sock.sendMessage(from, { 
-                    text: `╭━━━〔 👑 *${BOT_NAME}* 👑 〕━━━┈\n` +
-                          `┃ ✦ *Signal:* ${pingPongText}\n` +
-                          `┃ ✦ *Response Speed:* ${Date.now() - start}ms\n` +
-                          `┃ ✦ *Status:* Online my lord! ✅\n` +
-                          `╰━━━━━━━━━━━━━━━━━━━━━━━┈` 
+                    text: "╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Imperial Tool* 〕━━━┈\n" +
+                          "✦ *Tool:* .ping\n" +
+                          "✦ *Response Speed:* " + (Date.now() - start) + "ms\n" +
+                          "✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n" +
+                          "╰━━━━━━━━━━━━━━━━━━━━━━━┈" 
                 }, { quoted: msg });
                 break;
             }
-
 
             default: {
                 if (command) {
