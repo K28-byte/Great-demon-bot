@@ -361,7 +361,6 @@ async function startDemonBot() {
             console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
             const code = await sock.requestPairingCode(phoneNumber);
             const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
             console.log('\n🔑 YOUR PAIRING CODE: ' + formattedCode + '\n');
 
             console.log('==================================================\n');
