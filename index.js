@@ -959,70 +959,62 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            // 4. Guaranteed 100% Stable Anime Visual Card Command (.animecard)
+            // 4. Guaranteed 100% Stable Bulletproof Anime Visual Card Command (.animecard)
             case 'animecard':
             case 'gifcard':
             case 'animegif': {
                 await sock.sendMessage(from, { text: '🎨 *Summoning anime card from the nether realms, My Lord...*' }, { quoted: msg });
+                
+                let cardTitle = "Reverend Insanity";
+                let cardImg = "https://cdn.myanimelist.net/images/anime/1029/119279.jpg";
+                let cardSynopsis = "A masterpiece dark fantasy cultivation chronicle.";
+                let cardScore = "9.8/10";
+
                 try {
-                    // Using Nekos.best high speed anime image & info endpoint
-                    const nekosRes = await fetchJson(`https://nekos.best/api/v2/anime?amount=1`);
-                    
-                    if (nekosRes && nekosRes.results && nekosRes.results.length > 0) {
-                        const anime = nekosRes.results[0];
-                        
-                        const cardCaption = 
+                    // Try Waifu.pics SFW waifu endpoint first for guaranteed high quality portrait
+                    const waifuRes = await fetchJson('https://api.waifu.pics/sfw/waifu');
+                    if (waifuRes && waifuRes.url) {
+                        cardImg = waifuRes.url;
+                    }
+
+                    // Try fetching random top anime info via Jikan v4
+                    const jikanRes = await fetchJson('https://api.jikan.moe/v4/random/anime');
+                    if (jikanRes && jikanRes.data) {
+                        const dat = jikanRes.data;
+                        if (dat.title) cardTitle = dat.title;
+                        if (dat.score) cardScore = dat.score + "/10";
+                        if (dat.synopsis) cardSynopsis = dat.synopsis.slice(0, 150) + "...";
+                        if (dat.images?.jpg?.large_image_url) {
+                            cardImg = dat.images.jpg.large_image_url;
+                        }
+                    }
+                } catch (err) {
+                    // Fallback handled cleanly by pre-set variables
+                }
+
+                const cardCaption = 
 "╭━━━〔  👑 *DEMON EMPEROR ANIME CARD* 👑  〕━━━┈\n" +
-"┃ ⚔️ *Title:* " + (anime.name || 'Legendary Anime') + "\n" +
-"┃ ⭐ *Rating:* Masterpiece Art\n" +
+"┃ ⚔️ *Title:* " + cardTitle + "\n" +
+"┃ ⭐ *Score:* " + cardScore + " | 📺 *Status:* Masterpiece\n" +
 "┣━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
-"┃ 📜 " + (anime.synopsis ? anime.synopsis.slice(0, 160) + "..." : "A supreme artifact forged in the anime realm.") + "\n" +
+"┃ 📜 " + cardSynopsis + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
 "_“A legendary artifact bound to the Demon Realm”_";
 
-                        const imageUrl = anime.url || anime.cover_image || MENU_IMAGE_URL;
-
-                        await sock.sendMessage(from, { 
-                            image: { url: imageUrl }, 
-                            caption: cardCaption,
-                            contextInfo: {
-                                externalAdReply: {
-                                    title: "✦ " + (anime.name || 'Anime Archive') + " ✦",
-                                    body: "Demon Emperor Archive | Tap to inspect",
-                                    thumbnailUrl: imageUrl,
-                                    sourceUrl: "https://nekos.best",
-                                    mediaType: 1,
-                                    renderLargerThumbnail: true
-                                }
-                            }
-                        }, { quoted: msg });
-                        break;
-                    }
-                    throw new Error();
-                } catch (err) {
-                    const fallbackCaption = 
-"╭━━━〔  👑 *DEMON EMPEROR ANIME CARD* 👑  〕━━━┈\n" +
-"┃ ⚔️ *Title:* Reverend Insanity\n" +
-"┃ ⭐ *Score:* 9.8/10 | 📺 *Status:* Masterpiece\n" +
-"┣━━━━━━━━━━━━━━━━━━━━━━━┈\n" +
-"┃ 📜 Dark fantasy cultivation and supreme ambition.\n" +
-"╰━━━━━━━━━━━━━━━━━━━━━━━┈";
-
-                    await sock.sendMessage(from, { 
-                        image: { url: "https://cdn.myanimelist.net/images/anime/1029/119279.jpg" }, 
-                        caption: fallbackCaption,
-                        contextInfo: {
-                            externalAdReply: {
-                                title: "✦ Reverend Insanity ✦",
-                                body: "Demon Emperor Archive",
-                                thumbnailUrl: MENU_IMAGE_URL,
-                                sourceUrl: "https://myanimelist.net",
-                                mediaType: 1,
-                                renderLargerThumbnail: true
-                            }
+                await sock.sendMessage(from, { 
+                    image: { url: cardImg }, 
+                    caption: cardCaption,
+                    contextInfo: {
+                        externalAdReply: {
+                            title: "✦ " + cardTitle + " ✦",
+                            body: "Demon Emperor Archive | Tap to inspect",
+                            thumbnailUrl: cardImg,
+                            sourceUrl: "https://myanimelist.net",
+                            mediaType: 1,
+                            renderLargerThumbnail: true
                         }
-                    }, { quoted: msg });
-                }
+                    }
+                }, { quoted: msg });
                 break;
             }
 
