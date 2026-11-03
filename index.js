@@ -70,12 +70,14 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
+        const { version } = await fetchLatestBaileysVersion();
 
         const tempSock = makeWASocket({
+            version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            browser: ["Ubuntu", "Chrome", "20.0.04"]
+            browser: ["Mac OS", "Safari", "17.0.0"]
         });
 
         tempSock.ev.on('creds.update', saveCreds);
@@ -89,21 +91,23 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
 
         setTimeout(async () => {
             try {
-                let code = await tempSock.requestPairingCode(targetNum);
-                code = code?.match(/.{1,4}/g)?.join("-") || code;
-                
-                const opts = {
-                    chat_id: chatId,
-                    message_id: statusMsg.message_id,
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: "🔄 Get New Code", callback_data: `recode_${targetNum}` }]
-                        ]
-                    }
-                };
+                if (!tempSock.authState.creds.registered) {
+                    let code = await tempSock.requestPairingCode(targetNum);
+                    code = code?.match(/.{1,4}/g)?.join("-") || code;
+                    
+                    const opts = {
+                        chat_id: chatId,
+                        message_id: statusMsg.message_id,
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: "🔄 Get New Code", callback_data: `recode_${targetNum}` }]
+                            ]
+                        }
+                    };
 
-                await tgBot.editMessageText(`🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
+                    await tgBot.editMessageText(`🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
+                }
             } catch (innerErr) {
                 await tgBot.editMessageText(`❌ *Forging failed! Pairing seal rejected:* ${innerErr.message}`, {
                     chat_id: chatId,
@@ -111,7 +115,7 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
                     parse_mode: 'Markdown'
                 });
             }
-        }, 4000);
+        }, 6000);
     } catch (err) {
         await tgBot.sendMessage(chatId, `❌ *An error occurred during the ritual:* ${err.message}`, { parse_mode: 'Markdown' });
     }
@@ -1806,25 +1810,29 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     }
 
                     const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
+                    const { version } = await fetchLatestBaileysVersion();
 
                     const tempSock = makeWASocket({
+                        version,
                         logger: pino({ level: 'silent' }),
                         printQRInTerminal: false,
                         auth: state,
-                        browser: ["Ubuntu", "Chrome", "20.0.04"]
+                        browser: ["Mac OS", "Safari", "17.0.0"]
                     });
 
                     tempSock.ev.on('creds.update', saveCreds);
 
                     setTimeout(async () => {
                         try {
-                            let code = await tempSock.requestPairingCode(targetNum);
-                            code = code?.match(/.{1,4}/g)?.join("-") || code;
-                            await sock.sendMessage(from, { text: "🔑 *IMPERIAL LINK CODE:* `" + code + "`" }, { quoted: msg });
+                            if (!tempSock.authState.creds.registered) {
+                                let code = await tempSock.requestPairingCode(targetNum);
+                                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                                await sock.sendMessage(from, { text: "🔑 *IMPERIAL LINK CODE:* `" + code + "`" }, { quoted: msg });
+                            }
                         } catch (innerErr) {
                             await sock.sendMessage(from, { text: "❌ *Forging failed! Pairing rejected.*" }, { quoted: msg });
                         }
-                    }, 4000);
+                    }, 6000);
                 } catch (err) {
                     await sock.sendMessage(from, { text: "❌ *An error occurred Can't Forge link .*" }, { quoted: msg });
                 }
