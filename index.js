@@ -10,6 +10,81 @@ http.createServer((req, res) => {
     console.log('🌐 Keep-alive server running on 0.0.0.0:' + PORT);
 });
 
+// --- TELEGRAM CONFIGURATION ---
+const TelegramBot = require('node-telegram-bot-api');
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '9043764936:AAE1KZ97aL1DQ5gMv69S3Y_NOPgGP-vOmIU';
+const tgBot = new TelegramBot(TG_BOT_TOKEN, { polling: true });
+
+// --- TELEGRAM PAIRING ENGINE ---
+tgBot.onText(/\/pair (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const targetNum = match[1].replace(/[^0-9]/g, '');
+
+    if (!targetNum || targetNum.length < 10) {
+        return tgBot.sendMessage(chatId, "⚔️ *Provide a valid phone number with country code,amigo!*", { parse_mode: 'Markdown' });
+    }
+
+    try {
+        await tgBot.sendMessage(chatId, `⏳ *Forging link key for +${targetNum}, as my lord say i should...*`, { parse_mode: 'Markdown' });
+        const tempSessionPath = path.join(__dirname, 'sessions', 'session_' + targetNum);
+        
+        if (fs.existsSync(tempSessionPath)) {
+            fs.rmSync(tempSessionPath, { recursive: true, force: true });
+        }
+
+        const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
+
+        const tempSock = makeWASocket({
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: false,
+            auth: state,
+            browser: ["Ubuntu", "Chrome", "20.0.04"]
+        });
+
+        tempSock.ev.on('creds.update', saveCreds);
+
+        tempSock.ev.on('connection.update', (update) => {
+            const { connection } = update;
+            if (connection === 'open') {
+                tgBot.sendMessage(chatId, `✅ *WhatsApp Connected Successfully!*\n\n📱 *Number:* +${targetNum}`, { parse_mode: 'Markdown' });
+            }
+        });
+
+        setTimeout(async () => {
+            try {
+                let code = await tempSock.requestPairingCode(targetNum);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                
+                const opts = {
+                    parse_mode: 'Markdown',
+                    reply_markup: JSON.stringify({
+                        inline_keyboard: [
+                            [{ text: "🔄 Get New Code", callback_data: `recode_${targetNum}` }]
+                        ]
+                    })
+                };
+
+                await tgBot.sendMessage(chatId, `🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
+            } catch (innerErr) {
+                await tgBot.sendMessage(chatId, "❌ *Forging failed! Pairing seal rejected.*", { parse_mode: 'Markdown' });
+            }
+        }, 4000);
+    } catch (err) {
+        await tgBot.sendMessage(chatId, "❌ *An error occurred during the ritual.*", { parse_mode: 'Markdown' });
+    }
+});
+
+// --- TELEGRAM /start COMMAND ---
+tgBot.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    tgBot.sendMessage(chatId, 
+        "👑 *𝐆𝐑𝐄𝐀𝐓_𝐃𝐄𝐌𝐎𝐍 𝐕4 Control Panel*\n\n" +
+        "Welcome My Peeps! Use the command below to pair a number:\n" +
+        "`/pair 234xxxxxxxxxx`", 
+        { parse_mode: 'Markdown' }
+    );
+});
+
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
