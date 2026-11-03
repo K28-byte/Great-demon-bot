@@ -1,5 +1,5 @@
 const messageCache = new Map();
-const warningMap = new Map(); // Tracks warning counts per user per group
+const warningMap = new Map(); 
 const http = require('http');
 const PORT = process.env.PORT || 3000;
 
@@ -333,7 +333,6 @@ const tgBot = new TelegramBot(TG_BOT_TOKEN, {
     }
 });
 
-// Suppress polling conflict crashes so server stability is maintained
 tgBot.on('polling_error', (error) => {
     if (error.code !== 'ETELEGRAM' || !error.message.includes('409 Conflict')) {
         console.error('Telegram Polling Error:', error.code);
@@ -350,9 +349,7 @@ tgBot.onText(/\/start/, async (msg) => {
 "† ✰\n" +
 "┌─[ 💀 WELCOME 💀 ]─┐\n" +
 "└────────────────────┘\n" +
-"✰ ⚔️ /connect > pair number\n" +
-"✰ ⚔️ /disconnect > unpair number\n" +
-"✰ ⚔️ /listdevices > wa pairs\n" +
+"✰ ⚔️ `/connect <number>` > Generate pairing code cleanly\n" +
 "✰═════════[ 😈 ]═════════✰";
 
     try {
@@ -365,6 +362,11 @@ tgBot.onText(/\/start/, async (msg) => {
     }
 });
 
+let activeSock = null;
+let isPairingRequested = false;
+let pendingPairNumber = null;
+let activeTelegramChatId = null;
+
 tgBot.onText(/\/connect(?: (.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     let targetNum = match[1] ? match[1].replace(/[^0-9]/g, '') : '';
@@ -373,93 +375,22 @@ tgBot.onText(/\/connect(?: (.+))?/, async (msg, match) => {
         return tgBot.sendMessage(chatId, "⚔️ *Provide a valid phone number with country code*\n\n💡 *Usage:* `/connect 2347061696819`", { parse_mode: 'Markdown' });
     }
 
-    await handlePairingProcess(chatId, targetNum);
-});
+    await tgBot.sendMessage(chatId, `⏳ *Resetting session & requesting fresh pairing code for +${targetNum}...*`, { parse_mode: 'Markdown' });
 
-// --- FULLY OPTIMIZED TELEGRAM PAIRING HANDLER ---
-async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
-    try {
-        let statusMsg;
-        if (messageIdToEdit) {
-            await tgBot.editMessageText(`⏳ *Forging fresh link key for +${targetNum}...*`, {
-                chat_id: chatId,
-                message_id: messageIdToEdit,
-                parse_mode: 'Markdown'
-            });
-            statusMsg = { message_id: messageIdToEdit };
-        } else {
-            statusMsg = await tgBot.sendMessage(chatId, `⏳ *Forging link key for +${targetNum}, kindly wait...*`, { parse_mode: 'Markdown' });
-        }
-
-        const tempSessionPath = path.join(__dirname, 'demon_session');
-        if (fs.existsSync(tempSessionPath)) {
-            fs.rmSync(tempSessionPath, { recursive: true, force: true });
-        }
-
-        const { state, saveCreds } = await useMultiFileAuthState(tempSessionPath);
-        const { version } = await fetchLatestBaileysVersion();
-
-        const tempSock = makeWASocket({
-            version,
-            logger: pino({ level: 'silent' }),
-            printQRInTerminal: false,
-            auth: state,
-            browser: Browsers.windows('Desktop'),
-            syncFullHistory: false,
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 60000,
-            keepAliveIntervalMs: 15000,
-            generateHighQualityLinkPreview: false
-        });
-
-        tempSock.ev.on('creds.update', saveCreds);
-
-        tempSock.ev.on('connection.update', async (update) => {
-            const { connection } = update;
-            if (connection === 'open') {
-                await tgBot.editMessageText(`✅ *WhatsApp Connected Successfully via Telegram!*\n\n📱 *Number:* +${targetNum}`, {
-                    chat_id: chatId,
-                    message_id: statusMsg.message_id,
-                    parse_mode: 'Markdown'
-                });
-                setTimeout(() => {
-                    startDemonBot(); 
-                }, 2000);
-            }
-        });
-
-        if (!tempSock.authState.creds.registered) {
-            setTimeout(async () => {
-                try {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    let code = await tempSock.requestPairingCode(targetNum);
-                    code = code?.match(/.{1,4}/g)?.join("-") || code;
-                    
-                    const opts = {
-                        chat_id: chatId,
-                        message_id: statusMsg.message_id,
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: "🔄 Get New Code", callback_data: `recode_${targetNum}` }]
-                            ]
-                        }
-                    };
-
-                    await tgBot.editMessageText(`🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
-                } catch (innerErr) {
-                    await tgBot.editMessageText(`❌ *Forging failed! Pairing seal rejected:* ${innerErr.message}`, {
-                        chat_id: chatId,
-                        message_id: statusMsg.message_id,
-                        parse_mode: 'Markdown'
-                    });
-                }
-            }, 4000);
-        }
-    } catch (err) {
-        await tgBot.sendMessage(chatId, `❌ *An error occurred during the ritual:* ${err.message}`, { parse_mode: 'Markdown' });
+    const sessionPath = './demon_session';
+    if (fs.existsSync(sessionPath)) {
+        fs.rmSync(sessionPath, { recursive: true, force: true });
     }
-}
+
+    isPairingRequested = true;
+    pendingPairNumber = targetNum;
+    activeTelegramChatId = chatId;
+
+    if (activeSock && typeof activeSock.end === 'function') {
+        try { activeSock.end(new Error('Restarting for pairing')); } catch (e) {}
+    }
+    startDemonBot();
+});
 
 tgBot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
@@ -468,15 +399,27 @@ tgBot.on('callback_query', async (query) => {
 
     if (data.startsWith('recode_')) {
         const targetNum = data.split('_')[1];
-        await tgBot.answerCallbackQuery(query.id, { text: "🔄 Generating a fresh code for My Lord..." });
-        await handlePairingProcess(chatId, targetNum, messageId);
+        await tgBot.answerCallbackQuery(query.id, { text: "🔄 Generating a fresh code..." });
+        
+        const sessionPath = './demon_session';
+        if (fs.existsSync(sessionPath)) {
+            fs.rmSync(sessionPath, { recursive: true, force: true });
+        }
+        isPairingRequested = true;
+        pendingPairNumber = targetNum;
+        activeTelegramChatId = chatId;
+
+        if (activeSock && typeof activeSock.end === 'function') {
+            try { activeSock.end(); } catch (e) {}
+        }
+        startDemonBot();
     }
 });
 
 async function startDemonBot() {
     const sessionPath = './demon_session';
 
-    if (process.env.SESSION_ID && process.env.SESSION_ID.trim().length > 20) {
+    if (process.env.SESSION_ID && process.env.SESSION_ID.trim().length > 20 && !isPairingRequested) {
         if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
         try {
             const rawId = process.env.SESSION_ID.trim().replace(/^GREAT_DEMON_/, '');
@@ -486,11 +429,6 @@ async function startDemonBot() {
         } catch (err) {
             console.log('❌ Failed to decode SESSION_ID:', err.message);
         }
-    }
-
-    if (!fs.existsSync(path.join(sessionPath, 'creds.json'))) {
-        console.log('⏳ Waiting for pairing... Use Telegram /connect command to generate session credentials.');
-        return;
     }
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
@@ -508,7 +446,39 @@ async function startDemonBot() {
         defaultQueryTimeoutMs: 0
     });
 
+    activeSock = sock;
     sock.ev.on('creds.update', saveCreds);
+
+    if (!sock.authState.creds.registered) {
+        let phoneNumber = pendingPairNumber || process.env.PHONE_NUMBER || OWNER_NUMBER;
+        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+
+        setTimeout(async () => {
+            try {
+                console.log('⏳ Requesting pairing code for +' + phoneNumber + '...');
+                let code = await sock.requestPairingCode(phoneNumber);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                
+                console.log('\n🔑 PAIRING CODE: ' + code + '\n');
+
+                if (activeTelegramChatId && TG_BOT_TOKEN) {
+                    await tgBot.sendMessage(activeTelegramChatId, `🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Enter this code into WhatsApp now.*`, {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: "🔄 Get New Code", callback_data: `recode_${phoneNumber}` }]
+                            ]
+                        }
+                    });
+                }
+            } catch (err) {
+                console.log('❌ Error requesting pairing code:', err.message);
+                if (activeTelegramChatId && TG_BOT_TOKEN) {
+                    await tgBot.sendMessage(activeTelegramChatId, `❌ *Pairing Error:* ${err.message}`, { parse_mode: 'Markdown' });
+                }
+            }
+        }, 5000);
+    }
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
@@ -518,10 +488,15 @@ async function startDemonBot() {
                 console.log('⚡ Reconnecting Great Demon Bot...');
                 startDemonBot();
             } else {
-                console.log('❌ Session logged out from WhatsApp servers. Please re-pair via Telegram.');
+                console.log('❌ Session logged out from WhatsApp servers.');
             }
         } else if (connection === 'open') {
             console.log('\n⚡ 𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕 CONNECTED AND ONLINE! ⚡\n');
+            if (activeTelegramChatId && TG_BOT_TOKEN) {
+                tgBot.sendMessage(activeTelegramChatId, `✅ *WhatsApp Connected Successfully!* ⚡`, { parse_mode: 'Markdown' }).catch(()=>{});
+                activeTelegramChatId = null;
+                isPairingRequested = false;
+            }
         }
     });
 
@@ -2830,4 +2805,3 @@ userTag + " has departed from *" + groupName + "*.\n" +
 }
 
 startDemonBot();
-
