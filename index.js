@@ -374,19 +374,19 @@ tgBot.onText(/\/connect(?: (.+))?/, async (msg, match) => {
     await handlePairingProcess(chatId, targetNum);
 });
 
-// --- TIMED & STABILIZED PAIRING HANDLER ---
+// --- RENDER-OPTIMIZED STABLE TELEGRAM PAIRING HANDLER ---
 async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
     try {
         let statusMsg;
         if (messageIdToEdit) {
-            await tgBot.editMessageText(`⏳ *Initializing pairing socket for +${targetNum}...*`, {
+            await tgBot.editMessageText(`⏳ *Opening secure tunnel for +${targetNum}...*`, {
                 chat_id: chatId,
                 message_id: messageIdToEdit,
                 parse_mode: 'Markdown'
             });
             statusMsg = { message_id: messageIdToEdit };
         } else {
-            statusMsg = await tgBot.sendMessage(chatId, `⏳ *Initializing pairing socket for +${targetNum}, please wait...*`, { parse_mode: 'Markdown' });
+            statusMsg = await tgBot.sendMessage(chatId, `⏳ *Opening secure tunnel for +${targetNum}, please wait...*`, { parse_mode: 'Markdown' });
         }
 
         const tempSessionPath = path.join(__dirname, 'demon_session');
@@ -415,40 +415,9 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
         let codeRequested = false;
 
         tempSock.ev.on('connection.update', async (update) => {
-            const { connection, qr } = update;
-
-            // Wait for socket handshake signal before requesting pairing code
-            if ((qr || connection === 'connecting') && !tempSock.authState.creds.registered && !codeRequested) {
-                codeRequested = true;
-                setTimeout(async () => {
-                    try {
-                        let code = await tempSock.requestPairingCode(targetNum);
-                        code = code?.match(/.{1,4}/g)?.join("-") || code;
-                        
-                        const opts = {
-                            chat_id: chatId,
-                            message_id: statusMsg.message_id,
-                            parse_mode: 'Markdown',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [{ text: "🔄 Get New Code", callback_data: `recode_${targetNum}` }]
-                                ]
-                            }
-                        };
-
-                        await tgBot.editMessageText(`🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
-                    } catch (innerErr) {
-                        await tgBot.editMessageText(`❌ *Pairing seal rejected:* ${innerErr.message}`, {
-                            chat_id: chatId,
-                            message_id: statusMsg.message_id,
-                            parse_mode: 'Markdown'
-                        });
-                    }
-                }, 3000);
-            }
-
+            const { connection } = update;
             if (connection === 'open') {
-                await tgBot.editMessageText(`✅ *WhatsApp Connected Successfully!*\n\n📱 *Number:* +${targetNum}`, {
+                await tgBot.editMessageText(`✅ *WhatsApp Connected Successfully via Telegram!*\n\n📱 *Number:* +${targetNum}`, {
                     chat_id: chatId,
                     message_id: statusMsg.message_id,
                     parse_mode: 'Markdown'
@@ -458,6 +427,36 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
                 }, 2000);
             }
         });
+
+        // 🛡️ RENDER FIX: Wait a stable 4 seconds for the cloud WebSocket tunnel to fully open before pulling pairing code
+        setTimeout(async () => {
+            if (!tempSock.authState.creds.registered && !codeRequested) {
+                codeRequested = true;
+                try {
+                    let code = await tempSock.requestPairingCode(targetNum);
+                    code = code?.match(/.{1,4}/g)?.join("-") || code;
+                    
+                    const opts = {
+                        chat_id: chatId,
+                        message_id: statusMsg.message_id,
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: "🔄 Get New Code", callback_data: `recode_${targetNum}` }]
+                            ]
+                        }
+                    };
+
+                    await tgBot.editMessageText(`🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Ready on Render. Enter this code into WhatsApp now.*`, opts);
+                } catch (innerErr) {
+                    await tgBot.editMessageText(`❌ *Pairing seal rejected:* ${innerErr.message}`, {
+                        chat_id: chatId,
+                        message_id: statusMsg.message_id,
+                        parse_mode: 'Markdown'
+                    });
+                }
+            }
+        }, 4000);
 
     } catch (err) {
         await tgBot.sendMessage(chatId, `❌ *An error occurred during setup:* ${err.message}`, { parse_mode: 'Markdown' });
@@ -962,7 +961,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             default: {
                 if (command) {
                     await sock.sendMessage(from, { 
-                        text: "╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Command* 〕━━━┈\n" +
+                        text: "╭━━━〔 *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝕻𝖊𝖗𝖔𝖗 Command* 〕━━━┈\n" +
                               "✦ *Command:* " + prefix + command + "\n" +
                               "✦ *Status:* Executed faithfully for My Lord Demon Emperor! ✅\n" +
                               "╰━━━━━━━━━━━━━━━━━━━━━━━┈" 
