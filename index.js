@@ -15,8 +15,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '9043764936:AAE1KZ97aL1DQ5gMv69S3Y_NOPgGP-vOmIU'; 
 const tgBot = new TelegramBot(TG_BOT_TOKEN, { polling: true });
 
-// --- TELEGRAM /start COMMAND
-tgBot.onText(/\/start/, (msg) => {
+// --- TELEGRAM /start COMMAND WITH BULLETPROOF FALLBACK ---
+tgBot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const startCaption = 
 "✰ † ✰━━━━━━━━━━━━━━━━━━━━━━━━✰ † ✰\n" +
@@ -31,12 +31,15 @@ tgBot.onText(/\/start/, (msg) => {
 "✰ ⚔️ /listdevices > wa pairs\n" +
 "✰═════════[ 😈 ]═════════✰";
 
-    tgBot.sendPhoto(chatId, MENU_IMAGE_URL, {
-        caption: startCaption,
-        parse_mode: 'Markdown'
-    }).catch(() => {
-        tgBot.sendMessage(chatId, startCaption, { parse_mode: 'Markdown' });
-    });
+    try {
+        await tgBot.sendPhoto(chatId, MENU_IMAGE_URL, {
+            caption: startCaption,
+            parse_mode: 'Markdown'
+        });
+    } catch (e) {
+        // Fallback to text message if Telegram image preview fails
+        await tgBot.sendMessage(chatId, startCaption, { parse_mode: 'Markdown' });
+    }
 });
 
 tgBot.onText(/\/connect(?: (.+))?/, async (msg, match) => {
@@ -54,7 +57,7 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
     try {
         let statusMsg;
         if (messageIdToEdit) {
-            await tgBot.editMessageText(`⏳ *Forging fresh link key for +${targetNum}, for you ...*`, {
+            await tgBot.editMessageText(`⏳ *Forging fresh link key for +${targetNum}...*`, {
                 chat_id: chatId,
                 message_id: messageIdToEdit,
                 parse_mode: 'Markdown'
@@ -77,9 +80,13 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            browser: ["Mac OS", "Safari", "17.0.0"],
+            // Hardened browser parameters to prevent WhatsApp mobile handshake drops
+            browser: ["Chrome (Linux)", "", ""],
             syncFullHistory: false,
-            connectTimeoutMs: 60000
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 10000,
+            generateHighQualityLinkPreview: false
         });
 
         tempSock.ev.on('creds.update', saveCreds);
@@ -117,12 +124,11 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
                     parse_mode: 'Markdown'
                 });
             }
-        }, 6000);
+        }, 8000);
     } catch (err) {
         await tgBot.sendMessage(chatId, `❌ *An error occurred during the ritual:* ${err.message}`, { parse_mode: 'Markdown' });
     }
 }
-
 
 tgBot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
@@ -492,9 +498,6 @@ async function startDemonBot() {
     });
 
     sock.ev.on('creds.update', saveCreds);
-
-    // AUTO-PAIRING BLOCK COMPLETELY REMOVED FROM HERE TO PREVENT RENDER CONFLICTS.
-    // USE TELEGRAM /connect COMMAND INSTEAD.
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
@@ -1803,9 +1806,11 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         logger: pino({ level: 'silent' }),
                         printQRInTerminal: false,
                         auth: state,
-                        browser: ["Mac OS", "Safari", "17.0.0"],
+                        browser: ["Chrome (Linux)", "", ""],
                         syncFullHistory: false,
-                        connectTimeoutMs: 60000
+                        connectTimeoutMs: 60000,
+                        defaultQueryTimeoutMs: 60000,
+                        keepAliveIntervalMs: 10000
                     });
 
                     tempSock.ev.on('creds.update', saveCreds);
@@ -1820,7 +1825,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         } catch (innerErr) {
                             await sock.sendMessage(from, { text: "❌ *Forging failed! Pairing rejected.*" }, { quoted: msg });
                         }
-                    }, 6000);
+                    }, 8000);
                 } catch (err) {
                     await sock.sendMessage(from, { text: "❌ *An error occurred Can't Forge link .*" }, { quoted: msg });
                 }
