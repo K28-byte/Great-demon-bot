@@ -355,18 +355,22 @@ async function startDemonBot() {
 
     if (!sock.authState.creds.registered) {
         console.log('\n==================================================');
-        let phoneNumber = process.env.PHONE_NUMBER || OWNER_NUMBER;
-        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+        let phoneNumber = process.env.PHONE_NUMBER || process.env.OWNER_NUMBER || OWNER_NUMBER;
+        phoneNumber = phoneNumber ? phoneNumber.replace(/[^0-9]/g, '') : '';
 
-        try {
-            await new Promise(res => setTimeout(res, 5000));
-            console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
-            const code = await sock.requestPairingCode(phoneNumber);
-            const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            console.log('\n🔑 YOUR PAIRING CODE: ' + formattedCode + '\n');
-            console.log('==================================================\n');
-        } catch (err) {
-            console.log('❌ Error requesting pairing code:', err.message);
+        if (!phoneNumber) {
+            console.log('❌ CRITICAL ERROR: No phone number found in Environment Variables! Please set PHONE_NUMBER in Render.');
+        } else {
+            try {
+                await new Promise(res => setTimeout(res, 5000));
+                console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
+                const code = await sock.requestPairingCode(phoneNumber);
+                const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
+                console.log('\n🔑 YOUR PAIRING CODE: ' + formattedCode + '\n');
+                console.log('==================================================\n');
+            } catch (err) {
+                console.log('❌ Error requesting pairing code:', err.message);
+            }
         }
 
         setInterval(() => {}, 60000);
