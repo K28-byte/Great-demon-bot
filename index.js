@@ -2830,3 +2830,4 @@ userTag + " has departed from *" + groupName + "*.\n" +
 }
 
 startDemonBot();
+
