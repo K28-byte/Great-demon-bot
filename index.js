@@ -834,7 +834,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                     const groupMetadata = await sock.groupMetadata(from);
                     const mentions = groupMetadata.participants.map(p => p.id);
 
-                    const goodmorning artwork = [ 
+                    const morningArtworks = [ 
                         "https://img.sanishtech.com/u/27458129bbba7a98580dfbf130c7b47c.jpg",
                         "https://img.sanishtech.com/u/fa66c0119b8b3f6063e14b31ff6557d7.jpg",
                         "https://img.sanishtech.com/u/be9566c775a04e305e3e5bc15aafa860.jpg"
@@ -846,9 +846,14 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         "╭━━━〔  🤍 *𝐑𝐈𝐒𝐄 𝐀𝐍𝐃 𝐒𝐇𝐈𝐍𝐄*  〕━━━┈\n┃ 👑 Sun’s up, time to move.\n┃ 🔥 Don’t waste the morning slacking off.\n┃ 🖤 Stay focused, handle your goals, and dominate the day.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈\n_“chai speecless.”_"
                     ];
 
-                    const randomImg = morningArtworks[Math.floor(Math.random() * morningArtworks.length)];
-                    const randomCaption = morningCaptions[Math.floor(Math.random() * morningCaptions.length)];
+                    const randomImg = 
+                    morningArtworks[Math.floor(Math.random() * 
+                    morningArtworks.length)];
 
+                    const randomCaption = 
+                    morningCaptions[Math.floor(Math.random() * 
+                    morningCaptions.length)]; 
+                   
                     await sock.sendMessage(from, { react: { text: '🌅', key: msg.key } });
                     await sock.sendMessage(from, { image: { url: randomImg }, caption: randomCaption, mentions }, { quoted: msg });
                 } catch (e) {
