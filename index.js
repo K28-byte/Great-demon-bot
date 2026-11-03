@@ -324,7 +324,7 @@ const COOLDOWN_TIME = 10000;
 
 // --- TELEGRAM CONFIGURATION & HANDLERS ---
 const TelegramBot = require('node-telegram-bot-api');
-const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '9043764936:AAE1KZ97aL1DQ5gMv69S3Y_NOPgGP-vOmIU'; 
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN ||''; 
 const tgBot = new TelegramBot(TG_BOT_TOKEN, { polling: true });
 
 tgBot.onText(/\/start/, async (msg) => {
