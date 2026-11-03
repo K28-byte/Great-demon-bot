@@ -363,7 +363,7 @@ tgBot.onText(/\/connect(?: (.+))?/, async (msg, match) => {
     await handlePairingProcess(chatId, targetNum);
 });
 
-// --- FIXED TELEGRAM PAIRING HANDLER (WORKING BAIELEYS PAIRING) ---
+// --- FULLY OPTIMIZED TELEGRAM PAIRING HANDLER ---
 async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
     try {
         let statusMsg;
@@ -391,11 +391,11 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            browser: Browsers.macOS('Chrome'), // Fixed browser client identity for optimal pairing token acceptance
+            browser: Browsers.macOS('Chrome'),
             syncFullHistory: false,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
-            keepAliveIntervalMs: 10000,
+            keepAliveIntervalMs: 15000,
             generateHighQualityLinkPreview: false
         });
 
@@ -415,10 +415,10 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
             }
         });
 
-        // Trigger pairing code correctly after socket initializes
         if (!tempSock.authState.creds.registered) {
             setTimeout(async () => {
                 try {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                     let code = await tempSock.requestPairingCode(targetNum);
                     code = code?.match(/.{1,4}/g)?.join("-") || code;
                     
@@ -441,7 +441,7 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
                         parse_mode: 'Markdown'
                     });
                 }
-            }, 5000);
+            }, 4000);
         }
     } catch (err) {
         await tgBot.sendMessage(chatId, `❌ *An error occurred during the ritual:* ${err.message}`, { parse_mode: 'Markdown' });
@@ -933,7 +933,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "╭━━━〔 👑 *𝘼𝘽𝙊𝙐𝙏 𝘾𝙍𝙀𝘼𝙏𝙊𝙍* 👑 〕━━━┈\n" +
 "┃ 👑 *CREATOR:* ᴵᴬᴹ«»ᘜяᥱᥲт ᗪᥱмση ᙓмρ\n" +
 "┃ 📞 *CONTACT:* +2347061696819\n" +
-"┃ 🛡️ *IDENTITY:* 𝐰𝐡𝐲 𝐚𝐥𝐰𝐚𝐲𝐬 𝐊𝐞𝐥𝐯𝐢𝐧\n" +
+"┃ 🛡️ *IDENTITY:* 𝐰𝐡𝐲 𝐚𝐥w𝐚𝐲𝐬 𝐊𝐞𝐥𝐯𝐢𝐧\n" +
 "┃ 🐙 *GITHUB:* too lazy to put my git acc\n" +
 "┃\n" +
 "┃ 💐 _\"𝙏𝒉𝒆 𝙁𝒓𝒂𝒈𝒓𝒂𝒏𝒕 𝒇𝒍𝒐𝒘𝒆𝒓𝒔 𝘽𝒍𝒐𝒐𝒎𝒔 𝒘𝒊𝒕𝙝 𝘿𝒊𝒈𝒏𝒊𝒕𝒚\"_\n" +
@@ -1840,7 +1840,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 for (const groupId of groups) {
                     await sock.sendMessage(groupId, {
-                        text: "📢 *𝑮𝒓𝒆𝒂𝒕 𝑫𝒆𝒎𝒐𝒏 𝑽4 Broadcasting\n\n" + q + "\n\n_~ Directly from My Lord Demon Emperor_"
+                        text: "📢 *𝑮𝒓𝒆𝒂𝒕 𝑫𝒆𝒎𝒐𝒏 𝑽4 Broadcasting*\n\n" + q + "\n\n_~ Directly from My Lord Demon Emperor_"
                     });
                 }
                 await sock.sendMessage(from, { text: '✅ *Broadcasting delivered, My Lord!*' }, { quoted: msg });
@@ -1857,7 +1857,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             case 'inspectsock':
             case 'status': {
                 await sock.sendMessage(from, { 
-                    text: "⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝕻𝖊𝖗𝖔𝖗 Core Health*\n\n" +
+                    text: "⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Core Health*\n\n" +
                           "• *Socket:* Bound & Synced ✅\n" +
                           "• *Latency:* Optimal\n" +
                           "• *Protection:* Active"
