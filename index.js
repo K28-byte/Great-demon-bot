@@ -1897,7 +1897,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             case 'antiadd':
             case 'antibot':
             case 'antidemote':
-            case 'antiimage';
+            case 'antiimage':
             case 'antipromote':
             case 'antiremove':
             case 'antispam':
