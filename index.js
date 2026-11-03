@@ -19,7 +19,8 @@ const {
     downloadMediaMessage,
     generateWAMessageContent,
     generateWAMessageFromContent,
-    jidNormalizedUser
+    jidNormalizedUser,
+    Browsers
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
@@ -362,6 +363,7 @@ tgBot.onText(/\/connect(?: (.+))?/, async (msg, match) => {
     await handlePairingProcess(chatId, targetNum);
 });
 
+// --- FIXED TELEGRAM PAIRING HANDLER (WORKING BAIELEYS PAIRING) ---
 async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
     try {
         let statusMsg;
@@ -389,7 +391,7 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            browser: ["Desktop", "Chrome", "120.0.0.0"],
+            browser: Browsers.macOS('Chrome'), // Fixed browser client identity for optimal pairing token acceptance
             syncFullHistory: false,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
@@ -399,19 +401,24 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
 
         tempSock.ev.on('creds.update', saveCreds);
 
-        tempSock.ev.on('connection.update', (update) => {
+        tempSock.ev.on('connection.update', async (update) => {
             const { connection } = update;
             if (connection === 'open') {
-                tgBot.sendMessage(chatId, `✅ *WhatsApp Connected Successfully via Telegram!*\n\n📱 *Number:* +${targetNum}`, { parse_mode: 'Markdown' });
+                await tgBot.editMessageText(`✅ *WhatsApp Connected Successfully via Telegram!*\n\n📱 *Number:* +${targetNum}`, {
+                    chat_id: chatId,
+                    message_id: statusMsg.message_id,
+                    parse_mode: 'Markdown'
+                });
                 setTimeout(() => {
-                    startDemonBot(); // Automatically start bot instance upon successful pairing
+                    startDemonBot(); 
                 }, 2000);
             }
         });
 
-        setTimeout(async () => {
-            try {
-                if (!tempSock.authState.creds.registered) {
+        // Trigger pairing code correctly after socket initializes
+        if (!tempSock.authState.creds.registered) {
+            setTimeout(async () => {
+                try {
                     let code = await tempSock.requestPairingCode(targetNum);
                     code = code?.match(/.{1,4}/g)?.join("-") || code;
                     
@@ -427,15 +434,15 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
                     };
 
                     await tgBot.editMessageText(`🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
+                } catch (innerErr) {
+                    await tgBot.editMessageText(`❌ *Forging failed! Pairing seal rejected:* ${innerErr.message}`, {
+                        chat_id: chatId,
+                        message_id: statusMsg.message_id,
+                        parse_mode: 'Markdown'
+                    });
                 }
-            } catch (innerErr) {
-                await tgBot.editMessageText(`❌ *Forging failed! Pairing seal rejected:* ${innerErr.message}`, {
-                    chat_id: chatId,
-                    message_id: statusMsg.message_id,
-                    parse_mode: 'Markdown'
-                });
-            }
-        }, 8000);
+            }, 5000);
+        }
     } catch (err) {
         await tgBot.sendMessage(chatId, `❌ *An error occurred during the ritual:* ${err.message}`, { parse_mode: 'Markdown' });
     }
@@ -481,7 +488,7 @@ async function startDemonBot() {
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ["Desktop", "Chrome", "120.0.0.0"],
+        browser: Browsers.macOS('Chrome'),
         syncFullHistory: false,
         markOnlineOnConnect: autoSettings.autoonline,
         connectTimeoutMs: 60000,
@@ -1797,7 +1804,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         logger: pino({ level: 'silent' }),
                         printQRInTerminal: false,
                         auth: state,
-                        browser: ["Desktop", "Chrome", "120.0.0.0"],
+                        browser: Browsers.macOS('Chrome'),
                         syncFullHistory: false,
                         connectTimeoutMs: 60000,
                         defaultQueryTimeoutMs: 60000,
@@ -1833,7 +1840,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 for (const groupId of groups) {
                     await sock.sendMessage(groupId, {
-                        text: "📢 *𝑮𝒓𝒆𝒂𝒕 𝑫𝒆𝒎𝒐𝒏 𝑽4 Broadcasting*\n\n" + q + "\n\n_~ Directly from My Lord Demon Emperor_"
+                        text: "📢 *𝑮𝒓𝒆𝒂𝒕 𝑫𝒆𝒎𝒐𝒏 𝑽4 Broadcasting\n\n" + q + "\n\n_~ Directly from My Lord Demon Emperor_"
                     });
                 }
                 await sock.sendMessage(from, { text: '✅ *Broadcasting delivered, My Lord!*' }, { quoted: msg });
@@ -1850,7 +1857,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             case 'inspectsock':
             case 'status': {
                 await sock.sendMessage(from, { 
-                    text: "⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝖕𝖊𝖗𝖔𝖗 Core Health*\n\n" +
+                    text: "⚡ *𝕯𝖊𝖒𝖔𝖓 𝕰𝖒𝕻𝖊𝖗𝖔𝖗 Core Health*\n\n" +
                           "• *Socket:* Bound & Synced ✅\n" +
                           "• *Latency:* Optimal\n" +
                           "• *Protection:* Active"
