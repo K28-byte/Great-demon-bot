@@ -174,7 +174,7 @@ const { translate } = require('@vitalets/google-translate-api');
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍";
-const BOT_NAME = "𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍-𝐕4";
+const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
 const BOT_VERSION = "V4 ULTRA";
 const MENU_IMAGE_URL = "https://img.sanishtech.com/u/96b35f47cb64cc0f77b9a781b40d0990.jpg";
 const PURPLE_COLOR = '#9C27B0';
