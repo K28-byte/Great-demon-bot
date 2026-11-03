@@ -80,8 +80,8 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            // Hardened browser parameters to prevent WhatsApp mobile handshake drops
-            browser: ["Chrome (Linux)", "", ""],
+            // Stable Desktop Chrome pairing signature to prevent rejection
+            browser: ["Desktop", "Chrome", "120.0.0.0"],
             syncFullHistory: false,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 60000,
@@ -490,7 +490,7 @@ async function startDemonBot() {
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"],
+        browser: ["Desktop", "Chrome", "120.0.0.0"],
         syncFullHistory: false,
         markOnlineOnConnect: autoSettings.autoonline,
         connectTimeoutMs: 60000,
@@ -1806,7 +1806,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         logger: pino({ level: 'silent' }),
                         printQRInTerminal: false,
                         auth: state,
-                        browser: ["Chrome (Linux)", "", ""],
+                        browser: ["Desktop", "Chrome", "120.0.0.0"],
                         syncFullHistory: false,
                         connectTimeoutMs: 60000,
                         defaultQueryTimeoutMs: 60000,
