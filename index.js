@@ -38,11 +38,11 @@ const { truth } = require('@bochilteam/scraper');
 const { translate } = require('@vitalets/google-translate-api');
 
 // --- BOT CONFIGURATION ---
-const OWNER_NUMBER = "";
+const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍";
 const BOT_NAME = "𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍-𝐕4";
 const BOT_VERSION = "v4 ULTRA";
-const MENU_IMAGE_URL = "https://img.sanishtech.com/u/91f778e151f882edc7e4974fd5fcb209.jpg";
+const MENU_IMAGE_URL = "https://img.sanishtech.com/u/96b35f47cb64cc0f77b9a781b40d0990.jpg";
 const PURPLE_COLOR = '#9C27B0';
 const startTime = Date.now();
 
@@ -355,22 +355,18 @@ async function startDemonBot() {
 
     if (!sock.authState.creds.registered) {
         console.log('\n==================================================');
-        let phoneNumber = process.env.PHONE_NUMBER || process.env.OWNER_NUMBER || OWNER_NUMBER;
-        phoneNumber = phoneNumber ? phoneNumber.replace(/[^0-9]/g, '') : '';
+        let phoneNumber = process.env.PHONE_NUMBER || OWNER_NUMBER;
+        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
 
-        if (!phoneNumber) {
-            console.log('❌ CRITICAL ERROR: No phone number found in Environment Variables! Please set PHONE_NUMBER in Render.');
-        } else {
-            try {
-                await new Promise(res => setTimeout(res, 5000));
-                console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
-                const code = await sock.requestPairingCode(phoneNumber);
-                const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-                console.log('\n🔑 YOUR PAIRING CODE: ' + formattedCode + '\n');
-                console.log('==================================================\n');
-            } catch (err) {
-                console.log('❌ Error requesting pairing code:', err.message);
-            }
+        try {
+            await new Promise(res => setTimeout(res, 5000));
+            console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
+            const code = await sock.requestPairingCode(phoneNumber);
+            const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
+            console.log('\n🔑 YOUR PAIRING CODE: ' + formattedCode + '\n');
+            console.log('==================================================\n');
+        } catch (err) {
+            console.log('❌ Error requesting pairing code:', err.message);
         }
 
         setInterval(() => {}, 60000);
