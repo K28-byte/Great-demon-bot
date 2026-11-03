@@ -869,6 +869,9 @@ userTag + " has departed from *" + groupName + "*.\n" +
 
                 try {
                     const groupMetadata = await sock.groupMetadata(from);
+                    const mentions = groupMetadata.participants;
+
+                    const afternoonCaptions = [
                         "╭━━━〔  🔥 * 𝑨𝑭𝑻𝑬𝑹𝑵𝑶𝑶𝑵  𝒀'𝑨𝑳𝑳*  〕━━━┈\n┃ ☀️ Peak of the day right here.\n┃ ⚡ Take a quick breather if you need to, then back to work.\n┃ ⚔️ Make the rest of the day count.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈\n_“Stay locked in.”_",
                         "╭━━━〔  👑 *𝑲𝑶𝑵𝑵𝑰𝑪𝑯𝑰𝑾𝑨 * 😊 〕━━━┈\n┃ 🌤️ The sun is high, keep pushing through.\n┃ 🩸 No room for laziness halfway through the grind.\n┃ 🖤 Stay sharp until the sun sets.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈\n_“I dey motivate una keh 😂 omo no grind oo lol.”_"
                     ];
