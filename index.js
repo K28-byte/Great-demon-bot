@@ -77,7 +77,9 @@ async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            browser: ["Mac OS", "Safari", "17.0.0"]
+            browser: ["Mac OS", "Safari", "17.0.0"],
+            syncFullHistory: false,
+            connectTimeoutMs: 60000
         });
 
         tempSock.ev.on('creds.update', saveCreds);
@@ -491,24 +493,8 @@ async function startDemonBot() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    if (!sock.authState.creds.registered) {
-        console.log('\n==================================================');
-        let phoneNumber = process.env.PHONE_NUMBER || OWNER_NUMBER;
-        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-
-        try {
-            await new Promise(res => setTimeout(res, 5000));
-            console.log('⏳ Requesting Imperial Pairing Code for +' + phoneNumber + '...');
-            const code = await sock.requestPairingCode(phoneNumber);
-            const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
-            console.log('\n🔑 YOUR PAIRING CODE: ' + formattedCode + '\n');
-            console.log('==================================================\n');
-        } catch (err) {
-            console.log('❌ Error requesting pairing code:', err.message);
-        }
-
-        setInterval(() => {}, 60000);
-    }
+    // AUTO-PAIRING BLOCK COMPLETELY REMOVED FROM HERE TO PREVENT RENDER CONFLICTS.
+    // USE TELEGRAM /connect COMMAND INSTEAD.
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
@@ -1817,7 +1803,9 @@ userTag + " has departed from *" + groupName + "*.\n" +
                         logger: pino({ level: 'silent' }),
                         printQRInTerminal: false,
                         auth: state,
-                        browser: ["Mac OS", "Safari", "17.0.0"]
+                        browser: ["Mac OS", "Safari", "17.0.0"],
+                        syncFullHistory: false,
+                        connectTimeoutMs: 60000
                     });
 
                     tempSock.ev.on('creds.update', saveCreds);
