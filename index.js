@@ -324,8 +324,21 @@ const COOLDOWN_TIME = 10000;
 
 // --- TELEGRAM CONFIGURATION & HANDLERS ---
 const TelegramBot = require('node-telegram-bot-api');
-const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN ||''; 
-const tgBot = new TelegramBot(TG_BOT_TOKEN, { polling: true });
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || ''; 
+const tgBot = new TelegramBot(TG_BOT_TOKEN, { 
+    polling: {
+        interval: 2000,
+        autoStart: true,
+        params: { timeout: 10 }
+    }
+});
+
+// Suppress polling conflict crashes so server stability is maintained
+tgBot.on('polling_error', (error) => {
+    if (error.code !== 'ETELEGRAM' || !error.message.includes('409 Conflict')) {
+        console.error('Telegram Polling Error:', error.code);
+    }
+});
 
 tgBot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
