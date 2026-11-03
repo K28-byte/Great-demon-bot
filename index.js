@@ -12,22 +12,59 @@ http.createServer((req, res) => {
 
 // --- TELEGRAM CONFIGURATION ---
 const TelegramBot = require('node-telegram-bot-api');
-const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '9043764936:AAE1KZ97aL1DQ5gMv69S3Y_NOPgGP-vOmIU';
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '9043764936:AAE1KZ97aL1DQ5gMv69S3Y_NOPgGP-vOmIU'; 
 const tgBot = new TelegramBot(TG_BOT_TOKEN, { polling: true });
 
-// --- TELEGRAM PAIRING ENGINE ---
-tgBot.onText(/\/pair (.+)/, async (msg, match) => {
+// --- TELEGRAM /start COMMAND
+tgBot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    const targetNum = match[1].replace(/[^0-9]/g, '');
+    const startCaption = 
+"✰ † ✰━━━━━━━━━━━━━━━━━━━━━━━━✰ † ✰\n" +
+"† ✰\n" +
+"             𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍-𝐕4
+"✰ † ✰━━━━━━━━━━━━━━━━━━━━━━━✰ † ✰\n" +
+"† ✰\n" +
+"┌─[ 💀 WELCOME 💀 ]─┐\n" +
+"└────────────────────┘\n" +
+"✰ ⚔️ /connect > pair number\n" +
+"✰ ⚔️ /disconnect > unpair number\n" +
+"✰ ⚔️ /listdevices > wa pairs\n" +
+"✰═════════[ 😈 ]═════════✰";
+
+    tgBot.sendPhoto(chatId, MENU_IMAGE_URL, {
+        caption: startCaption,
+        parse_mode: 'Markdown'
+    }).catch(() => {
+        tgBot.sendMessage(chatId, startCaption, { parse_mode: 'Markdown' });
+    });
+});
+
+tgBot.onText(/\/connect(?: (.+))?/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    let targetNum = match[1] ? match[1].replace(/[^0-9]/g, '') : '';
 
     if (!targetNum || targetNum.length < 10) {
-        return tgBot.sendMessage(chatId, "⚔️ *Provide a valid phone number with country code,amigo!*", { parse_mode: 'Markdown' });
+        return tgBot.sendMessage(chatId, "⚔️ *Provide a valid phone number with country code*\n\n💡 *Usage:* `/connect 2347061696819`", { parse_mode: 'Markdown' });
     }
 
+    await handlePairingProcess(chatId, targetNum);
+});
+
+async function handlePairingProcess(chatId, targetNum, messageIdToEdit = null) {
     try {
-        await tgBot.sendMessage(chatId, `⏳ *Forging link key for +${targetNum}, as my lord say i should...*`, { parse_mode: 'Markdown' });
+        let statusMsg;
+        if (messageIdToEdit) {
+            await tgBot.editMessageText(`⏳ *Forging fresh link key for +${targetNum}, for you ...*`, {
+                chat_id: chatId,
+                message_id: messageIdToEdit,
+                parse_mode: 'Markdown'
+            });
+            statusMsg = { message_id: messageIdToEdit };
+        } else {
+            statusMsg = await tgBot.sendMessage(chatId, `⏳ *Forging link key for +${targetNum}, kindly wait...*`, { parse_mode: 'Markdown' });
+        }
+
         const tempSessionPath = path.join(__dirname, 'sessions', 'session_' + targetNum);
-        
         if (fs.existsSync(tempSessionPath)) {
             fs.rmSync(tempSessionPath, { recursive: true, force: true });
         }
@@ -56,33 +93,55 @@ tgBot.onText(/\/pair (.+)/, async (msg, match) => {
                 code = code?.match(/.{1,4}/g)?.join("-") || code;
                 
                 const opts = {
+                    chat_id: chatId,
+                    message_id: statusMsg.message_id,
                     parse_mode: 'Markdown',
-                    reply_markup: JSON.stringify({
+                    reply_markup: {
                         inline_keyboard: [
                             [{ text: "🔄 Get New Code", callback_data: `recode_${targetNum}` }]
                         ]
-                    })
+                    }
                 };
 
-                await tgBot.sendMessage(chatId, `🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
+                await tgBot.editMessageText(`🔑 *IMPERIAL LINK CODE:* \`${code}\`\n\n⏰ *Expires in 60 seconds.*`, opts);
             } catch (innerErr) {
-                await tgBot.sendMessage(chatId, "❌ *Forging failed! Pairing seal rejected.*", { parse_mode: 'Markdown' });
+                await tgBot.editMessageText(`❌ *Forging failed! Pairing seal rejected:* ${innerErr.message}`, {
+                    chat_id: chatId,
+                    message_id: statusMsg.message_id,
+                    parse_mode: 'Markdown'
+                });
             }
         }, 4000);
     } catch (err) {
-        await tgBot.sendMessage(chatId, "❌ *An error occurred during the ritual.*", { parse_mode: 'Markdown' });
+        await tgBot.sendMessage(chatId, `❌ *An error occurred during the ritual:* ${err.message}`, { parse_mode: 'Markdown' });
     }
-});
+}
 
-// --- TELEGRAM /start COMMAND ---
-tgBot.onText(/\/start/, (msg) => {
-    const chatId = msg.chat.id;
-    tgBot.sendMessage(chatId, 
-        "👑 *𝐆𝐑𝐄𝐀𝐓_𝐃𝐄𝐌𝐎𝐍 𝐕4 Control Panel*\n\n" +
-        "Welcome My Peeps! Use the command below to pair a number:\n" +
-        "`/pair 234xxxxxxxxxx`", 
-        { parse_mode: 'Markdown' }
-    );
+
+tgBot.on('callback_query', async (query) => {
+    const chatId = query.message.chat.id;
+    const messageId = query.message.message_id;
+    const data = query.data;
+
+    if (data.startsWith('recode_')) {
+        const targetNum = data.split('_')[1];
+        await tgBot.answerCallbackQuery(query.id, { text: "🔄 Generating a fresh code for My Lord..." });
+        await handlePairingProcess(chatId, targetNum, messageId);
+    } else if (data === "confirm_disconnect") {
+        await tgBot.answerCallbackQuery(query.id, { text: "Disconnected." });
+        await tgBot.editMessageText("⚠️ *WhatsApp Disconnected!* Account logged out from servers.", {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'Markdown'
+        });
+    } else if (data === "cancel_disconnect") {
+        await tgBot.answerCallbackQuery(query.id, { text: "Cancelled." });
+        await tgBot.editMessageText("✅ Disconnect action cancelled.", {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'Markdown'
+        });
+    }
 });
 
 const { 
@@ -114,9 +173,9 @@ const { translate } = require('@vitalets/google-translate-api');
 
 // --- BOT CONFIGURATION ---
 const OWNER_NUMBER = "2347061696819";
-const OWNER_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏";
-const BOT_NAME = "𝙂𝒓𝒆𝒂𝒕 𝒅𝒆𝒎𝒐𝒏 𝑩𝒐𝒕";
-const BOT_VERSION = "v4 ULTRA";
+const OWNER_NAME = "𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍";
+const BOT_NAME = "𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍-𝐕4";
+const BOT_VERSION = "V4 ULTRA";
 const MENU_IMAGE_URL = "https://img.sanishtech.com/u/96b35f47cb64cc0f77b9a781b40d0990.jpg";
 const PURPLE_COLOR = '#9C27B0';
 const startTime = Date.now();
@@ -857,7 +916,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
 "┃ *🌖 Version:* " + BOT_VERSION + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  👑 *𝐄𝐌𝐏𝐄𝐑𝐎𝐑 𝐌𝐄𝐍𝐔*  〕━━━┈\n" +
-"✿ sudo\n✿ sudolist\n✿ sudoremove\n✿ setprefix\n✿ anticall\n✿ antigroupstatus\n✿ delgcstatus\n✿ delete / del\n✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ autoreact\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
+"✿ sudo\n✿ sudolist\n✿ sudoremove\n✿ setprefix\n✿ anticall\n✿ antigroupstatus\n✿ delgcstatus\n✿ delete / del\n✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ autoreact\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ connect\n✿ broadcast\n✿ spamngl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🎭 *𝐇𝐚𝐯𝐞 𝐅𝐮𝐧 𝐰𝐢𝐭𝐡 𝐄𝐦𝐩*  〕━━━┈\n" +
 "✿ gm / goodmorning\n✿ ga / goodafternoon\n✿ gn / goodnight\n✿ konachan / konachansfw\n✿ wasted\n✿ top / activeusers\n✿ gayrate\n✿ flirt\n✿ dare\n✿ truth\n" +
@@ -1732,14 +1791,14 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            case 'pair': {
+            case 'connect': {
                 let targetNum = args[0] ? args[0].replace(/[^0-9]/g, '') : '';
                 if (!targetNum || targetNum.length < 10) {
-                    return sock.sendMessage(from, { text: "⚔️ *Provide a valid phone number with country code!*" }, { quoted: msg });
+                    return sock.sendMessage(from, { text: "⚔️ *Provide a valid phone number with country code!* (e.g., `.connect 2347061696819`)" }, { quoted: msg });
                 }
 
                 try {
-                    await sock.sendMessage(from, { text: "⏳ *Forging link key for +" + targetNum + ", For pairing...*" }, { quoted: msg });
+                    await sock.sendMessage(from, { text: "⏳ *Forging link key for +" + targetNum + ", for pairing...*" }, { quoted: msg });
                     const tempSessionPath = path.join(__dirname, 'sessions', 'session_' + targetNum);
                     
                     if (fs.existsSync(tempSessionPath)) {
