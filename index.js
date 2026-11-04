@@ -1253,7 +1253,7 @@ async function startDemonBot(options = {}) {
 "┃ *🌖 Version:* " + BOT_VERSION + "\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  👑 *𝐄𝐌𝐏𝐄𝐑𝐎𝐑 𝐌𝐄𝐍𝐔*  〕━━━┈\n" +
-"✿ sudo\n✿ sudolist\n✿ sudoremove\n✿ setprefix\n✿ anticall\n✿ antigroupstatus\n✿ delgcstatus\n✿ delete / del\n✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ autoreact\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ gcstatus\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
+"✿ sudo\n✿ sudolist\n✿ sudoremove\n✿ setprefix\n✿ anticall\n✿\delgcstatus\n✿ delete / del\n✿ addowner\n✿ antidelete\n✿ antiviewonce\n✿ autoonline\n✿ autorecording\n✿ autostatuslike\n✿ autostatusview\n✿ autotyping\n✿ autoreact\n✿ block\n✿ unblock\n✿ buatgc\n✿ changebio\n✿ devices\n✿ getpp\n✿ joingroup\n✿ leavegroup\n✿ listfont\n✿ listgroup\n✿ bancheck\n✿ botlink\n✿ fetchstatus\n✿ listchannels\n✿ mode\n✿ pair\n✿ broadcast\n✿ spamngl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🎭 *𝐇𝐚𝐯𝐞 𝐅𝐮𝐧 𝐰𝐢𝐭𝐡 𝐄𝐦𝐩*  〕━━━┈\n" +
 "✿ gm / goodmorning\n✿ ga / goodafternoon\n✿ gn / goodnight\n✿ konachan / konachansfw\n✿ wasted\n✿ top / activeusers\n✿ gayrate\n✿ flirt\n✿ dare\n✿ truth\n" +
@@ -1466,58 +1466,109 @@ async function startDemonBot(options = {}) {
                 break;
             }
 
-            // 3. Konachan Anime Visual Command (.konachan)
-            case 'konachan':
-            case 'konachansfw': {
-                try {
-                    await sock.sendMessage(from, { text: '🎨 *Harvesting Konachan anime visual, My Lord...*' }, { quoted: msg });
+case 'konachan':
+case 'konachansfw': {
+    try {
+        await extra.reply('🎨 *Fetching a safe anime image, My Lord...*');
 
-                    let imageUrl = null;
-                    try {
-                        const res = await fetchJson('https://konachan.net/post.json?limit=20');
-                        if (Array.isArray(res) && res.length > 0) {
-                            const validPosts = res.filter(p => p.file_url);
-                            if (validPosts.length > 0) {
-                                const randomPost = validPosts[Math.floor(Math.random() * validPosts.length)];
-                                imageUrl = randomPost.file_url.startsWith('http') ? randomPost.file_url : 'https:' + randomPost.file_url;
-                            }
-                        }
-                    } catch (err) {}
+        let imageUrl = null;
 
-                    if (!imageUrl) {
-                        const fallbackRes = await fetchJson('https://api.waifu.pics/sfw/waifu');
-                        if (fallbackRes && fallbackRes.url) {
-                            imageUrl = fallbackRes.url;
-                        }
+        // 1. Try Konachan safe-rated images
+        try {
+            const res = await axios.get(
+                'https://konachan.net/post.json?limit=20&tags=rating%3Asafe',
+                {
+                    timeout: 15000,
+                    headers: {
+                        'User-Agent': 'GreatDemonV4/1.0'
                     }
-
-                    if (!imageUrl) {
-                        return extra.reply('❌ *No Konachan image could be harvested at this moment, My Lord.*');
-                    }
-
-                    const imageResponse = await axios.get(imageUrl, {
-                        responseType: 'arraybuffer',
-                        timeout: 30000
-                    });
-
-                    const imageBuffer = Buffer.from(imageResponse.data);
-                    if (!imageBuffer || imageBuffer.length === 0) {
-                        throw new Error('Empty image response received');
-                    }
-
-                    await sock.sendMessage(from, {
-                        image: imageBuffer,
-                        caption: "✦ *Konachan Anime Visual Archive* ✦\n_“Summoned successfully for My Lord Demon Emperor”_"
-                    }, { quoted: msg });
-
-                } catch (error) {
-                    console.error('[konachan error]:', error.message);
-                    await extra.reply(`❌ *Could not fetch konachan image:* ${error.message}`);
                 }
-                break;
-            }
+            );
 
-            // =========================================================================
+            if (Array.isArray(res.data) && res.data.length > 0) {
+                const validPosts = res.data.filter(p =>
+                    p.file_url &&
+                    /^https?:\/\//i.test(p.file_url)
+                );
+
+                if (validPosts.length > 0) {
+                    const post = validPosts[
+                        Math.floor(Math.random() * validPosts.length)
+                    ];
+
+                    imageUrl = post.file_url;
+                }
+            }
+        } catch (err) {
+            console.log('[KONACHAN API]', err.message);
+        }
+
+        // 2. Safe fallback
+        if (!imageUrl) {
+            try {
+                const fallback = await axios.get(
+                    'https://api.waifu.pics/sfw/waifu',
+                    { timeout: 15000 }
+                );
+
+                if (fallback.data?.url) {
+                    imageUrl = fallback.data.url;
+                }
+            } catch (err) {
+                console.log('[WAIFU FALLBACK]', err.message);
+            }
+        }
+
+        if (!imageUrl) {
+            return extra.reply(
+                '❌ No anime image is available right now. Please try again later.'
+            );
+        }
+
+        // 3. Download and validate image
+        const response = await axios.get(imageUrl, {
+            responseType: 'arraybuffer',
+            timeout: 20000,
+            maxContentLength: 8 * 1024 * 1024,
+            maxBodyLength: 8 * 1024 * 1024,
+            headers: {
+                'User-Agent': 'GreatDemonV4/1.0'
+            }
+        });
+
+        const contentType = response.headers['content-type'] || '';
+
+        if (!contentType.toLowerCase().startsWith('image/')) {
+            throw new Error('The image provider returned a non-image file.');
+        }
+
+        const imageBuffer = Buffer.from(response.data);
+
+        if (!imageBuffer.length) {
+            throw new Error('The downloaded image is empty.');
+        }
+
+        // 4. Send image
+        await sock.sendMessage(from, {
+            image: imageBuffer,
+            caption:
+                '✦ *GREAT DEMON V4 — ANIME ARCHIVE* ✦\n\n' +
+                '_Summoned successfully for My Lord Demon Emperor_ 👑'
+        }, { quoted: msg });
+
+    } catch (error) {
+        console.error('[KONACHAN ERROR]', error.message);
+
+        await extra.reply(
+            '❌ *Anime image fetching failed.*\n' +
+            'Please try again in a moment.'
+        ).catch(() => {});
+    }
+
+    break;
+}
+
+                      // =========================================================================
             // EXISTING BOT COMMANDS
             // =========================================================================
             case 'sudo': {
@@ -1583,41 +1634,6 @@ async function startDemonBot(options = {}) {
                 break;
             }
 
-            case 'antigroupstatus':
-            case 'antigstatus':
-            case 'ags': {
-                if (!isGroup) return extra.reply('⚔️ *Domain Command Only!*');
-                if (!isSenderAdmin) return extra.reply('⚔️ *Admin rights required!*');
-                
-                try {
-                    const ctx = msg.message?.extendedTextMessage?.contextInfo;
-                    if (!args[0]) {
-                        const settings = groupSettings[extra.from];
-                        const status = settings.antigroupstatus ? 'ON' : 'OFF';
-                        const action = settings.antigroupstatusAction || 'delete';
-                        return extra.reply(
-                            `📵 *Anti Group Status*\n\n` +
-                            `Status: *${status}*\n` +
-                            `Action: *${action}*\n\n` +
-                            `Blocks members from posting WhatsApp group statuses.\n` +
-                            `Usage:\n  ${prefix}antigroupstatus on\n  ${prefix}antigroupstatus off`
-                        );
-                    }
-
-                    const opt = args[0].toLowerCase();
-                    if (opt === 'on') {
-                        groupSettings[extra.from].antigroupstatus = true;
-                        return extra.reply('*Anti group status has been turned ON*');
-                    }
-                    if (opt === 'off') {
-                        groupSettings[extra.from].antigroupstatus = false;
-                        return extra.reply('*Anti group status has been turned OFF*');
-                    }
-                } catch (e) {
-                    await extra.reply(`❌ Error: ${e.message}`);
-                }
-                break;
-            }
 
             case 'del':
             case 'delete': {
@@ -2166,95 +2182,7 @@ async function startDemonBot(options = {}) {
                 }, { quoted: msg });
                 break;
             }
- case 'gcstatus': {
-    if (!isSudo) {
-        return reply("❌ Only the Owner or Sudo users can use this command!");
-    }
-
-    if (!isGroup) {
-        return reply("❌ Use this command inside the group where you want to post the status.");
-    }
-
-    const inviteLink = args.find(arg =>
-        /https?:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/i.test(arg)
-    );
-
-    if (!inviteLink) {
-        return reply(
-            "👑 *GREAT DEMON V4 — GC STATUS*\n\n" +
-            `Usage: ${prefix}gcstatus LINK\n\n` +
-            "The bot will fetch the new group's profile picture " +
-            "and post it as a Group Status here."
-        );
-    }
-
-    const match = inviteLink.match(
-        /https?:\/\/chat\.whatsapp\.com\/([A-Za-z0-9]+)/i
-    );
-
-    if (!match) {
-        return reply("❌ Invalid WhatsApp group invitation link!");
-    }
-
-    const validLink = `https://chat.whatsapp.com/${match[1]}`;
-    const inviteCode = match[1];
-
-    try {
-        await reply("⏳ Fetching new group information...");
-
-        const groupInfo = await sock.groupGetInviteInfo(inviteCode);
-
-        if (!groupInfo || !groupInfo.id) {
-            return reply("❌ Could not retrieve the new group's information.");
-        }
-
-        const pictureUrl = await sock.profilePictureUrl(
-            groupInfo.id,
-            "image"
-        ).catch(() => null);
-
-        if (!pictureUrl) {
-            return reply("❌ Could not fetch the new group's profile picture.");
-        }
-
-        const response = await axios.get(pictureUrl, {
-            responseType: "arraybuffer"
-        });
-
-        const groupPicture = Buffer.from(response.data);
-
-        if (!groupPicture.length) {
-            return reply("❌ The group profile picture is empty.");
-        }
-
-        const caption =
-            "╭━━〔 👑 GREAT DEMON V4 〕━━╮\n\n" +
-            "🔥 *NEW GROUP INVITATION!*\n\n" +
-            `📢 Group: ${groupInfo.subject || "New Group"}\n\n` +
-            "Join our new community:\n\n" +
-            `🔗 ${validLink}\n\n` +
-            "💀 Everyone is welcome!\n" +
-            "╰━━━━━━━━━━━━━━━━━━━━╯";
-
-        await reply("⏳ Posting the new group invitation as Group Status...");
-
-        await groupStatusBroadcast(sock, from, {
-            image: groupPicture,
-            caption: caption
-        });
-
-        return reply(
-            "✅ Group Status request sent!\n\n" +
-            `📢 Group: ${groupInfo.subject || "New Group"}`
-        );
-
-    } catch (err) {
-        console.error("GCSTATUS ERROR:", err);
-        return reply("❌ GCSTATUS failed: " + err.message);
-    }
-
-    break;
-}
+ 
 
 case 'antiadd':
 case 'antibot':
