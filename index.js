@@ -1700,167 +1700,131 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-            case 'gcstatus':
-            case 'groupstatus':
-            case 'togstatus':
-            case 'swgc':
-            case 'gs':
-            case 'gstatus': {
-                if (!isSudo) {
-                    return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor or Sudo Nobility can broadcast group statuses!*' }, { quoted: msg });
+case 'gcstatus': {
+    if (!isSudo) {
+        return reply("❌ Only the Owner or Sudo users can use this command!");
+    }
+
+    // Usage: .gcstatus https://chat.whatsapp.com/XXXX
+    const inviteLink = args.find(arg =>
+        /chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(arg)
+    );
+
+    if (!inviteLink) {
+        return reply(
+            "👑 *GREAT DEMON V4 — GC STATUS*\n\n" +
+            "Send a group invite link with this command.\n\n" +
+            "📝 Text:\n" +
+            `${prefix}gcstatus LINK\n\n` +
+            "🖼️ Image:\n" +
+            "Reply to an image with the command and link.\n\n" +
+            "🎥 Video:\n" +
+            "Reply to a video with the command and link."
+        );
+    }
+
+    const validLink = inviteLink.match(
+        /https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/
+    )[0];
+
+    const media = resolveMedia(msg);
+    const caption = args
+        .filter(arg => arg !== inviteLink)
+        .join(" ")
+        .trim();
+
+    let mediaBuffer = null;
+
+    try {
+        if (media && ['image', 'video'].includes(media.kind)) {
+            mediaBuffer = await downloadMediaMessage(
+                media.targetMessage,
+                'buffer',
+                {},
+                {
+                    logger: pino({ level: 'silent' }),
+                    reuploadRequest: sock.updateMediaMessage
                 }
-                if (!isGroup) {
-                    return sock.sendMessage(from, { text: '👥 This command can only be used in groups.' }, { quoted: msg });
+            );
+        }
+
+        if (media && !['image', 'video'].includes(media.kind)) {
+            return reply("❌ Only images and videos are supported.");
+        }
+
+        const groups = await sock.groupFetchAllParticipating();
+        const groupIds = Object.keys(groups);
+
+        if (!groupIds.length) {
+            return reply("❌ The bot is not in any groups!");
+        }
+
+        await reply(
+            "👑 *GREAT DEMON V4 — IMPERIAL BROADCAST*\n\n" +
+            `📢 Groups found: ${groupIds.length}\n` +
+            "⏳ Starting invitation broadcast..."
+        );
+
+        let successful = 0;
+        let failed = 0;
+
+        const broadcastCaption =
+            "╭━━〔 👑 GREAT DEMON V4 〕━━╮\n\n" +
+            "🔥 *NEW GROUP INVITATION!*\n\n" +
+            (caption ? caption + "\n\n" : "") +
+            "Join our new community:\n\n" +
+            `🔗 ${validLink}\n\n` +
+            "💀 Everyone is welcome!\n" +
+            "╰━━━━━━━━━━━━━━━━━━━━╯";
+
+        for (const groupId of groupIds) {
+            try {
+                let messageContent;
+
+                if (media?.kind === 'image') {
+                    messageContent = {
+                        image: mediaBuffer,
+                        caption: broadcastCaption
+                    };
+                } else if (media?.kind === 'video') {
+                    messageContent = {
+                        video: mediaBuffer,
+                        caption: broadcastCaption
+                    };
+                } else {
+                    messageContent = {
+                        text: broadcastCaption
+                    };
                 }
 
-                try {
-                    const argsList = body.slice(prefix.length + command.length).trim().split(/ +/);
-                    let targetUrl = argsList.find(arg => arg.includes('chat.whatsapp.com') || arg.includes('t.me') || arg.includes('http'));
-                    let customText = argsList.filter(arg => !arg.includes('chat.whatsapp.com') && !arg.includes('t.me') && !arg.includes('http')).join(' ');
+                await sock.sendMessage(groupId, messageContent);
+                successful++;
 
-                    const media = resolveMedia(msg);
-
-                    if (!media && !targetUrl) {
-                        const caption = (q || '').trim();
-                        if (!caption) {
-                            return sock.sendMessage(from, {
-                                text: '📝 *Group Status Usage*\n\n' +
-                                      '• Send/reply with an *image/video/audio* and caption:\n' +
-                                      '  `' + prefix + command + ' [optional caption]`\n' +
-                                      '• Post a *link* as status story with optional text:\n' +
-                                      '  `' + prefix + command + ' https://chat.whatsapp.com/xxx Custom text`\n' +
-                                      '• Or text status only:\n' +
-                                      '  `' + prefix + command + ' Your text here`'
-                            }, { quoted: msg });
-                        }
-
-                        await sock.sendMessage(from, { text: '⏳ Posting text group status...' }, { quoted: msg });
-                        await groupStatusBroadcast(sock, from, {
-                            text: caption,
-                            backgroundColor: PURPLE_COLOR,
-                        });
-                        return sock.sendMessage(from, { text: '✅ Text group status posted!' }, { quoted: msg });
-                    }
-
-                    if (!media && targetUrl) {
-                        await sock.sendMessage(from, { text: '⏳ Fetching link preview & posting group status story...' }, { quoted: msg });
-
-                        let linkPicBuffer = null;
-                        if (targetUrl.includes('chat.whatsapp.com/')) {
-                            try {
-                                const inviteCode = targetUrl.split('chat.whatsapp.com/')[1].split('?')[0];
-                                const inviteInfo = await sock.groupGetInviteInfo(inviteCode).catch(() => null);
-                                if (inviteInfo && inviteInfo.id) {
-                                    const groupPpUrl = await sock.profilePictureUrl(inviteInfo.id, 'image').catch(() => null);
-                                    if (groupPpUrl) {
-                                        linkPicBuffer = await new Promise((resolve) => {
-                                            https.get(groupPpUrl, (res) => {
-                                                let data = [];
-                                                res.on('data', chunk => data.push(chunk));
-                                                res.on('end', () => resolve(Buffer.concat(data)));
-                                            }).on('error', () => resolve(null));
-                                        });
-                                    }
-                                }
-                            } catch (e) {}
-                        }
-
-                        if (!linkPicBuffer) {
-                            linkPicBuffer = await new Promise((resolve) => {
-                                https.get(MENU_IMAGE_URL, (res) => {
-                                    let data = [];
-                                    res.on('data', chunk => data.push(chunk));
-                                    res.on('end', () => resolve(Buffer.concat(data)));
-                                }).on('error', () => resolve(null));
-                            });
-                        }
-
-                        const captionText = (customText ? customText + "\n\n" : "") + targetUrl;
-
-                        await groupStatusBroadcast(sock, from, {
-                            image: linkPicBuffer,
-                            caption: captionText
-                        });
-                        return sock.sendMessage(from, { text: '✅ Link group status story posted!' }, { quoted: msg });
-                    }
-
-                    let buf;
-                    try {
-                        buf = await downloadMediaMessage(
-                            media.targetMessage,
-                            'buffer',
-                            {},
-                            { logger: undefined, reuploadRequest: sock.updateMediaMessage }
-                        );
-                    } catch (dlErr) {
-                        try {
-                            const type =
-                                media.kind === 'sticker' ? 'sticker' :
-                                media.kind === 'video' ? 'video' :
-                                media.kind === 'audio' ? 'audio' : 'image';
-                            buf = await downloadMedia(media.targetMessage.message, type);
-                        } catch (e2) {
-                            return sock.sendMessage(from, { text: '❌ Failed to download media' }, { quoted: msg });
-                        }
-                    }
-
-                    if (!buf || !buf.length) {
-                        return sock.sendMessage(from, { text: '❌ Could not download media' }, { quoted: msg });
-                    }
-
-                    const caption = (q || '').trim();
-
-                    if (media.kind === 'image' || media.kind === 'sticker') {
-                        await sock.sendMessage(from, { text: '⏳ Posting image group status...' }, { quoted: msg });
-                        await groupStatusBroadcast(sock, from, {
-                            image: buf,
-                            caption: caption || '',
-                        });
-                        return sock.sendMessage(from, { text: '✅ Image group status posted!' }, { quoted: msg });
-                    }
-
-                    if (media.kind === 'video') {
-                        await sock.sendMessage(from, { text: '⏳ Posting video group status...' }, { quoted: msg });
-                        await groupStatusBroadcast(sock, from, {
-                            video: buf,
-                            caption: caption || '',
-                        });
-                        return sock.sendMessage(from, { text: '✅ Video group status posted!' }, { quoted: msg });
-                    }
-
-                    if (media.kind === 'audio') {
-                        await sock.sendMessage(from, { text: '⏳ Posting audio group status...' }, { quoted: msg });
-
-                        let vn;
-                        try {
-                            vn = await toVN(buf);
-                        } catch {
-                            vn = buf;
-                        }
-
-                        let waveform;
-                        try {
-                            waveform = await generateWaveform(buf);
-                        } catch {
-                            waveform = undefined;
-                        }
-
-                        await groupStatusBroadcast(sock, from, {
-                            audio: vn,
-                            mimetype: 'audio/ogg; codecs=opus',
-                            ptt: true,
-                            waveform,
-                        });
-                        return sock.sendMessage(from, { text: '✅ Audio group status posted!' }, { quoted: msg });
-                    }
-
-                    return sock.sendMessage(from, { text: '❌ Unsupported media type.' }, { quoted: msg });
-                } catch (e) {
-                    console.error('groupstatus command error:', e);
-                    return sock.sendMessage(from, { text: '❌ Error: ' + (e.message || e) }, { quoted: msg });
-                }
-                break;
+            } catch (err) {
+                failed++;
+                console.error("GCSTATUS delivery failed:", err.message);
             }
+
+            // Delivery delay between groups
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+
+        await reply(
+            "╭━━〔 👑 BROADCAST REPORT 〕━━╮\n\n" +
+            `✅ Successful: ${successful}\n` +
+            `❌ Failed: ${failed}\n` +
+            `📊 Total groups: ${groupIds.length}\n\n` +
+            "🔥 *GREAT DEMON V4 — IMPERIAL BROADCAST COMPLETE*\n" +
+            "╰━━━━━━━━━━━━━━━━━━━━╯"
+        );
+
+    } catch (err) {
+        console.error("GCSTATUS ERROR:", err);
+        await reply("❌ Broadcast failed: " + err.message);
+    }
+
+    break;
+}
 
             case 'antiadd':
             case 'antibot':
