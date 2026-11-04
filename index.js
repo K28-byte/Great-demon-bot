@@ -830,33 +830,6 @@ async function startDemonBot(options = {}) {
             }
         }
 
-        // =========================================================================
-        // 🛡️ ANTIGCSTATUS
-        // =========================================================================
-        if (isGroup && groupSettings[from].antigcstatus && !isSenderAdmin) {
-            const isStatusMessage =
-                !!msg.message?.groupStatusMentionMessage ||
-                msg.message?.protocolMessage?.type === 25;
-
-            if (isStatusMessage) {
-                await sock.sendMessage(from, {
-                    delete: msg.key
-                }).catch(() => {});
-
-                await sock.sendMessage(from, {
-                    text: '🗡️ @' + senderNum +
-                        ', group status transmissions are forbidden!',
-                    mentions: [sender]
-                }).catch(() => {});
-
-                if (isBotAdmin) {
-                    await sock.groupParticipantsUpdate(
-                        from, [sender], 'remove'
-                    ).catch(() => {});
-                }
-                return;
-            }
-        }
 
         // =========================================================================
         // 🚫 IMPERIAL ANTISPAM
