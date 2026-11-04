@@ -1700,58 +1700,58 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 break;
             }
 
-case 'gcstatus': {
+     case 'gcstatus': {
     if (!isSudo) {
         return reply("❌ Only the Owner or Sudo users can use this command!");
     }
 
-    // Usage: .gcstatus https://chat.whatsapp.com/XXXX
     const inviteLink = args.find(arg =>
-        /chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(arg)
+        /https?:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/i.test(arg)
     );
 
     if (!inviteLink) {
         return reply(
             "👑 *GREAT DEMON V4 — GC STATUS*\n\n" +
-            "Send a group invite link with this command.\n\n" +
-            "📝 Text:\n" +
-            `${prefix}gcstatus LINK\n\n` +
-            "🖼️ Image:\n" +
-            "Reply to an image with the command and link.\n\n" +
-            "🎥 Video:\n" +
-            "Reply to a video with the command and link."
+            `Usage: ${prefix}gcstatus LINK\n\n` +
+            "The bot will fetch the new group's profile picture " +
+            "and broadcast it with the invitation link."
         );
     }
 
-    const validLink = inviteLink.match(
-        /https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/
-    )[0];
+    const match = inviteLink.match(
+        /https?:\/\/chat\.whatsapp\.com\/([A-Za-z0-9]+)/i
+    );
 
-    const media = resolveMedia(msg);
-    const caption = args
-        .filter(arg => arg !== inviteLink)
-        .join(" ")
-        .trim();
+    if (!match) {
+        return reply("❌ Invalid WhatsApp group invitation link!");
+    }
 
-    let mediaBuffer = null;
+    const validLink = `https://chat.whatsapp.com/${match[1]}`;
+    const inviteCode = match[1];
 
     try {
-        if (media && ['image', 'video'].includes(media.kind)) {
-            mediaBuffer = await downloadMediaMessage(
-                media.targetMessage,
-                'buffer',
-                {},
-                {
-                    logger: pino({ level: 'silent' }),
-                    reuploadRequest: sock.updateMediaMessage
-                }
+        await reply("⏳ Fetching new group information...");
+
+        // Get information about the group from its invite code
+        const groupInfo = await sock.groupGetInviteInfo(inviteCode);
+
+        if (!groupInfo || !groupInfo.id) {
+            return reply("❌ Could not retrieve the new group's information.");
+        }
+
+        // Fetch the new group's profile picture
+        let groupPicture = null;
+
+        try {
+            groupPicture = await sock.profilePictureUrl(
+                groupInfo.id,
+                'image'
             );
+        } catch (err) {
+            console.log("Group picture unavailable:", err.message);
         }
 
-        if (media && !['image', 'video'].includes(media.kind)) {
-            return reply("❌ Only images and videos are supported.");
-        }
-
+        // Get all groups the bot belongs to
         const groups = await sock.groupFetchAllParticipating();
         const groupIds = Object.keys(groups);
 
@@ -1759,53 +1759,43 @@ case 'gcstatus': {
             return reply("❌ The bot is not in any groups!");
         }
 
-        await reply(
-            "👑 *GREAT DEMON V4 — IMPERIAL BROADCAST*\n\n" +
-            `📢 Groups found: ${groupIds.length}\n` +
-            "⏳ Starting invitation broadcast..."
-        );
-
-        let successful = 0;
-        let failed = 0;
-
         const broadcastCaption =
             "╭━━〔 👑 GREAT DEMON V4 〕━━╮\n\n" +
             "🔥 *NEW GROUP INVITATION!*\n\n" +
-            (caption ? caption + "\n\n" : "") +
+            `📢 Group: ${groupInfo.subject || "New Group"}\n\n` +
             "Join our new community:\n\n" +
             `🔗 ${validLink}\n\n` +
             "💀 Everyone is welcome!\n" +
             "╰━━━━━━━━━━━━━━━━━━━━╯";
 
+        await reply(
+            `👑 Group found: ${groupInfo.subject || "New Group"}\n` +
+            `🖼️ Profile picture: ${groupPicture ? "Available" : "Unavailable"}\n` +
+            `📢 Broadcasting to ${groupIds.length} groups...`
+        );
+
+        let successful = 0;
+        let failed = 0;
+
         for (const groupId of groupIds) {
             try {
-                let messageContent;
-
-                if (media?.kind === 'image') {
-                    messageContent = {
-                        image: mediaBuffer,
+                if (groupPicture) {
+                    await sock.sendMessage(groupId, {
+                        image: { url: groupPicture },
                         caption: broadcastCaption
-                    };
-                } else if (media?.kind === 'video') {
-                    messageContent = {
-                        video: mediaBuffer,
-                        caption: broadcastCaption
-                    };
+                    });
                 } else {
-                    messageContent = {
+                    await sock.sendMessage(groupId, {
                         text: broadcastCaption
-                    };
+                    });
                 }
 
-                await sock.sendMessage(groupId, messageContent);
                 successful++;
-
             } catch (err) {
                 failed++;
-                console.error("GCSTATUS delivery failed:", err.message);
+                console.error("GCSTATUS delivery failed:", err);
             }
 
-            // Delivery delay between groups
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
@@ -1814,13 +1804,13 @@ case 'gcstatus': {
             `✅ Successful: ${successful}\n` +
             `❌ Failed: ${failed}\n` +
             `📊 Total groups: ${groupIds.length}\n\n` +
-            "🔥 *GREAT DEMON V4 — IMPERIAL BROADCAST COMPLETE*\n" +
+            "🔥 *BROADCAST COMPLETE*\n" +
             "╰━━━━━━━━━━━━━━━━━━━━╯"
         );
 
     } catch (err) {
         console.error("GCSTATUS ERROR:", err);
-        await reply("❌ Broadcast failed: " + err.message);
+        await reply("❌ GCSTATUS failed: " + err.message);
     }
 
     break;
@@ -2705,11 +2695,13 @@ async function startTelegramManager() {
 
     const telegram = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
     const linkedSessions = loadTelegramSessions();
-    const bannerUrl = MENU_IMAGE_URL;
+    
+const TELEGRAM_WELCOME_IMAGE = "https://img.sanishtech.com/u/58210e1bf8b93988aa95289701c31b48.png";
+const bannerUrl = TELEGRAM_WELCOME_IMAGE;
 
     const menuCaption =
         '✦ † ━━━━━━━━━━━━━ † ✦\n' +
-        '       👑 *GREAT DEMON V4* 👑\n' +
+        '       👑 *𝐆𝐑𝐄𝐀𝐓𝐃𝐄𝐌𝐎𝐍 𝐕4* 👑\n' +
         '✦ † ━━━━━━━━━━━━━ † ✦\n\n' +
         '╔════════════════════╗\n' +
         '       💀 *WELCOME, DEMON* 💀\n' +
