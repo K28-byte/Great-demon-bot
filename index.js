@@ -195,44 +195,70 @@ function resolveMedia(msg) {
   return null;
 }
 
-async function downloadMedia(msg, type) {
-  const mediaMsg = msg[type + 'Message'] || msg.documentMessage || msg;
-  const stream = await downloadContentFromMessage(mediaMsg, type === 'sticker' ? 'sticker' : type);
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
 async function groupStatusBroadcast(sock, jid, content) {
-  const { backgroundColor } = content;
-  delete content.backgroundColor;
+    if (!sock.user?.id) {
+        throw new Error("WhatsApp socket is not fully connected.");
+    }
 
-  const inside = await generateWAMessageContent(content, {
-    upload: sock.waUploadToServer,
-    backgroundColor: backgroundColor || PURPLE_COLOR,
-  });
+    const { backgroundColor } = content;
+    const statusContent = { ...content };
+    delete statusContent.backgroundColor;
 
-  const secret = crypto.randomBytes(32);
+    const inside = await generateWAMessageContent(statusContent, {
+        upload: sock.waUploadToServer,
+        backgroundColor: backgroundColor || PURPLE_COLOR,
+    });
 
-  const msg = generateWAMessageFromContent(
-    jid,
-    {
-      messageContextInfo: { messageSecret: secret },
-      groupStatusMessageV2: {
-        message: {
-          ...inside,
-          messageContextInfo: { messageSecret: secret },
+    if (!inside || !Object.keys(inside).length) {
+        throw new Error("Failed to generate group status content.");
+    }
+
+    const messageSecret = crypto.randomBytes(32);
+    const messageType = Object.keys(inside)[0];
+
+    if (
+        inside[messageType] &&
+        typeof inside[messageType] === "object"
+    ) {
+        inside[messageType].contextInfo = {
+            ...(inside[messageType].contextInfo || {}),
+            isGroupStatus: true,
+        };
+    }
+
+    const msg = generateWAMessageFromContent(
+        jid,
+        {
+            messageContextInfo: {
+                messageSecret,
+            },
+            groupStatusMessageV2: {
+                message: {
+                    ...inside,
+                    messageContextInfo: {
+                        messageSecret,
+                    },
+                },
+            },
         },
-      },
-    },
-    {}
-  );
+        {
+            userJid: sock.user.id,
+        }
+    );
 
-  await sock.relayMessage(jid, msg.message, { messageId: msg.key.id });
-  return msg;
+    if (!msg?.message || !msg?.key?.id) {
+        throw new Error("Failed to create group status message.");
+    }
+
+    await sock.relayMessage(
+        jid,
+        msg.message,
+        { messageId: msg.key.id }
+    );
+
+    return msg;
 }
+
 
 function toVN(buffer) {
   return new Promise((resolve, reject) => {
@@ -428,31 +454,132 @@ async function startDemonBot(options = {}) {
         }
     });
 
+ 
     // =========================================================================
-    // 👋 WELCOME & GOODBYE EVENT LISTENER WITH PFP STATUS
+    // 👑 IMPERIAL GROUP PROTECTION SYSTEM
+    // =========================================================================
+
+    // Separate protection tracking maps
+    const imperialSpamMap = new Map();
+    const imperialWarningMap = new Map();
+
+    // =========================================================================
+    // 👋 WELCOME, GOODBYE AND GROUP PARTICIPANT PROTECTION
     // =========================================================================
     sock.ev.on('group-participants.update', async (update) => {
         try {
-            const { id: from, participants, action } = update;
- 
+            const { id: from, participants = [], action, author } = update;
+
+            if (!from || !from.endsWith('@g.us')) return;
+
             if (!groupSettings[from]) {
-                groupSettings[from] = { 
-                    antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                    antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                    antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                    antitagadmin: false, grouponly: false, antigcstatus: false,
+                groupSettings[from] = {
+                    antiadd: false, antibot: false, antidemote: false,
+                    antigroupsmention: false, antiimage: false, antilink: false,
+                    antipromote: false, antiremove: false, antispam: false,
+                    antitag: false, welcome: false, goodbye: false,
+                    antidelete: false, antitagadmin: false, grouponly: false,
+                    antigcstatus: false,
                     antilinkMode: 'kick', antilinkWarnLimit: 3,
                     antigroupsmentionMode: 'kick', antigroupsmentionWarnLimit: 3
                 };
             }
 
-            const groupMetadata = await sock.groupMetadata(from).catch(() => ({ subject: 'Domain' }));
-            const groupName = groupMetadata.subject;
+            const settings = groupSettings[from];
+            const metadata = await sock.groupMetadata(from);
+            const groupName = metadata.subject || 'Our Group';
 
-            for (let num of participants) {
-                const userJid = num;
+            const normalize = jid => jid ? jidNormalizedUser(jid) : '';
+            const botJid = normalize(sock.user?.id);
+            const actorJid = normalize(author);
+
+            const botParticipant = metadata.participants.find(
+                p => normalize(p.id) === botJid
+            );
+
+            const isBotAdmin = !!botParticipant &&
+                ['admin', 'superadmin'].includes(botParticipant.admin);
+
+            const actorParticipant = metadata.participants.find(
+                p => normalize(p.id) === actorJid
+            );
+
+            const actorNum = actorJid.split('@')[0];
+            const actorIsAdmin = !!actorParticipant &&
+                ['admin', 'superadmin'].includes(actorParticipant.admin);
+
+            const trustedActor = !actorJid ||
+                actorJid === botJid ||
+                actorIsAdmin ||
+                sudoUsers.has(actorNum);
+
+            for (const participant of participants) {
+                const userJid = normalize(participant);
+                if (!userJid) continue;
+
                 const userTag = '@' + userJid.split('@')[0];
 
+                // ANTIADD
+                if (action === 'add' && settings.antiadd && !trustedActor) {
+                    if (isBotAdmin) {
+                        await sock.sendMessage(from, {
+                            text: '🚫 Unauthorized member addition detected. Removing ' + userTag + '.',
+                            mentions: [userJid]
+                        });
+
+                        await sock.groupParticipantsUpdate(
+                            from, [userJid], 'remove'
+                        ).catch(err => console.error('[ANTIADD]', err.message));
+                    }
+                    continue;
+                }
+
+                // ANTIREMOVE
+                if (action === 'remove' && settings.antiremove && !trustedActor) {
+                    if (isBotAdmin) {
+                        await sock.sendMessage(from, {
+                            text: '🛡️ Unauthorized removal detected. Attempting to restore ' + userTag + '.',
+                            mentions: [userJid]
+                        });
+
+                        await sock.groupParticipantsUpdate(
+                            from, [userJid], 'add'
+                        ).catch(err => console.error('[ANTIREMOVE]', err.message));
+                    }
+                    continue;
+                }
+
+                // ANTIPROMOTE
+                if (action === 'promote' && settings.antipromote && !trustedActor) {
+                    if (isBotAdmin) {
+                        await sock.sendMessage(from, {
+                            text: '🛡️ Unauthorized promotion detected. Reversing promotion of ' + userTag + '.',
+                            mentions: [userJid]
+                        });
+
+                        await sock.groupParticipantsUpdate(
+                            from, [userJid], 'demote'
+                        ).catch(err => console.error('[ANTIPROMOTE]', err.message));
+                    }
+                    continue;
+                }
+
+                // ANTIDEMOTE
+                if (action === 'demote' && settings.antidemote && !trustedActor) {
+                    if (isBotAdmin) {
+                        await sock.sendMessage(from, {
+                            text: '🛡️ Unauthorized demotion detected. Attempting to restore ' + userTag + '.',
+                            mentions: [userJid]
+                        });
+
+                        await sock.groupParticipantsUpdate(
+                            from, [userJid], 'promote'
+                        ).catch(err => console.error('[ANTIDEMOTE]', err.message));
+                    }
+                    continue;
+                }
+
+                // PROFILE PICTURE
                 let ppUrl;
                 try {
                     ppUrl = await sock.profilePictureUrl(userJid, 'image');
@@ -460,291 +587,657 @@ async function startDemonBot(options = {}) {
                     ppUrl = MENU_IMAGE_URL;
                 }
 
-                // --- AUTOMATIC WELCOME CARD ---
-                if (action === 'add' && groupSettings[from].welcome) {
-                    const welcomeMsg = 
-"👑 *IMPERIAL WELCOME* 👑\n\n" +
-"Welcome to *" + groupName + "*, " + userTag + "! ⚔️\n" +
-"We hope you enjoy your time here we are all friends if you need something ask some might help,and here to have fun under rule of Emperor!";
-
-                    await sock.sendMessage(from, { 
-                        image: { url: ppUrl }, 
-                        caption: welcomeMsg, 
-                        mentions: [userJid] 
-                    });
+                // WELCOME
+                if (action === 'add' && settings.welcome) {
+                    await sock.sendMessage(from, {
+                        image: { url: ppUrl },
+                        caption:
+                            '👑 *IMPERIAL WELCOME* 👑\n\n' +
+                            'Welcome to *' + groupName + '*, ' + userTag + '! ⚔️\n' +
+                            'We hope you enjoy your time here. If you need help, ask the group. Enjoy your stay under the rule of the Emperor!',
+                        mentions: [userJid]
+                    }).catch(err => console.error('[WELCOME]', err.message));
                 }
 
-                // --- AUTOMATIC GOODBYE CARD ---
-                if (action === 'remove' && groupSettings[from].goodbye) {
-                    const goodbyeMsg = 
-"👋 *IMPERIAL FAREWELL* 👋\n\n" +
-userTag + " has departed from *" + groupName + "*.\n" +
-"We hope you enjoyed your time here and we are happy you joined us even if you left us ! Farewell! ⚔️";
-
-                    await sock.sendMessage(from, { 
-                        image: { url: ppUrl }, 
-                        caption: goodbyeMsg, 
-                        mentions: [userJid] 
-                    });
+                // GOODBYE
+                if (action === 'remove' && settings.goodbye) {
+                    await sock.sendMessage(from, {
+                        image: { url: ppUrl },
+                        caption:
+                            '👋 *IMPERIAL FAREWELL* 👋\n\n' +
+                            userTag + ' has departed from *' + groupName + '*.\n' +
+                            'We hope you enjoyed your time here. Farewell! ⚔️',
+                        mentions: [userJid]
+                    }).catch(err => console.error('[GOODBYE]', err.message));
                 }
             }
         } catch (err) {
-            console.error('Welcome/Goodbye Error:', err.message);
+            console.error('[GROUP PROTECTION EVENT]', err.message);
         }
     });
 
-    // --- AUTO STATUS VIEW & LIKE HANDLER ---
+    // =========================================================================
+    // 📱 MESSAGE HANDLER, STATUS VIEW AND LIKE
+    // =========================================================================
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         try {
-            const msg = messages[0];
-            if (msg && msg.key && msg.key.remoteJid === 'status@broadcast') {
-                const statusJid = msg.key.participant;
+            const statusMsg = messages?.[0];
+
+            if (statusMsg?.key?.remoteJid === 'status@broadcast') {
+                const statusJid = statusMsg.key.participant;
+
                 if (autoSettings.autostatusview) {
-                    await sock.readMessages([msg.key]);
+                    await sock.readMessages([statusMsg.key]).catch(() => {});
                 }
+
                 if (autoSettings.autostatuslike && statusJid) {
-                    await sock.sendMessage('status@broadcast', { 
-                        react: { text: '🖤', key: msg.key } 
-                    }, { statusJid });
+                    await sock.sendMessage('status@broadcast', {
+                        react: { text: '🖤', key: statusMsg.key }
+                    }, { statusJid }).catch(() => {});
                 }
                 return;
             }
-        } catch (err) {}
+        } catch (err) {
+            console.error('[STATUS HANDLER]', err.message);
+        }
 
-        // ==========================================
-        // 🛡️ BULLETPROOF ANTICRASH SHIELD
-        // ==========================================
+        // =========================================================================
+        // 🛡️ IMPERIAL ADVANCED ANTICRASH SHIELD
+        // =========================================================================
         try {
-            const msgCheck = messages[0];
-            if (msgCheck && msgCheck.message) {
-                const rawCheckText = JSON.stringify(msgCheck.message);
-                const isTooLong = rawCheckText.length > 8000;
-                const hasBidiExploit = /[\u200B-\u200D\uFEFF\u202A-\u202E]{5,}/.test(rawCheckText);
-                const hasNullBytes = rawCheckText.includes('\u0000') || rawCheckText.includes('%00');
-                const hasHeavyNesting = (rawCheckText.match(/message/g) || []).length > 8;
+            if (!Array.isArray(messages) || messages.length === 0) return;
 
-                if (isTooLong || hasBidiExploit || hasNullBytes || hasHeavyNesting) {
-                    console.warn("🚨 [ANTICRASH SHIELD] Intercepted malicious payload from " + msgCheck.key.remoteJid + "!");
-                    return;
-                }
+            const check = messages[0];
+
+            if (!check || typeof check !== 'object' ||
+                !check.key || !check.key.remoteJid) {
+                console.warn('[ANTICRASH] Invalid message structure blocked.');
+                return;
             }
-        } catch (shieldErr) {}
+
+            if (!check.message || typeof check.message !== 'object') return;
+
+            let raw;
+
+            try {
+                raw = JSON.stringify(check.message);
+            } catch (err) {
+                console.warn('[ANTICRASH] Invalid message payload blocked.');
+                return;
+            }
+
+            if (typeof raw !== 'string') return;
+
+            // Reject unusually large payloads, without blocking ordinary long messages.
+            if (raw.length > 65536) {
+                console.warn('[ANTICRASH] Oversized payload blocked:', check.key.remoteJid);
+                return;
+            }
+
+            const controlChars =
+                (raw.match(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g) || []).length;
+
+            if (controlChars > 100) {
+                console.warn('[ANTICRASH] Excessive control characters blocked.');
+                return;
+            }
+
+            const bidiCount =
+                (raw.match(/[\u202A-\u202E\u2066-\u2069]/g) || []).length;
+
+            if (bidiCount > 50) {
+                console.warn('[ANTICRASH] Excessive directional characters blocked.');
+                return;
+            }
+
+            const keys = Object.keys(check.message);
+
+            if (keys.length === 0 || keys.length > 40) {
+                console.warn('[ANTICRASH] Abnormal message structure blocked.');
+                return;
+            }
+
+        } catch (err) {
+            console.error('[ANTICRASH ERROR]', err.message);
+            return;
+        }
 
         if (type !== 'notify') return;
-        const msg = messages[0];
-        if (!msg.message) return;
 
-        // Cache message for Antidelete
+        const msg = messages[0];
+        if (!msg?.message || !msg.key?.remoteJid) return;
+
+        // =========================================================================
+        // 💾 MESSAGE CACHE FOR ANTIDELETE
+        // =========================================================================
         if (!msg.key.fromMe) {
             messageCache.set(msg.key.id, msg);
+
             if (messageCache.size > 500) {
-                const firstKey = messageCache.keys().next().value;
-                messageCache.delete(firstKey);
+                const oldestKey = messageCache.keys().next().value;
+                messageCache.delete(oldestKey);
             }
         }
 
         const from = msg.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
-        const sender = msg.key.participant || msg.key.remoteJid;
+        const sender = msg.key.participant || from;
         const senderNum = sender.split('@')[0];
 
-        // Track message counts for leaderboard
         if (isGroup && !msg.key.fromMe) {
             incrementMessageCount(from, sender);
         }
 
-        const body = msg.message.conversation || 
-                     msg.message.extendedTextMessage?.text || 
-                     msg.message.imageMessage?.caption || '';
+        const body =
+            msg.message.conversation ||
+            msg.message.extendedTextMessage?.text ||
+            msg.message.imageMessage?.caption ||
+            msg.message.videoMessage?.caption ||
+            msg.message.documentMessage?.caption ||
+            '';
 
         if (!groupSettings[from]) {
-            groupSettings[from] = { 
-                antiadd: false, antibot: false, antidemote: false, antigroupsmention: false, 
-                antiimage: false, antilink: false, antipromote: false, antiremove: false, 
-                antispam: false, antitag: false, welcome: false, goodbye: false, antidelete: false,
-                antitagadmin: false, grouponly: false, antigcstatus: false,
+            groupSettings[from] = {
+                antiadd: false, antibot: false, antidemote: false,
+                antigroupsmention: false, antiimage: false, antilink: false,
+                antipromote: false, antiremove: false, antispam: false,
+                antitag: false, welcome: false, goodbye: false,
+                antidelete: false, antitagadmin: false, grouponly: false,
+                antigcstatus: false,
                 antilinkMode: 'kick', antilinkWarnLimit: 3,
                 antigroupsmentionMode: 'kick', antigroupsmentionWarnLimit: 3
             };
         }
 
-        // The linked WhatsApp account controls its own socket; the primary owner remains recognized globally.
-        const isOwner = msg.key.fromMe || (isPrimary && (sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER));
+        const isOwner = msg.key.fromMe ||
+            (isPrimary && (sender.includes(OWNER_NUMBER) || senderNum === OWNER_NUMBER));
+
         const isSudo = isOwner || sudoUsers.has(senderNum);
 
-        // 🛡️ GLOBAL PRIVATE/PUBLIC MODE GATEKEEPER
-        if (botMode === 'private' && !isSudo) {
-            return; 
-        }
+        if (botMode === 'private' && !isSudo) return;
 
+        // =========================================================================
+        // 👑 CORRECT ADMIN DETECTION
+        // =========================================================================
         let isAdmin = false;
         let isBotAdmin = false;
+
         if (isGroup) {
             try {
-                const groupMetadata = await sock.groupMetadata(from);
-                const botJid = jidNormalizedUser(sock.user.id);
-                const botNumClean = botJid.split('@')[0];
+                const metadata = await sock.groupMetadata(from);
+                const normalize = jid => jidNormalizedUser(jid);
 
-                const userObj = groupMetadata.participants.find(p => jidNormalizedUser(p.id).split('@')[0] === senderNum);
-                isAdmin = userObj && (userObj.admin === 'admin' || userObj.admin === 'superadmin');
+                const userObj = metadata.participants.find(
+                    p => normalize(p.id) === normalize(sender)
+                );
 
-                const botObj = groupMetadata.participants.find(p => jidNormalizedUser(p.id).split('@')[0] === botNumClean);
-                isBotAdmin = botObj && (botObj.admin === 'admin' || botObj.admin === 'superadmin');
+                isAdmin = !!userObj &&
+                    ['admin', 'superadmin'].includes(userObj.admin);
 
-                if (isSudo && isAdmin) isBotAdmin = true;
-            } catch (e) {}
+                const botJid = normalize(sock.user.id);
+
+                const botObj = metadata.participants.find(
+                    p => normalize(p.id) === botJid
+                );
+
+                isBotAdmin = !!botObj &&
+                    ['admin', 'superadmin'].includes(botObj.admin);
+
+            } catch (err) {
+                console.error('[ADMIN CHECK]', err.message);
+            }
         }
 
         const isSenderAdmin = isAdmin || isSudo;
 
-        // --- GLOBAL AUTO-REACT PROCESSOR ---
-        if (autoSettings.autoreact && msg.message && !msg.key.fromMe) {
+        // =========================================================================
+        // 🔥 GLOBAL AUTO-REACT
+        // =========================================================================
+        if (autoSettings.autoreact && !msg.key.fromMe) {
             try {
                 const emojis = ['🔥', '⚡', '💀', '👑', '🖤', '⚔️', '⭐'];
-                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                await sock.sendMessage(from, { 
-                    react: { text: randomEmoji, key: msg.key } 
+                const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+                await sock.sendMessage(from, {
+                    react: { text: emoji, key: msg.key }
                 });
-            } catch (e) {}
+            } catch (err) {}
         }
 
-        // --- AUTOMATED QUOTE-REPLY MEME DETECTOR ---
+        // =========================================================================
+        // 😂 QUOTE-REPLY MEME DETECTOR
+        // =========================================================================
         const quotedMsgInfo = msg.message?.extendedTextMessage?.contextInfo;
-        if (quotedMsgInfo && quotedMsgInfo.stanzaId) {
-            const replierText = body.trim().toLowerCase();
-            if (['nope', 'no', 'yeah', 'yes', 'nah'].includes(replierText)) {
-                const replierJid = sender;
-                const originalSenderJid = quotedMsgInfo.participant;
-                if (replierJid && originalSenderJid) {
-                    const replierTag = '@' + replierJid.split('@')[0];
-                    const originalTag = '@' + originalSenderJid.split('@')[0];
-                    const memeUrl = 'https://i.imgur.com/2wzGhpF.jpeg';
-                    const memeCaption = `🙋‍♂️ ${replierTag} said ${body.trim()} to ${originalTag}!`;
+
+        if (quotedMsgInfo?.stanzaId) {
+            const replyText = body.trim().toLowerCase();
+
+            if (['nope', 'no', 'yeah', 'yes', 'nah'].includes(replyText)) {
+                const originalSender = quotedMsgInfo.participant;
+
+                if (sender && originalSender) {
+                    const memeCaption =
+                        '🙋‍♂️ @' + sender.split('@')[0] +
+                        ' said ' + body.trim() +
+                        ' to @' + originalSender.split('@')[0] + '!';
+
                     await sock.sendMessage(from, {
-                        image: { url: memeUrl },
+                        image: { url: 'https://i.imgur.com/2wzGhpF.jpeg' },
                         caption: memeCaption,
-                        mentions: [replierJid, originalSenderJid]
-                    }, { quoted: msg });
+                        mentions: [sender, originalSender]
+                    }, { quoted: msg }).catch(() => {});
                 }
             }
         }
 
-        // --- ANTIGCSTATUS INTERCEPTOR ---
-        if (isGroup && groupSettings[from] && groupSettings[from].antigcstatus && !isSenderAdmin) {
-            const isStatusMessage = from === 'status@broadcast' || 
-                                    msg.message?.groupStatusMentionMessage || 
-                                    msg.message?.protocolMessage?.type === 25;
+        // =========================================================================
+        // 🛡️ ANTIGCSTATUS
+        // =========================================================================
+        if (isGroup && groupSettings[from].antigcstatus && !isSenderAdmin) {
+            const isStatusMessage =
+                !!msg.message?.groupStatusMentionMessage ||
+                msg.message?.protocolMessage?.type === 25;
 
             if (isStatusMessage) {
-                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                await sock.sendMessage(from, { 
-                    text: "🗡️ @" + sender.split('@')[0] + ", group status transmissions are forbidden in this domain!",
+                await sock.sendMessage(from, {
+                    delete: msg.key
+                }).catch(() => {});
+
+                await sock.sendMessage(from, {
+                    text: '🗡️ @' + senderNum +
+                        ', group status transmissions are forbidden!',
                     mentions: [sender]
-                });
+                }).catch(() => {});
 
                 if (isBotAdmin) {
-                    await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                    await sock.groupParticipantsUpdate(
+                        from, [sender], 'remove'
+                    ).catch(() => {});
                 }
                 return;
             }
         }
 
-        // --- ANTISPAM INTERCEPTOR ---
-        const senderId = msg.key.participant || msg.key.remoteJid;
-        if (body.startsWith(prefix)) {
-            const currentTime = Date.now();
-            if (spamMap.has(senderId)) {
-                const userData = spamMap.get(senderId);
-                if (userData.inCooldown) {
-                    if (currentTime < userData.cooldownUntil) {
-                        await sock.sendMessage(from, { text: "⚔️ *Imperial Warning:* Do not spam the Demon Realm's commands!" }, { quoted: msg });
-                        return;
-                    } else {
-                        spamMap.delete(senderId);
-                    }
-                } else {
-                    if (currentTime - userData.firstMsgTime < SPAM_TIME) {
-                        userData.msgCount += 1;
-                        if (userData.msgCount >= SPAM_LIMIT) {
-                            userData.inCooldown = true;
-                            userData.cooldownUntil = currentTime + COOLDOWN_TIME;
-                            await sock.sendMessage(from, { text: "🚫 *Demon Realm Seal:* You have triggered anti-spam! Muted for 10 seconds." }, { quoted: msg });
-                            return;
-                        }
-                    } else {
-                        spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
-                    }
-                }
-            } else {
-                spamMap.set(senderId, { msgCount: 1, firstMsgTime: currentTime, inCooldown: false });
+        // =========================================================================
+        // 🚫 IMPERIAL ANTISPAM
+        // =========================================================================
+        if (isGroup && groupSettings[from].antispam && !isSenderAdmin) {
+            const spamKey = from + '_' + sender;
+            const now = Date.now();
+
+            const data = imperialSpamMap.get(spamKey) || {
+                times: [],
+                cooldownUntil: 0
+            };
+
+            if (now < data.cooldownUntil) {
+                await sock.sendMessage(from, {
+                    delete: msg.key
+                }).catch(() => {});
+                return;
             }
+
+            data.times = data.times.filter(time => now - time < 10000);
+            data.times.push(now);
+
+            if (data.times.length >= 6) {
+                data.cooldownUntil = now + 15000;
+                data.times = [];
+
+                imperialSpamMap.set(spamKey, data);
+
+                await sock.sendMessage(from, {
+                    delete: msg.key
+                }).catch(() => {});
+
+                await sock.sendMessage(from, {
+                    text: '🚫 @' + senderNum +
+                        ', stop flooding the group! You are on a 15-second cooldown.',
+                    mentions: [sender]
+                }).catch(() => {});
+
+                return;
+            }
+
+            imperialSpamMap.set(spamKey, data);
         }
 
-        // --- BULLETPROOF GROUP PROTECTION INTERCEPTORS ---
+        // =========================================================================
+        // 🛡️ IMPERIAL GROUP MESSAGE PROTECTIONS
+        // =========================================================================
         if (isGroup && groupSettings[from] && !isSenderAdmin) {
-            const fullTextContent = msg.message?.conversation || 
-                                    msg.message?.extendedTextMessage?.text || 
-                                    msg.message?.imageMessage?.caption || 
-                                    msg.message?.videoMessage?.caption || '';
+            const fullTextContent =
+                msg.message?.conversation ||
+                msg.message?.extendedTextMessage?.text ||
+                msg.message?.imageMessage?.caption ||
+                msg.message?.videoMessage?.caption ||
+                msg.message?.documentMessage?.caption ||
+                '';
 
-            const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
-            const isLink = linkRegex.test(fullTextContent);
-            const isGroupMention = fullTextContent.includes('chat.whatsapp.com');
             const cleanSenderJid = jidNormalizedUser(sender);
 
-            if (groupSettings[from].antilink && isLink) {
-                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+            // ANTILINK
+            const linkRegex =
+                /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/i;
+
+            if (groupSettings[from].antilink && linkRegex.test(fullTextContent)) {
+                await sock.sendMessage(from, {
+                    delete: msg.key
+                }).catch(() => {});
+
                 const mode = groupSettings[from].antilinkMode || 'kick';
-                
+
                 if (mode === 'kick') {
-                    await sock.sendMessage(from, { text: "🗡️ @" + cleanSenderJid.split('@')[0] + ", links are forbidden by decree of the Demon Emperor!", mentions: [cleanSenderJid] });
+                    await sock.sendMessage(from, {
+                        text: '🗡️ @' + senderNum + ', links are forbidden!',
+                        mentions: [cleanSenderJid]
+                    }).catch(() => {});
+
                     if (isBotAdmin) {
-                        await sock.groupParticipantsUpdate(from, [cleanSenderJid], 'remove').catch(() => {});
+                        await sock.groupParticipantsUpdate(
+                            from, [cleanSenderJid], 'remove'
+                        ).catch(() => {});
                     }
-                } else if (mode === 'warn') {
+                } else {
                     const limit = groupSettings[from].antilinkWarnLimit || 3;
                     const warnKey = from + '_' + cleanSenderJid;
-                    const currentWarns = (warningMap.get(warnKey) || 0) + 1;
-                    warningMap.set(warnKey, currentWarns);
+                    const warns = (imperialWarningMap.get(warnKey) || 0) + 1;
 
-                    if (currentWarns >= limit) {
-                        warningMap.delete(warnKey);
-                        await sock.sendMessage(from, { text: "🚫 @" + cleanSenderJid.split('@')[0] + " reached " + limit + "/" + limit + " warnings for link sharing. Banishing!", mentions: [cleanSenderJid] });
-                        if (isBotAdmin) await sock.groupParticipantsUpdate(from, [cleanSenderJid], 'remove').catch(() => {});
+                    imperialWarningMap.set(warnKey, warns);
+
+                    if (warns >= limit) {
+                        imperialWarningMap.delete(warnKey);
+
+                        await sock.sendMessage(from, {
+                            text: '🚫 @' + senderNum +
+                                ' reached the warning limit. Removing!',
+                            mentions: [cleanSenderJid]
+                        }).catch(() => {});
+
+                        if (isBotAdmin) {
+                            await sock.groupParticipantsUpdate(
+                                from, [cleanSenderJid], 'remove'
+                            ).catch(() => {});
+                        }
                     } else {
-                        await sock.sendMessage(from, { text: "⚠️ @" + cleanSenderJid.split('@')[0] + ", links are forbidden! Warning " + currentWarns + "/" + limit, mentions: [cleanSenderJid] });
+                        await sock.sendMessage(from, {
+                            text: '⚠️ @' + senderNum +
+                                ', link warning ' + warns + '/' + limit,
+                            mentions: [cleanSenderJid]
+                        }).catch(() => {});
                     }
                 }
                 return;
             }
 
-            if (groupSettings[from].antigroupsmention && isGroupMention) {
-                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                const mode = groupSettings[from].antigroupsmentionMode || 'kick';
+            // ANTIGROUP INVITE
+            if (groupSettings[from].antigroupsmention &&
+                /chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}/i.test(fullTextContent)) {
 
-                if (mode === 'kick') {
-                    await sock.sendMessage(from, { text: "🗡️ @" + cleanSenderJid.split('@')[0] + ", group invites are forbidden!", mentions: [cleanSenderJid] });
-                    if (isBotAdmin) {
-                        await sock.groupParticipantsUpdate(from, [cleanSenderJid], 'remove').catch(() => {});
-                    }
+                await sock.sendMessage(from, {
+                    delete: msg.key
+                }).catch(() => {});
+
+                await sock.sendMessage(from, {
+                    text: '🗡️ @' + senderNum +
+                        ', group invitations are forbidden!',
+                    mentions: [cleanSenderJid]
+                }).catch(() => {});
+
+                if ((groupSettings[from].antigroupsmentionMode || 'kick') === 'kick' &&
+                    isBotAdmin) {
+                    await sock.groupParticipantsUpdate(
+                        from, [cleanSenderJid], 'remove'
+                    ).catch(() => {});
                 }
                 return;
             }
 
-            if (groupSettings[from].antibot && !msg.key.fromMe) {
-                const isExternalBot = msg.key.id.startsWith('BAE5') || msg.key.id.length === 16;
-                if (isExternalBot) {
-                    await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
-                    await sock.sendMessage(from, { text: "🚨 @" + cleanSenderJid.split('@')[0] + ", external construct detected! Banishing...", mentions: [cleanSenderJid] });
-                    if (isBotAdmin) {
-                        await sock.groupParticipantsUpdate(from, [cleanSenderJid], 'remove').catch(() => {});
-                    }
+            // ANTIIMAGE
+            if (groupSettings[from].antiimage && msg.message?.imageMessage) {
+                await sock.sendMessage(from, {
+                    delete: msg.key
+                }).catch(() => {});
+
+                await sock.sendMessage(from, {
+                    text: '🖼️ @' + senderNum +
+                        ', image sharing is disabled in this group.',
+                    mentions: [cleanSenderJid]
+                }).catch(() => {});
+                return;
+            }
+
+            // ANTITAG: BLOCK MASS MENTIONS
+            if (groupSettings[from].antitag) {
+                const mentioned =
+                    msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+                if (mentioned.length >= 5) {
+                    await sock.sendMessage(from, {
+                        delete: msg.key
+                    }).catch(() => {});
+
+                    await sock.sendMessage(from, {
+                        text: '🚫 @' + senderNum + ', mass tagging is forbidden!',
+                        mentions: [cleanSenderJid]
+                    }).catch(() => {});
                     return;
                 }
             }
+
+            // ANTITAGADMIN
+            if (groupSettings[from].antitagadmin) {
+                const mentioned =
+                    msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+                if (mentioned.length > 0) {
+                    try {
+                        const metadata = await sock.groupMetadata(from);
+
+                        const adminJids = metadata.participants
+                            .filter(p => ['admin', 'superadmin'].includes(p.admin))
+                            .map(p => jidNormalizedUser(p.id));
+
+                        const taggedAdmins = mentioned.filter(jid =>
+                            adminJids.includes(jidNormalizedUser(jid))
+                        );
+
+                        if (taggedAdmins.length > 0) {
+                            await sock.sendMessage(from, {
+                                delete: msg.key
+                            }).catch(() => {});
+
+                            await sock.sendMessage(from, {
+                                text: '🛡️ @' + senderNum +
+                                    ', tagging group administrators is restricted!',
+                                mentions: [cleanSenderJid]
+                            }).catch(() => {});
+                            return;
+                        }
+                    } catch (err) {
+                        console.error('[ANTITAGADMIN]', err.message);
+                    }
+                }
+            }
+
+            // ANTIBOT
+            // WhatsApp has no reliable universal bot-account identifier.
+            // Suspicious automated messages are logged, not automatically kicked.
+            if (groupSettings[from].antibot && !msg.key.fromMe) {
+                if (/(?:powered by|bot commands|automated message|i am a bot)/i.test(fullTextContent)) {
+                    console.log('[ANTIBOT] Suspicious automated-style message:', sender);
+                }
+            }
         }
 
-        if (!body.startsWith(prefix)) {
+
+        // --- IMPERIAL ANTISPAM INTERCEPTOR ---
+        if (isGroup && groupSettings[from]?.antispam && !isSenderAdmin) {
+            const spamKey = from + "_" + sender;
+            const now = Date.now();
+            const data = spamMap.get(spamKey) || { times: [], cooldownUntil: 0 };
+
+            if (now < data.cooldownUntil) {
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                return;
+            }
+
+            data.times = data.times.filter(time => now - time < 10000);
+            data.times.push(now);
+
+            if (data.times.length >= 6) {
+                data.cooldownUntil = now + 15000;
+                data.times = [];
+                spamMap.set(spamKey, data);
+
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                await sock.sendMessage(from, {
+                    text: "🚫 @" + sender.split("@")[0] +
+                        ", stop flooding the group! You are on a 15-second cooldown.",
+                    mentions: [sender]
+                });
+                return;
+            }
+
+            spamMap.set(spamKey, data);
+        }
+
+        // --- IMPERIAL GROUP PROTECTION INTERCEPTORS ---
+        if (isGroup && groupSettings[from] && !isSenderAdmin) {
+            const fullTextContent =
+                msg.message?.conversation ||
+                msg.message?.extendedTextMessage?.text ||
+                msg.message?.imageMessage?.caption ||
+                msg.message?.videoMessage?.caption ||
+                msg.message?.documentMessage?.caption || "";
+
+            const cleanSenderJid = jidNormalizedUser(sender);
+
+            // --- ANTILINK ---
+            const linkRegex = /(chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}|https?:\/\/[^\s]+)/gi;
+
+            if (groupSettings[from].antilink && linkRegex.test(fullTextContent)) {
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                const mode = groupSettings[from].antilinkMode || "kick";
+
+                if (mode === "kick") {
+                    await sock.sendMessage(from, {
+                        text: "🗡️ @" + senderNum + ", links are forbidden!",
+                        mentions: [cleanSenderJid]
+                    });
+
+                    if (isBotAdmin) {
+                        await sock.groupParticipantsUpdate(from, [cleanSenderJid], "remove").catch(() => {});
+                    }
+                } else {
+                    const limit = groupSettings[from].antilinkWarnLimit || 3;
+                    const warnKey = from + "_" + cleanSenderJid;
+                    const warns = (warningMap.get(warnKey) || 0) + 1;
+                    warningMap.set(warnKey, warns);
+
+                    if (warns >= limit) {
+                        warningMap.delete(warnKey);
+                        await sock.sendMessage(from, {
+                            text: "🚫 @" + senderNum + " reached the warning limit. Banishing!",
+                            mentions: [cleanSenderJid]
+                        });
+
+                        if (isBotAdmin) {
+                            await sock.groupParticipantsUpdate(from, [cleanSenderJid], "remove").catch(() => {});
+                        }
+                    } else {
+                        await sock.sendMessage(from, {
+                            text: "⚠️ @" + senderNum + ", link warning " + warns + "/" + limit,
+                            mentions: [cleanSenderJid]
+                        });
+                    }
+                }
+                return;
+            }
+
+            // --- ANTIGROUP INVITE ---
+            if (groupSettings[from].antigroupsmention &&
+                /chat\.whatsapp\.com\/[A-Za-z0-9]{20,24}/i.test(fullTextContent)) {
+
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                await sock.sendMessage(from, {
+                    text: "🗡️ @" + senderNum + ", group invitations are forbidden!",
+                    mentions: [cleanSenderJid]
+                });
+
+                if ((groupSettings[from].antigroupsmentionMode || "kick") === "kick" && isBotAdmin) {
+                    await sock.groupParticipantsUpdate(from, [cleanSenderJid], "remove").catch(() => {});
+                }
+                return;
+            }
+
+            // --- ANTIIMAGE ---
+            if (groupSettings[from].antiimage && msg.message?.imageMessage) {
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                await sock.sendMessage(from, {
+                    text: "🖼️ @" + senderNum + ", image sharing is disabled in this group.",
+                    mentions: [cleanSenderJid]
+                });
+                return;
+            }
+
+            // --- ANTITAG: BLOCK MASS MENTIONS ---
+            if (groupSettings[from].antitag) {
+                const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+                if (mentioned.length >= 5) {
+                    await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                    await sock.sendMessage(from, {
+                        text: "🚫 @" + senderNum + ", mass tagging is forbidden!",
+                        mentions: [cleanSenderJid]
+                    });
+                    return;
+                }
+            }
+
+            // --- ANTITAGADMIN: PROTECT GROUP ADMINS ---
+            if (groupSettings[from].antitagadmin) {
+                const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+                if (mentioned.length) {
+                    try {
+                        const metadata = await sock.groupMetadata(from);
+                        const adminJids = metadata.participants
+                            .filter(p => p.admin === "admin" || p.admin === "superadmin")
+                            .map(p => jidNormalizedUser(p.id));
+
+                        const taggedAdmins = mentioned.filter(jid =>
+                            adminJids.includes(jidNormalizedUser(jid))
+                        );
+
+                        if (taggedAdmins.length) {
+                            await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+                            await sock.sendMessage(from, {
+                                text: "🛡️ @" + senderNum + ", tagging group administrators is restricted!",
+                                mentions: [cleanSenderJid]
+                            });
+                            return;
+                        }
+                    } catch (err) {
+                        console.error("ANTITAGADMIN ERROR:", err.message);
+                    }
+                }
+            }
+
+            // --- ANTIBOT ---
+            // WhatsApp does not provide a reliable bot-account identifier.
+            // Do not automatically kick users based only on message IDs.
+            if (groupSettings[from].antibot && !msg.key.fromMe) {
+                const suspiciousText = /(?:powered by|bot commands|automated message|i am a bot)/i.test(fullTextContent);
+
+                if (suspiciousText) {
+                    console.log("[ANTIBOT] Suspicious automated-style message in", from, "from", sender);
+                }
+            }
+        }
+
+
+       if (!body.startsWith(prefix)) {
             return;
         }
 
@@ -764,6 +1257,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             reply: async (text, options = {}) => sock.sendMessage(from, { text, ...options }, { quoted: msg }),
             react: async (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }).catch(() => {})
         };
+        
 
         switch (command) {
             // =========================================================================
@@ -1699,10 +2193,13 @@ userTag + " has departed from *" + groupName + "*.\n" +
                 }, { quoted: msg });
                 break;
             }
-
-     case 'gcstatus': {
+ case 'gcstatus': {
     if (!isSudo) {
         return reply("❌ Only the Owner or Sudo users can use this command!");
+    }
+
+    if (!isGroup) {
+        return reply("❌ Use this command inside the group where you want to post the status.");
     }
 
     const inviteLink = args.find(arg =>
@@ -1714,7 +2211,7 @@ userTag + " has departed from *" + groupName + "*.\n" +
             "👑 *GREAT DEMON V4 — GC STATUS*\n\n" +
             `Usage: ${prefix}gcstatus LINK\n\n` +
             "The bot will fetch the new group's profile picture " +
-            "and broadcast it with the invitation link."
+            "and post it as a Group Status here."
         );
     }
 
@@ -1732,34 +2229,32 @@ userTag + " has departed from *" + groupName + "*.\n" +
     try {
         await reply("⏳ Fetching new group information...");
 
-        // Get information about the group from its invite code
         const groupInfo = await sock.groupGetInviteInfo(inviteCode);
 
         if (!groupInfo || !groupInfo.id) {
             return reply("❌ Could not retrieve the new group's information.");
         }
 
-        // Fetch the new group's profile picture
-        let groupPicture = null;
+        const pictureUrl = await sock.profilePictureUrl(
+            groupInfo.id,
+            "image"
+        ).catch(() => null);
 
-        try {
-            groupPicture = await sock.profilePictureUrl(
-                groupInfo.id,
-                'image'
-            );
-        } catch (err) {
-            console.log("Group picture unavailable:", err.message);
+        if (!pictureUrl) {
+            return reply("❌ Could not fetch the new group's profile picture.");
         }
 
-        // Get all groups the bot belongs to
-        const groups = await sock.groupFetchAllParticipating();
-        const groupIds = Object.keys(groups);
+        const response = await axios.get(pictureUrl, {
+            responseType: "arraybuffer"
+        });
 
-        if (!groupIds.length) {
-            return reply("❌ The bot is not in any groups!");
+        const groupPicture = Buffer.from(response.data);
+
+        if (!groupPicture.length) {
+            return reply("❌ The group profile picture is empty.");
         }
 
-        const broadcastCaption =
+        const caption =
             "╭━━〔 👑 GREAT DEMON V4 〕━━╮\n\n" +
             "🔥 *NEW GROUP INVITATION!*\n\n" +
             `📢 Group: ${groupInfo.subject || "New Group"}\n\n` +
@@ -1768,82 +2263,71 @@ userTag + " has departed from *" + groupName + "*.\n" +
             "💀 Everyone is welcome!\n" +
             "╰━━━━━━━━━━━━━━━━━━━━╯";
 
-        await reply(
-            `👑 Group found: ${groupInfo.subject || "New Group"}\n` +
-            `🖼️ Profile picture: ${groupPicture ? "Available" : "Unavailable"}\n` +
-            `📢 Broadcasting to ${groupIds.length} groups...`
-        );
+        await reply("⏳ Posting the new group invitation as Group Status...");
 
-        let successful = 0;
-        let failed = 0;
+        await groupStatusBroadcast(sock, from, {
+            image: groupPicture,
+            caption: caption
+        });
 
-        for (const groupId of groupIds) {
-            try {
-                if (groupPicture) {
-                    await sock.sendMessage(groupId, {
-                        image: { url: groupPicture },
-                        caption: broadcastCaption
-                    });
-                } else {
-                    await sock.sendMessage(groupId, {
-                        text: broadcastCaption
-                    });
-                }
-
-                successful++;
-            } catch (err) {
-                failed++;
-                console.error("GCSTATUS delivery failed:", err);
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-
-        await reply(
-            "╭━━〔 👑 BROADCAST REPORT 〕━━╮\n\n" +
-            `✅ Successful: ${successful}\n` +
-            `❌ Failed: ${failed}\n` +
-            `📊 Total groups: ${groupIds.length}\n\n` +
-            "🔥 *BROADCAST COMPLETE*\n" +
-            "╰━━━━━━━━━━━━━━━━━━━━╯"
+        return reply(
+            "✅ Group Status request sent!\n\n" +
+            `📢 Group: ${groupInfo.subject || "New Group"}`
         );
 
     } catch (err) {
         console.error("GCSTATUS ERROR:", err);
-        await reply("❌ GCSTATUS failed: " + err.message);
+        return reply("❌ GCSTATUS failed: " + err.message);
     }
 
     break;
 }
 
-            case 'antiadd':
-            case 'antibot':
-            case 'antidemote':
-            case 'antiimage':
-            case 'antipromote':
-            case 'antiremove':
-            case 'antispam':
-            case 'antitag':
-            case 'antitagadmin': {
-                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain Command Only!*' }, { quoted: msg });
-                if (!isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
+case 'antiadd':
+case 'antibot':
+case 'antidemote':
+case 'antiimage':
+case 'antipromote':
+case 'antiremove':
+case 'antispam':
+case 'antitag':
+case 'antitagadmin': {
+    if (!isGroup) {
+        return sock.sendMessage(from, {
+            text: '⚔️ *Domain Command Only!*'
+        }, { quoted: msg });
+    }
 
-                const setting = command;
-                const stateArg = args[0]?.toLowerCase();
+    if (!isSenderAdmin) {
+        return sock.sendMessage(from, {
+            text: '⚔️ *Admin rights required!*'
+        }, { quoted: msg });
+    }
 
-                if (stateArg === 'on') {
-                    groupSettings[from][setting] = true;
-                    await sock.sendMessage(from, { text: "✅ *By decree of the Emperor:* *" + setting.toUpperCase() + "* is ENFORCED!" }, { quoted: msg });
-                } else if (stateArg === 'off') {
-                    groupSettings[from][setting] = false;
-                    await sock.sendMessage(from, { text: "❌ *Imperial Dispensation:* *" + setting.toUpperCase() + "* is DISABLED!" }, { quoted: msg });
-                } else {
-                    groupSettings[from][setting] = !groupSettings[from][setting];
-                    await sock.sendMessage(from, { text: "🛡️ *" + setting.toUpperCase() + " Barrier:* " + (groupSettings[from][setting] ? 'ENFORCED ✅' : 'LIFTED ❌') }, { quoted: msg });
-                }
-                break;
-            }
+    const setting = command;
+    const stateArg = args[0]?.toLowerCase();
 
+    if (!['on', 'off'].includes(stateArg)) {
+        return sock.sendMessage(from, {
+            text: `⚙️ *${setting.toUpperCase()} SETTINGS*\n\n` +
+                `Use:\n` +
+                `${prefix}${setting} on - Enable protection\n` +
+                `${prefix}${setting} off - Disable protection`
+        }, { quoted: msg });
+    }
+
+    groupSettings[from][setting] = stateArg === 'on';
+
+    await sock.sendMessage(from, {
+        text: stateArg === 'on'
+            ? `✅ *${setting.toUpperCase()} is now ON!*`
+            : `❌ *${setting.toUpperCase()} is now OFF!*`
+    }, { quoted: msg });
+
+    break;
+}
+            
+ 
             case 'welcome':
             case 'goodbye': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain Command Only!*' }, { quoted: msg });
