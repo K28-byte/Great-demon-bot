@@ -24,6 +24,7 @@ const {
     jidNormalizedUser
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
+const ytdl = require('ytdl-core');
 const yts = require('yt-search');
 const path = require('path');
 const pino = require('pino');
@@ -3080,10 +3081,12 @@ case 's': {
             }
 
 
-case 'play': {
-    if (!q) {
+        case 'play': {
+    const query = args.join(' ');
+
+    if (!query) {
         return sock.sendMessage(from, {
-            text: '🎵 Usage: .play Song Name'
+            text: '🎵 Enter a song name.\n\nExample: .play Calm Down'
         }, { quoted: msg });
     }
 
@@ -3092,36 +3095,60 @@ case 'play': {
             text: '🔎 Searching for your song...'
         }, { quoted: msg });
 
-        const search = await yts(q);
-        const song = search.videos?.[0];
+        const search = await yts(query);
+        const video = search.videos[0];
 
-        if (!song) {
+        if (!video) {
             return sock.sendMessage(from, {
-                text: '❌ Song not found. Try another name.'
+                text: '❌ Song not found.'
             }, { quoted: msg });
         }
 
         await sock.sendMessage(from, {
-            text: `🎵 *${song.title}*\n👤 ${song.author.name}\n⏱️ ${song.timestamp}\n\nPreparing audio...`
+            text: `⬇️ Downloading: ${video.title}`
         }, { quoted: msg });
 
-        // Audio retrieval must use an authorized music provider.
-        // yt-search only searches; it does not download audio.
+        const filePath = path.join(__dirname, `song_${Date.now()}.mp3`);
+
+        const stream = ytdl(video.url, {
+            filter: 'audioonly',
+            quality: 'highestaudio'
+        });
+
+        const ffmpeg = require('fluent-ffmpeg');
+        const ffmpegPath = require('ffmpeg-static');
+
+        ffmpeg.setFfmpegPath(ffmpegPath);
+
+        await new Promise((resolve, reject) => {
+            ffmpeg(stream)
+                .audioBitrate(128)
+                .format('mp3')
+                .save(filePath)
+                .on('end', resolve)
+                .on('error', reject);
+        });
 
         await sock.sendMessage(from, {
-            text: '⚠️ Search successful. Connect an authorized audio provider to enable downloading.'
+            audio: fs.readFileSync(filePath),
+            mimetype: 'audio/mpeg',
+            fileName: `${video.title}.mp3`,
+            ptt: false
         }, { quoted: msg });
 
-    } catch (err) {
-        console.error('Play Error:', err);
+        fs.unlinkSync(filePath);
+
+    } catch (error) {
+        console.error('PLAY ERROR:', error);
 
         await sock.sendMessage(from, {
-            text: '❌ Music search failed. Please try again.'
+            text: '❌ Could not download this song. Try another one.'
         }, { quoted: msg });
     }
 
     break;
 }
+
 
             case 'yts': {
                 if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a search term: .yts <query>*' }, { quoted: msg });
