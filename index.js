@@ -3090,6 +3090,8 @@ case 's': {
         }, { quoted: msg });
     }
 
+    let filePath;
+
     try {
         await sock.sendMessage(from, {
             text: '🔎 Searching for your song...'
@@ -3108,48 +3110,60 @@ case 's': {
             text: `⬇️ Downloading: ${video.title}`
         }, { quoted: msg });
 
-        const filePath = path.join(__dirname, `song_${Date.now()}.mp3`);
-
-        const stream = ytdl(video.url, {
-            filter: 'audioonly',
-            quality: 'highestaudio'
-        });
+        filePath = path.join(
+            __dirname,
+            `song_${Date.now()}.mp3`
+        );
 
         const ffmpeg = require('fluent-ffmpeg');
         const ffmpegPath = require('ffmpeg-static');
 
         ffmpeg.setFfmpegPath(ffmpegPath);
 
+        const stream = ytdl(video.url, {
+            filter: 'audioonly',
+            quality: 'highestaudio'
+        });
+
         await new Promise((resolve, reject) => {
-            ffmpeg(stream)
+            const command = ffmpeg(stream)
                 .audioBitrate(128)
                 .format('mp3')
-                .save(filePath)
                 .on('end', resolve)
                 .on('error', reject);
+
+            stream.on('error', reject);
+
+            command.save(filePath);
         });
+
+        if (!fs.existsSync(filePath) ||
+            fs.statSync(filePath).size === 0) {
+            throw new Error('Downloaded audio file is empty.');
+        }
 
         await sock.sendMessage(from, {
             audio: fs.readFileSync(filePath),
             mimetype: 'audio/mpeg',
-            fileName: `${video.title}.mp3`,
+            fileName: 'song.mp3',
             ptt: false
         }, { quoted: msg });
 
-        fs.unlinkSync(filePath);
-
     } catch (error) {
-        console.error('PLAY ERROR:', error);
+        console.error('PLAY DOWNLOAD ERROR:', error);
 
         await sock.sendMessage(from, {
-            text: '❌ Could not download this song. Try another one.'
+            text: `❌ Download failed: ${error.message || 'Unknown error'}`
         }, { quoted: msg });
+
+    } finally {
+        if (filePath && fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
     }
 
     break;
 }
-
-
             case 'yts': {
                 if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a search term: .yts <query>*' }, { quoted: msg });
                 try {
