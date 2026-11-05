@@ -1149,7 +1149,7 @@ async function startDemonBot(options = {}) {
 "✿ audio\n✿ convertmenu\n✿ stickermeme\n✿ stiker\n✿ swm\n✿ telestick\n✿ toaud\n✿ togif\n✿ toimg\n✿ tomp4\n✿ toptt\n✿ tourl\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  📥 *𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐓𝐨𝐨𝐥𝐬*  〕━━━┈\n" +
-"✿ applemusic\n✿ capcut\n✿ dl\n✿ downloadmenu\n✿ fb\n✿ yts\n✿ lyrics\n" +
+"✿ applemusic\n✿ capcut\n✿ play\n✿ \ndl\n✿ downloadmenu\n✿ fb\n✿ yts\n✿ lyrics\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🎮 *𝐈𝐦𝐩𝐞𝐫𝐢𝐚𝐥  𝐆𝐚𝐦𝐞𝐬*  〕━━━┈\n" +
 "✿ 2048\n✿ activegames\n✿ connect4\n✿ dino\n✿ emojidecode\n✿ endgame\n✿ flappy\n✿ galaxy\n✿ gamemenu\n✿ letterblitz\n✿ memory\n✿ mines\n✿ pong\n✿ reverseit\n" +
