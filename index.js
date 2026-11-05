@@ -2354,8 +2354,11 @@ case 'antitagadmin': {
             case 'remove':
             case 'dor': {
                 if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
-                if (!isSenderAdmin) return sock.sendMessage(from, { text: '⚔️ *Admin rights required!*' }, { quoted: msg });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ *The linked WhatsApp account must be a group admin to remove members.*' }, { quoted: msg });
+                
+                // Allow Owner, Sudo users, or regular group admins to execute
+                if (!isSenderAdmin && !isSudo && !isOwner) {
+                    return sock.sendMessage(from, { text: '⚔️ *Admin or Sudo rights required!*' }, { quoted: msg });
+                }
 
                 const commandMessage = unwrapMessage(msg.message) || {};
                 const contextInfo =
@@ -2388,7 +2391,6 @@ case 'antitagadmin': {
                 let targetJid = normalizeKickJid(target);
                 const adminJid = normalizeKickJid(sender);
 
-                // Convert LIDs to phone JIDs when this Baileys session has the mapping.
                 const toPhoneJid = async jid => {
                     if (!jid) return '';
                     if (jid.endsWith('@s.whatsapp.net')) return jid;
@@ -2410,11 +2412,8 @@ case 'antitagadmin': {
                         normalizeKickJid(p.phoneNumber) === targetJid
                     );
                     if (targetParticipant?.id) {
-                        // Use the exact participant ID returned by group metadata.
-                        // In LID-enabled groups this may be a @lid JID; do not replace it with phoneNumber.
                         targetJid = normalizeKickJid(targetParticipant.id);
                     } else if (!targetParticipant) {
-                        // A mentioned LID may correspond to a phone JID in the current session.
                         const mapped = await toPhoneJid(targetJid);
                         if (mapped) targetJid = mapped;
                     }
@@ -2427,17 +2426,23 @@ case 'antitagadmin': {
                         return sock.sendMessage(from, { text: '❌ That member is not in this group.' }, { quoted: msg });
                     }
 
-                    // Remove the member only. WhatsApp generates its own system
-                    // notice showing which admin removed the participant.
+                    // Execute removal
                     const result = await sock.groupParticipantsUpdate(from, [targetJid], 'remove');
                     const failed = Array.isArray(result) && result.some(item =>
                         item?.status && !['200', 200].includes(item.status)
                     );
                     if (failed) throw new Error('WhatsApp rejected the removal request');
+
+                    // Professional notice showing the removing admin and the target
+                    await sock.sendMessage(from, { 
+                        text: `🚫 *@${adminJid.split('@')[0]}* has removed *@${targetJid.split('@')[0]}* from the group.`,
+                        mentions: [adminJid, targetJid]
+                    }, { quoted: msg });
+
                 } catch (err) {
                     console.error('[KICK COMMAND]', err);
                     await sock.sendMessage(from, {
-                        text: '❌ *Kick failed.* Check that the bot is an admin and the target is not an admin.'
+                        text: '❌ *Kick failed.* Ensure the bot account is a group admin and the target is not an admin.'
                     }, { quoted: msg });
                 }
                 break;
