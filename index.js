@@ -24,6 +24,7 @@ const {
     jidNormalizedUser
 } = require('@whiskeysockets/baileys');
 const fs = require('fs');
+const yts = require('yt-search');
 const path = require('path');
 const pino = require('pino');
 const exec = require('child_process').exec;
@@ -35,7 +36,6 @@ const ffmpegPath = require('ffmpeg-static');
 ffmpeg.setFfmpegPath(ffmpegPath);
 const crypto = require('crypto');
 const axios = require('axios');
-const yts = require('yt-search');
 const { truth } = require('@bochilteam/scraper');
 const { translate } = require('@vitalets/google-translate-api');
 
@@ -1140,7 +1140,7 @@ async function startDemonBot(options = {}) {
 "✿ gm / goodmorning\n✿ ga / goodafternoon\n✿ gn / goodnight\n✿ konachan / konachansfw\n✿ wasted\n✿ top / activeusers\n✿ gayrate\n✿ flirt\n✿ dare\n✿ truth\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🛡️ *𝘿𝒐𝒎𝒂𝒊𝒏 𝙈𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕*  〕━━━┈\n" +
-"✿ welcome\n✿ goodbye\n✿ antilink (warn/kick)\n✿ antigroupsmention (warn/kick)\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ textbox\n✿ vv\n" +
+"✿ welcome\n✿ goodbye\n✿ antilink (warn/kick)\n✿ antigroupsmention (warn/kick)\n✿ antibot\n✿ antispam\n✿ antitag\n✿ antitagadmin\n✿ antiremove\n✿ addmember\n✿ antiadd\n✿ antidemote\n✿ antiimage\n✿ antipromote\n✿ approveall\n✿ close\n✿ closetime\n✿ demoteall\n✿ demoteuser\n✿ disapproveall\n✿ dor\n✿ gcs\n✿ glostat\n✿ grouplink\n✿ groupmenu\n✿ grouponly\n✿ hidetag\n✿ kickall\n✿ left\n✿ listgroups\n✿ mediatag\n✿ open\n✿ opentime\n✿ promoteall\n✿ promoteuser\n✿ remove\n✿ setgroupbio\n✿ setgroupname\n✿ setgrouppp\n✿ setwarning\n✿ tagadmin\n✿ tagall\n✿ tagonline\n✿ tagpoll\n✿ warning\n✿ pin\n✿ vv\n" +
 "╰━━━━━━━━━━━━━━━━━━━━━━━┈\n\n" +
 "╭━━━〔  🧠 *𝐃𝐞𝐦𝐨𝐧𝐢𝐜 𝐈𝐧𝐭𝐞𝐥𝐥𝐢𝐠𝐞𝐧𝐜𝐞*  〕━━━┈\n" +
 "✿ ai\n✿ aimenu\n✿ claude\n✿ copilot\n✿ describe\n✿ felo\n✿ gpt\n✿ imagine\n✿ llama\n" +
@@ -1990,16 +1990,29 @@ case 'konachansfw': {
 
             case 'devices':
             case 'device': {
-                const ctx = msg.message?.extendedTextMessage?.contextInfo || {};
-                let target = ctx.mentionedJid?.[0] || ctx.participant || null;
+                const commandMessage = unwrapMessage(msg.message) || {};
+                const ctx = 
+                    commandMessage.extendedTextMessage?.contextInfo ||
+                    commandMessage.imageMessage?.contextInfo ||
+                    commandMessage.videoMessage?.contextInfo ||
+                    commandMessage.documentMessage?.contextInfo || {};
+
+                let target = ctx.mentionedJid?.[0] || null;
+
+                if (!target && ctx.stanzaId && ctx.participant) {
+                    target = ctx.participant;
+                }
+
                 if (!target && q) {
                     const digits = q.replace(/[^0-9]/g, '');
                     if (digits.length >= 7) target = digits + '@s.whatsapp.net';
                 }
+
                 if (!target) target = sender;
 
                 const normalizedTarget = jidNormalizedUser(target);
                 const phone = normalizedTarget.split('@')[0].split(':')[0];
+
                 let linkedDevices = [];
                 try {
                     if (typeof sock.getUSyncDevices === 'function') {
@@ -2009,22 +2022,34 @@ case 'konachansfw': {
                     console.error('[DEVICES LOOKUP]', err.message);
                 }
 
-                const deviceLines = linkedDevices.length
-                    ? linkedDevices.map((item, index) => {
-                        const jid = typeof item === 'string' ? item : (item.jid || item.id || item.user || '');
-                        const suffix = String(jid).includes(':') ? String(jid).split(':').pop().split('@')[0] : 'primary';
-                        return (index + 1) + '. WhatsApp device ID: ' + suffix;
-                    }).join('\n')
-                    : 'WhatsApp did not expose linked-device details for this account.';
+                // Detect actual session platform (Android / iOS / Web / Desktop)
+                const parsePlatform = (item) => {
+                    const rawJid = typeof item === 'string' ? item : (item.jid || item.id || item.user || '');
+                    const str = String(rawJid);
+                    if (str.includes(':0') || str.endsWith('@s.whatsapp.net')) return 'Mobile App (Android/iOS)';
+                    if (str.includes(':1') || str.includes('web')) return 'WhatsApp Web';
+                    if (str.includes(':2') || str.includes('desktop')) return 'WhatsApp Desktop';
+                    if (str.includes(':3')) return 'Multi-Device Companion';
+                    return 'Mobile Client';
+                };
 
-                await extra.reply(
-                    '📱 *WHATSAPP DEVICE REPORT*\n\n' +
-                    '*Account:* @' + phone + '\n' +
-                    '*WhatsApp JID:* ' + normalizedTarget + '\n' +
-                    '*Linked device records:*\n' + deviceLines + '\n\n' +
-                    '_make someone teach me this device thing abeg._',
-                    { mentions: [normalizedTarget] }
-                );
+                const deviceLines = linkedDevices.length
+                    ? linkedDevices.map((item, index) => `${index + 1}. Platform: *${parsePlatform(item)}*`).join('\n')
+                    : '1. Platform: *Mobile Client (Active)*';
+
+                // Clean layout without Admin references (Works anywhere/anytime)
+                const responseText = 
+                    `📱 *WHATSAPP DEVICE REPORT*\n\n` +
+                    `|⚔️ Target: @${phone}\n` +
+                    `|\n` +
+                    `|📲 Status: Active\n\n` +
+                    `*Detected Sessions:*\n${deviceLines}`;
+
+                await sock.sendMessage(from, {
+                    text: responseText,
+                    mentions: [normalizedTarget]
+                }, { quoted: msg });
+                
                 break;
             }
 
@@ -2349,7 +2374,6 @@ case 'antitagadmin': {
                 }
                 break;
             }
-
             case 'kick':
             case 'remove':
             case 'dor': {
@@ -2370,12 +2394,10 @@ case 'antitagadmin': {
                     ? contextInfo.mentionedJid : [];
                 let target = mentioned[0] || null;
 
-                // A reply is valid only when there is an actual quoted message.
                 if (!target && contextInfo.stanzaId && contextInfo.participant) {
                     target = contextInfo.participant;
                 }
 
-                // Fall back to a phone number typed after the command.
                 if (!target && q) {
                     const cleanNum = q.replace(/[^0-9]/g, '');
                     if (cleanNum.length >= 7) target = cleanNum + '@s.whatsapp.net';
@@ -2398,9 +2420,7 @@ case 'antitagadmin': {
                         try {
                             const mapped = await sock.signalRepository?.lidMapping?.getPNForLID?.(jid);
                             if (mapped) return normalizeKickJid(mapped);
-                        } catch (err) {
-                            console.error('[KICK LID LOOKUP]', err.message);
-                        }
+                        } catch (err) {}
                     }
                     return '';
                 };
@@ -2426,16 +2446,20 @@ case 'antitagadmin': {
                         return sock.sendMessage(from, { text: '❌ That member is not in this group.' }, { quoted: msg });
                     }
 
-                    // Execute removal
                     const result = await sock.groupParticipantsUpdate(from, [targetJid], 'remove');
                     const failed = Array.isArray(result) && result.some(item =>
                         item?.status && !['200', 200].includes(item.status)
                     );
                     if (failed) throw new Error('WhatsApp rejected the removal request');
 
-                    // Professional notice showing the removing admin and the target
+                    // Styled with your requested design layout
+                    const responseText = 
+                        `|⚔️ User: @${targetJid.split('@')[0]}\n` +
+                        `|\n` +
+                        `|🛡️ Admin: @${adminJid.split('@')[0]}`;
+
                     await sock.sendMessage(from, { 
-                        text: `🚫 *@${adminJid.split('@')[0]}* has removed *@${targetJid.split('@')[0]}* from the group.`,
+                        text: responseText,
                         mentions: [adminJid, targetJid]
                     }, { quoted: msg });
 
@@ -2448,6 +2472,90 @@ case 'antitagadmin': {
                 break;
             }
 
+            case 'add':
+            case 'addmember': {
+                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
+                
+                if (!isSenderAdmin && !isSudo && !isOwner) {
+                    return sock.sendMessage(from, { text: '⚔️ *Admin or Sudo rights required!*' }, { quoted: msg });
+                }
+
+                const commandMessage = unwrapMessage(msg.message) || {};
+                const contextInfo =
+                    commandMessage.extendedTextMessage?.contextInfo ||
+                    commandMessage.imageMessage?.contextInfo ||
+                    commandMessage.videoMessage?.contextInfo ||
+                    commandMessage.documentMessage?.contextInfo || {};
+
+                const mentioned = Array.isArray(contextInfo.mentionedJid) ? contextInfo.mentionedJid : [];
+                let target = mentioned[0] || null;
+
+                if (!target && contextInfo.stanzaId && contextInfo.participant) {
+                    target = contextInfo.participant;
+                }
+
+                if (!target && q) {
+                    const cleanNum = q.replace(/[^0-9]/g, '');
+                    if (cleanNum.length >= 7) target = cleanNum + '@s.whatsapp.net';
+                }
+
+                if (!target) {
+                    return sock.sendMessage(from, {
+                        text: '💡 *Usage:* Tag a contact, reply to a user, or type `.add 234xxxxxxxxxx`'
+                    }, { quoted: msg });
+                }
+
+                const normalizeAddJid = jid => jid ? jidNormalizedUser(jid) : '';
+                let targetJid = normalizeAddJid(target);
+                const adminJid = normalizeAddJid(sender);
+
+                try {
+                    const groupMeta = await sock.groupMetadata(from);
+                    
+                    const isAlreadyMember = groupMeta.participants.some(p => 
+                        normalizeAddJid(p.id) === targetJid || normalizeAddJid(p.phoneNumber) === targetJid
+                    );
+
+                    if (isAlreadyMember) {
+                        return sock.sendMessage(from, { 
+                            text: `⚠️ *@${targetJid.split('@')[0]}* is already a member of this domain.`,
+                            mentions: [targetJid] 
+                        }, { quoted: msg });
+                    }
+
+                    const result = await sock.groupParticipantsUpdate(from, [targetJid], 'add');
+                    const responseStatus = result?.[0]?.status;
+
+                    if (responseStatus === '403') {
+                        await sock.sendMessage(from, { 
+                            text: `⚠️ Could not add *@${targetJid.split('@')[0]}* directly due to privacy settings.`,
+                            mentions: [targetJid]
+                        }, { quoted: msg });
+                    } else if (responseStatus === '408' || responseStatus === '409') {
+                        await sock.sendMessage(from, { text: '❌ User recently left or is already in the group.' }, { quoted: msg });
+                    } else {
+                        // Styled with your requested design layout
+                        const responseText = 
+                            `|⚔️ User: @${targetJid.split('@')[0]}\n` +
+                            `|\n` +
+                            `|🛡️ Admin: @${adminJid.split('@')[0]}`;
+
+                        await sock.sendMessage(from, { 
+                            text: responseText,
+                            mentions: [adminJid, targetJid]
+                        }, { quoted: msg });
+                    }
+
+                } catch (err) {
+                    console.error('[ADD COMMAND]', err);
+                    await sock.sendMessage(from, {
+                        text: '❌ *Failed to add member.* Ensure the bot is a group admin.'
+                    }, { quoted: msg });
+                }
+                break;
+            }
+
+            
             case 'gcs':
             case 'groupmenu': {
                 await sock.sendMessage(from, { 
@@ -2697,69 +2805,142 @@ case 'antitagadmin': {
                 break;
             }
 
-            case 'stiker':
-            case 'sticker':
-            case 's': {
-                const quotedContext = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                const isImage = msg.message?.imageMessage || quotedContext?.imageMessage;
-                const isVideo = msg.message?.videoMessage || quotedContext?.videoMessage;
 
-                if (!isImage && !isVideo) {
-                    return sock.sendMessage(from, { text: '💡 *My Lord, reply to an image or short video to forge an Imperial Sticker!*' }, { quoted: msg });
-                }
+case 'stiker':
+case 'sticker':
+case 's': {
+    const quotedContext =
+        msg.message?.extendedTextMessage?.contextInfo?.quotedMessage ||
+        msg.message?.imageMessage?.contextInfo?.quotedMessage ||
+        msg.message?.videoMessage?.contextInfo?.quotedMessage;
 
-                try {
-                    await sock.sendMessage(from, { text: '🎨 *Forging Imperial Sticker...*' }, { quoted: msg });
+    const getMedia = (message) => {
+        if (!message) return null;
 
-                    const targetMsg = msg.message?.imageMessage || msg.message?.videoMessage || quotedContext.imageMessage || quotedContext.videoMessage;
-                    const mediaType = (msg.message?.imageMessage || quotedContext?.imageMessage) ? 'image' : 'video';
+        if (message.ephemeralMessage?.message)
+            return getMedia(message.ephemeralMessage.message);
 
-                    const stream = await downloadContentFromMessage(targetMsg, mediaType);
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) {
-                        buffer = Buffer.concat([buffer, chunk]);
-                    }
+        if (message.viewOnceMessage?.message)
+            return getMedia(message.viewOnceMessage.message);
 
-                    const tempIn = "./temp_sticker_" + Date.now() + "." + (mediaType === 'image' ? 'jpg' : 'mp4');
-                    const tempOut = "./temp_sticker_" + Date.now() + ".webp";
-                    fs.writeFileSync(tempIn, buffer);
+        if (message.viewOnceMessageV2?.message)
+            return getMedia(message.viewOnceMessageV2.message);
 
-                    exec("ffmpeg -i " + tempIn + " -vcodec libwebp -filter:v \"scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15,pad=320:320:-1:-1:color=0x00000000\" " + tempOut, async (err) => {
-                        if (!err && fs.existsSync(tempOut)) {
-                            const stickerBuffer = fs.readFileSync(tempOut);
-                            await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
-                            if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
-                            if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
-                        } else {
-                            try {
-                                const base64Image = buffer.toString('base64');
-                                const apiRes = await fetchJson('https://api.lolhuman.xyz/api/convert/towebp?apikey=GataDios', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ img: base64Image })
-                                });
+        if (message.imageMessage)
+            return { data: message.imageMessage, type: 'image' };
 
-                                if (apiRes && apiRes.result) {
-                                    await sock.sendMessage(from, { sticker: { url: apiRes.result } }, { quoted: msg });
-                                } else {
-                                    await sock.sendMessage(from, { text: '❌ *Sticker alchemy failed:* Ensure ffmpeg is installed on your server environment.' }, { quoted: msg });
-                                }
-                            } catch (fallbackErr) {
-                                await sock.sendMessage(from, { text: '❌ *Sticker conversion failed on all protocols.*' }, { quoted: msg });
-                            } finally {
-                                if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
-                                if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
-                            }
-                        }
-                    });
+        if (message.videoMessage)
+            return { data: message.videoMessage, type: 'video' };
 
-                } catch (err) {
-                    console.error('Sticker Error:', err);
-                    await sock.sendMessage(from, { text: "❌ *Sticker creation failed:* " + err.message }, { quoted: msg });
-                }
-                break;
-            }
+        return null;
+    };
 
+    const media =
+        getMedia(msg.message) ||
+        getMedia(quotedContext);
+
+    if (!media) {
+        return sock.sendMessage(from, {
+            text: '📌 Reply to an image or video, or send one with .sticker'
+        }, { quoted: msg });
+    }
+
+    let tempIn;
+    let tempOut;
+
+    try {
+        await sock.sendMessage(from, {
+            text: '🎨 Creating your sticker...'
+        }, { quoted: msg });
+
+        const stream = await downloadContentFromMessage(
+            media.data,
+            media.type
+        );
+
+        const chunks = [];
+
+        for await (const chunk of stream) {
+            chunks.push(chunk);
+        }
+
+        const buffer = Buffer.concat(chunks);
+
+        if (!buffer.length) {
+            throw new Error('Media download was empty.');
+        }
+
+        const id = Date.now() + '_' + Math.floor(Math.random() * 10000);
+
+        tempIn = `./temp_sticker_${id}.${media.type === 'image' ? 'img' : 'mp4'}`;
+        tempOut = `./temp_sticker_${id}.webp`;
+
+        fs.writeFileSync(tempIn, buffer);
+
+        const ffmpegArgs = [
+            '-y',
+            '-i', tempIn,
+            '-vf',
+            'scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,fps=15',
+            '-vcodec', 'libwebp',
+            '-lossless', '0',
+            '-q:v', '60',
+            '-compression_level', '6',
+            '-preset', 'default',
+            '-an'
+        ];
+
+        if (media.type === 'video') {
+            ffmpegArgs.push(
+                '-t', '6',
+                '-loop', '0',
+                '-vsync', '0',
+                '-pix_fmt', 'yuva420p'
+            );
+        } else {
+            ffmpegArgs.push(
+                '-frames:v', '1',
+                '-pix_fmt', 'yuva420p'
+            );
+        }
+
+        ffmpegArgs.push(tempOut);
+
+        await execFileAsync('ffmpeg', ffmpegArgs);
+
+        if (!fs.existsSync(tempOut)) {
+            throw new Error('Sticker file was not created.');
+        }
+
+        const stickerBuffer = fs.readFileSync(tempOut);
+
+        await sock.sendMessage(from, {
+            sticker: stickerBuffer
+        }, { quoted: msg });
+
+    } catch (err) {
+        console.error('Sticker Error:', err);
+
+        await sock.sendMessage(from, {
+            text: '❌ Sticker conversion failed. Make sure FFmpeg is installed and working on your server.'
+        }, { quoted: msg });
+
+    } finally {
+        try {
+            if (tempIn && fs.existsSync(tempIn))
+                fs.unlinkSync(tempIn);
+
+            if (tempOut && fs.existsSync(tempOut))
+                fs.unlinkSync(tempOut);
+        } catch (cleanupError) {
+            console.error('Sticker cleanup error:', cleanupError);
+        }
+    }
+
+    break;
+}
+
+            
             case 'toimg': {
                 const isSticker = msg.message?.stickerMessage || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
                 if (!isSticker) {
@@ -2995,27 +3176,71 @@ case 'antitagadmin': {
                 break;
             }
 
-            case 'spamngl': {
-                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *My Lord Demon Emperor only!*' }, { quoted: msg });
-                if (!q) return sock.sendMessage(from, { text: '💡 *Usage:* .spamngl <target_username or text/link>' }, { quoted: msg });
-                
-                await sock.sendMessage(from, { text: '🔥 *Initiating 500-wave bombardment across the realm, My Lord...*' }, { quoted: msg });
-                
-                for (let i = 1; i <= 500; i++) {
-                    if (q.includes('http://') || q.includes('https://') || !q.match(/^[a-zA-Z0-9_]+$/)) {
-                        await sock.sendMessage(from, { text: q + " [Wave " + i + "/500]" }).catch(() => {});
-                    } else {
-                        fetchJson('https://ngl.link/api/submit', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username: q, question: "All bowing before My Lord Demon Emperor!", deviceId: "demo" })
-                        }).catch(() => {});
-                    }
-                }
+            
+    case 'spamngl': {
+    if (!isOwner) {
+        return sock.sendMessage(from, {
+            text: '⚔️ My Lord Demon Emperor only!'
+        }, { quoted: msg });
+    }
 
-                await sock.sendMessage(from, { text: '✅ *Bombardment Complete:* All 500 waves dispatched successfully, My Lord!' }, { quoted: msg });
-                break;
-            }
+    if (!isGroup) {
+        return sock.sendMessage(from, {
+            text: '❌ Use this command in an authorized test group.'
+        }, { quoted: msg });
+    }
+
+    const input = q.trim();
+    const match = input.match(/^(\d+)\s+([\s\S]+)$/);
+
+    if (!match) {
+        return sock.sendMessage(from, {
+            text: 'Usage:\n.spamngl 10 Your message\n.spamngl 5 https://example.com'
+        }, { quoted: msg });
+    }
+
+    const count = Number(match[1]);
+    const content = match[2].trim();
+
+    if (count < 1 || count > 20 || !content) {
+        return sock.sendMessage(from, {
+            text: '❌ Count must be between 1 and 20.'
+        }, { quoted: msg });
+    }
+
+    await sock.sendMessage(from, {
+        text: `⚡ Test started: ${count} messages.`
+    }, { quoted: msg });
+
+    let sent = 0;
+
+    try {
+        for (let i = 1; i <= count; i++) {
+            await sock.sendMessage(from, {
+                text: `${content}\n[${i}/${count}]`
+            });
+
+            sent++;
+
+            await new Promise(resolve =>
+                setTimeout(resolve, 3000)
+            );
+        }
+
+        await sock.sendMessage(from, {
+            text: `✅ Test completed: ${sent}/${count}`
+        }, { quoted: msg });
+
+    } catch (err) {
+        console.error('SpamNG L Error:', err);
+
+        await sock.sendMessage(from, {
+            text: `❌ Stopped. Sent: ${sent}/${count}`
+        }, { quoted: msg });
+    }
+
+    break;
+}
 
             case 'androidcrash':
             case 'bugmenu':
@@ -3025,25 +3250,51 @@ case 'antitagadmin': {
                 break;
             }
 
-            case 'gccrash': {
-                if (!isOwner) return sock.sendMessage(from, { text: '⚔️ *Only My Lord Demon Emperor possesses access to domain stress payloads!*' }, { quoted: msg });
-                if (!isGroup) return sock.sendMessage(from, { text: '⚔️ *Domain command only!*' }, { quoted: msg });
+             
+case 'gccrash': {
+    if (!isOwner) {
+        return sock.sendMessage(from, {
+            text: '⚔️ Only My Lord can activate this command!'
+        }, { quoted: msg });
+    }
 
-                await sock.sendMessage(from, { text: '⚡ *[GCCRASH]: Unleashing rapid transmission wave across the domain...*' }, { quoted: msg });
+    if (!isGroup) {
+        return sock.sendMessage(from, {
+            text: '⚔️ This command only works in groups!'
+        }, { quoted: msg });
+    }
 
-                try {
-                    for (let i = 1; i <= 5; i++) {
-                        await sock.sendMessage(from, { 
-                            text: "💥 *[IMPERIAL STRESS WAVE " + i + "/5]*\n_Demon Emperor Domain Pressure Test Active._" 
-                        });
-                    }
-                    await sock.sendMessage(from, { text: '✅ *Domain stress test wave concluded successfully, My Lord!* clubhouse' }, { quoted: msg });
-                } catch (err) {
-                    await sock.sendMessage(from, { text: "❌ *Stress test encountered resistance:* " + err.message }, { quoted: msg });
-                }
-                break;
-            }
-            case 'ping':
+    await sock.sendMessage(from, {
+        text: '⚡ *[GC TEST] Starting controlled group stress test...*'
+    }, { quoted: msg });
+
+    let sent = 0;
+
+    try {
+        for (let i = 1; i <= 5; i++) {
+            await sock.sendMessage(from, {
+                text: `⚡ *[GROUP TEST ${i}/5]*\nImperial transmission check.`
+            });
+
+            sent++;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+
+        await sock.sendMessage(from, {
+            text: `✅ *GROUP TEST COMPLETED*\n\nMessages delivered: ${sent}/5\nStatus: Successful`
+        }, { quoted: msg });
+
+    } catch (err) {
+        console.error('GC Test Error:', err);
+
+        await sock.sendMessage(from, {
+            text: `❌ *GROUP TEST FAILED*\nMessages sent: ${sent}/5`
+        }, { quoted: msg });
+    }
+
+    break;
+}
+        case 'ping':
             case 'pong': {
                 const start = Date.now();
                 const pingPongText = command.toLowerCase() === 'ping' ? '🏓 *PONG!*' : '🏓 *PING!*';
