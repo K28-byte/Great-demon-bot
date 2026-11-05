@@ -3079,6 +3079,50 @@ case 's': {
                 break;
             }
 
+
+case 'play': {
+    if (!q) {
+        return sock.sendMessage(from, {
+            text: '🎵 Usage: .play Song Name'
+        }, { quoted: msg });
+    }
+
+    try {
+        await sock.sendMessage(from, {
+            text: '🔎 Searching for your song...'
+        }, { quoted: msg });
+
+        const search = await yts(q);
+        const song = search.videos?.[0];
+
+        if (!song) {
+            return sock.sendMessage(from, {
+                text: '❌ Song not found. Try another name.'
+            }, { quoted: msg });
+        }
+
+        await sock.sendMessage(from, {
+            text: `🎵 *${song.title}*\n👤 ${song.author.name}\n⏱️ ${song.timestamp}\n\nPreparing audio...`
+        }, { quoted: msg });
+
+        // Audio retrieval must use an authorized music provider.
+        // yt-search only searches; it does not download audio.
+
+        await sock.sendMessage(from, {
+            text: '⚠️ Search successful. Connect an authorized audio provider to enable downloading.'
+        }, { quoted: msg });
+
+    } catch (err) {
+        console.error('Play Error:', err);
+
+        await sock.sendMessage(from, {
+            text: '❌ Music search failed. Please try again.'
+        }, { quoted: msg });
+    }
+
+    break;
+}
+
             case 'yts': {
                 if (!q) return sock.sendMessage(from, { text: '💡 *My Lord, provide a search term: .yts <query>*' }, { quoted: msg });
                 try {
