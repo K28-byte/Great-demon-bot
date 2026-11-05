@@ -1156,14 +1156,15 @@ async function startDemonBot(options = {}) {
                     const mentions = groupMetadata.participants.map(p => p.id);
 
                     const morningArtworks = [ 
-                        "https://img.sanishtech.com/u/27458129bbba7a98580dfbf130c7b47c.jpg",
-                        "https://img.sanishtech.com/u/fa66c0119b8b3f6063e14b31ff6557d7.jpg",
-                        "https://img.sanishtech.com/u/be9566c775a04e305e3e5bc15aafa860.jpg"
+                        "https://i.postimg.cc/g0KFgQ3z/c77a97e3d147412e46277e04aad9ec2d.jpg",
+                       "https://i.postimg.cc/vBmj3BQ9/a0dabd85c67ccddad4c21fb230b8e77b.jpg",
+                        "https://i.postimg.cc/tgmQ0PvF/fad9e7a371f4fb4325dfd484effcff9f.jpg",
+"https://i.postimg.cc/5ys2Djvd/daba42e86ad0aca92686fb9487d71caf.jpg"
                     ];
 
                     const morningCaptions = [
                         "╭━━━〔  🌄 *𝑮𝑶𝑶𝑫 𝑴𝑶𝑹𝑵𝑰𝑵𝑮*  〕━━━┈\n┃ ⚡ Sending a cute morning to y'all.\n┃ 👁️ here is another to grind , sharpen your focus, and stay ahead.\n┃ ⚔️ Remember perseverance is the best even if you fail .\n╰━━━━━━━━━━━━━━━━━━━━━━━┈\n_“Time waits for no one.”_",
-                        "╭━━━〔  ⚔️ *𝐎𝐇𝐀𝐘𝐎-𝐆𝐎𝐎𝐃 𝐌𝐎𝐑𝐍𝐈𝐍𝐆*  〕━━━┈\n┃ 🌅 Ohayo Gozaimasta ☺️❣️.\n┃ 😝 hope everyone slept good .\n┃ ⚡ just greeting y'all tho you can choose not to answer😌.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈\n_“and all the fam members too .”_",
+                        "╭━━━〔  ⚔️ *𝐎𝐇𝐀𝐘𝐎-𝐆𝐎𝐎𝐃 𝐌𝐎𝐑𝐍𝐈𝐍𝐆*  〕━━━┈\n┃ 🌅 Ohayo Gozaimasta ☺️❣️.\n┃ 😝 hope everyone slept good .\n┃ ⚡ just greeting y'all tho you can choose not to answer😌.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈\n_“and all the fra members too .”_",
                         "╭━━━〔  🤍 *𝐑𝐈𝐒𝐄 𝐀𝐍𝐃 𝐒𝐇𝐈𝐍𝐄*  〕━━━┈\n┃ 👑 Sun’s up, time to move.\n┃ 🔥 Don’t waste the morning slacking off.\n┃ 🖤 Stay focused, handle your goals, and dominate the day.\n╰━━━━━━━━━━━━━━━━━━━━━━━┈\n_“chai speechless.”_"
                     ];
 
@@ -1208,8 +1209,13 @@ async function startDemonBot(options = {}) {
                     const mentions = groupMetadata.participants.map(p => p.id);
 
                     const afternoonArtworks = [
-                        "https://img.sanishtech.com/u/42e275a2be3555c9a3bf46b154cf5293.jpg",
-                        "https://img.sanishtech.com/u/fa66c0119b8b3f6063e14b31ff6557d7.jpg"
+                        "https://i.postimg.cc/rsVSS0My/b266fc100e5037b5d2cb522fe98136ad.jpg",
+                        "https://i.postimg.cc/rsVSS0My/b266fc100e5037b5d2cb522fe98136ad.jpg",
+
+"https://i.postimg.cc/FH8g2HgV/58f71607457c7721df93dcdedd2dafb6.jpg",
+
+"https://i.postimg.cc/2yrx29Ff/40ac6ca16fedc707b7d13fa0bf4c7125.jpg"
+
                     ];
 
                     const afternoonCaptions = [
@@ -1258,9 +1264,9 @@ async function startDemonBot(options = {}) {
                     const mentions = groupMetadata.participants.map(p => p.id);
 
                     const nightArtworks = [
-                        "https://img.sanishtech.com/u/197847a0ca4488dd2778065dea3b5247.jpg",
-                        "https://img.sanishtech.com/u/360640b2c1491e0a7374c2c9f332d4fd.jpg",
-                        "https://img.sanishtech.com/u/a9dabc00ae97eac56bebcabc1456fe7f.jpg"
+                        "https://i.postimg.cc/bv2chr7K/1d25bcfea04a4ee14159252cb97b4efc.jpg",
+                        "https://i.postimg.cc/GpZR8GPv/14d51d4b546eefcb70052d84c37952da.jpg",
+                        "https://i.postimg.cc/jj9xHGT2/aa8fdc8aa04dcc3e2e82b4f094e7e1d9.jpg"
                     ];
 
                     const nightCaptions = [
@@ -1976,7 +1982,7 @@ case 'konachansfw': {
                     '*Account:* @' + phone + '\n' +
                     '*WhatsApp JID:* ' + normalizedTarget + '\n' +
                     '*Linked device records:*\n' + deviceLines + '\n\n' +
-                    '_Note: WhatsApp does not reliably reveal the person’s handset brand or model through this interface._',
+                    '_make someone teach me this device thing abeg._',
                     { mentions: [normalizedTarget] }
                 );
                 break;
