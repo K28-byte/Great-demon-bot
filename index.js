@@ -45,7 +45,7 @@ const OWNER_NUMBER = "2347061696819";
 const OWNER_NAME = "𝐆𝐑𝐄𝐀𝐓_𝐃𝐄𝐌𝐎𝐍";
 const BOT_NAME = "𝐆𝐑𝐄𝐀𝐓_𝐃𝐄𝐌𝐎𝐍 𝐕4";
 const BOT_VERSION = "v4 ULTRA";
-const MENU_IMAGE_URL = "https://img.sanishtech.com/u/42e275a2be3555c9a3bf46b154cf5293.jpg";
+const MENU_IMAGE_URL = "https://i.postimg.cc/C5nJz4BG/1793460010889.jpg";
 const PURPLE_COLOR = '#9C27B0';
 const startTime = Date.now();
 
