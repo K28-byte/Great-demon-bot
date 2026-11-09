@@ -571,7 +571,7 @@ async function startDemonBot(options = {}) {
                 if (action === 'remove' && settings.antiremove && !trustedActor) {
                     if (isBotAdmin) {
                         await sock.sendMessage(from, {
-                            text: '🛡️ Unauthorized removal detected. Attempting to restore ' + userTag + '.',
+                            text: '🛡️ Unauthorized removal detected without Emperor uninformed,Attempting to restore ' + userTag + '.',
                             mentions: [userJid]
                         });
 
@@ -601,7 +601,7 @@ async function startDemonBot(options = {}) {
                 if (action === 'demote' && settings.antidemote && !trustedActor) {
                     if (isBotAdmin) {
                         await sock.sendMessage(from, {
-                            text: '🛡️ Unauthorized demotion detected. Attempting to restore ' + userTag + '.',
+                            text: '🛡️ Unauthorized demotion detected withoutEmperor uninformed. Attempting to restore ' + userTag + '.',
                             mentions: [userJid]
                         });
 
@@ -2092,7 +2092,7 @@ case 'konachansfw': {
                 try {
                     const code = q.split('chat.whatsapp.com/')[1] || q;
                     await sock.groupAcceptInvite(code);
-                    await sock.sendMessage(from, { text: '👑 *Domain entered by Imperial decree, My Lord!*' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '👑 *Domain entered by your decree, My Lord!*' }, { quoted: msg });
                 } catch (e) {
                     await sock.sendMessage(from, { text: '❌ *Invalid domain invite link.*' }, { quoted: msg });
                 }
@@ -2685,7 +2685,7 @@ case 'antitagadmin': {
                 if (!target) return sock.sendMessage(from, { text: '💡 *Tag or reply to a user to promote them!*' }, { quoted: msg });
 
                 await sock.groupParticipantsUpdate(from, [target], 'promote');
-                await sock.sendMessage(from, { text: '👑 *You Are elevated to High Lord rank, My Lord!*' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '👑 *user Are elevated to High Lord rank, My Lord!*' }, { quoted: msg });
                 break;
             }
 
